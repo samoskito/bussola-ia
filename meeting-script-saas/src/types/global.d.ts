@@ -1,0 +1,44 @@
+// Declaração global para JSX
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      [elemName: string]: any;
+    }
+  }
+  
+  namespace React {
+    interface FC<P = {}> {
+      (props: P): React.ReactElement | null;
+    }
+    type ReactNode = ReactElement | string | number | boolean | null | undefined;
+    interface ReactElement {}
+  }
+}
+
+// Declarações para módulos que não possuem tipos
+declare module 'react' {
+  export = React;
+  export as namespace React;
+}
+
+declare module 'next' {
+  export interface Metadata {
+    title?: string;
+    description?: string;
+  }
+}
+
+declare module 'next/image';
+declare module 'next/link';
+declare module 'next/navigation' {
+  export function redirect(url: string): never;
+}
+
+declare module 'next/font/google' {
+  export function Inter(options: { subsets: string[] }): { className: string };
+}
+
+declare module '@supabase/auth-helpers-nextjs';
+declare module '@supabase/supabase-js' {
+  export function createClient(url: string, key: string): any;
+}

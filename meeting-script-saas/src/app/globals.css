@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 26, 26, 26;
+  --background-end-rgb: 26, 26, 26;
+  --primary-color: 255, 107, 0;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white font-semibold py-3 px-6 rounded-md hover:bg-orange-600 transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent text-primary border border-primary font-semibold py-3 px-6 rounded-md hover:bg-primary/10 transition-colors;
+  }
+  
+  .input-field {
+    @apply bg-dark-300 text-white rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-primary;
+  }
+  
+  .sidebar-item {
+    @apply flex items-center gap-2 p-3 rounded-md hover:bg-dark-300 transition-colors;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-dark-300 text-primary;
+  }
+}

@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Meeting Script Generator',
-  description: 'Generate professional meeting scripts with AI',
+  title: 'Bússola Executiva - Gerador de Scripts para Reuniões',
+  description: 'Gere scripts profissionais para suas reuniões com IA',
 }
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <body className={inter.className}>{children}</body>
     </html>
   )

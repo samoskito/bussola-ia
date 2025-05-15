@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -34,6 +34,67 @@ const Sidebar: React.FC<SidebarProps> = ({ projects, chats }: SidebarProps) => {
           </div>
         </Link>
       </div>
+      
+      {/* Main Navigation */}
+      <nav className="mt-6 px-4">
+        <ul className="space-y-1">
+          <li>
+            <Link 
+              href="/dashboard"
+              className="sidebar-item"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+              </svg>
+              <span>Dashboard</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/dashboard/scripts"
+              className="sidebar-item"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+              </svg>
+              <span>Gerar Scripts</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/dashboard/scripts/saved"
+              className="sidebar-item"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+              </svg>
+              <span>Scripts Salvos</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/dashboard/profile"
+              className="sidebar-item"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+              <span>Perfil</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/dashboard/help"
+              className="sidebar-item"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+              <span>Ajuda</span>
+            </Link>
+          </li>
+        </ul>
+      </nav>
 
       {/* Projects Section */}
       <div className="mt-6 px-4">
@@ -89,6 +150,19 @@ const Sidebar: React.FC<SidebarProps> = ({ projects, chats }: SidebarProps) => {
         <div className="mt-2 text-center">
           <button className="text-xs text-primary">Ver mais</button>
         </div>
+      </div>
+      
+      {/* Logout Button */}
+      <div className="mt-auto p-4 border-t border-dark-300">
+        <Link 
+          href="/auth/logout"
+          className="sidebar-item text-red-500 hover:bg-red-500/10"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414l-5-5H3zm7 5a1 1 0 10-2 0v4a1 1 0 102 0V8zm-1-7a1 1 0 00-1 1v1a1 1 0 102 0V2a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <span>Sair</span>
+        </Link>
       </div>
     </aside>
   );

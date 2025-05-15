@@ -6,7 +6,7 @@ interface HeaderProps {
   userName: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ userName }) => {
+const Header: React.FC<HeaderProps> = ({ userName }: HeaderProps) => {
   return (
     <header className="flex justify-between items-center p-4">
       <div className="flex items-center">

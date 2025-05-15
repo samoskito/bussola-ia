@@ -1,12 +1,12 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { login } from './actions';
+import { register } from './actions';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-dark-100 flex flex-col md:flex-row">
-      {/* Left side - Login Form */}
+      {/* Left side - Registration Form */}
       <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
         <div className="max-w-md mx-auto w-full">
           <div className="mb-8">
@@ -19,7 +19,9 @@ export default function LoginPage() {
             />
           </div>
           
-          <form className="space-y-6" action={login}>
+          <h2 className="text-2xl font-bold text-white mb-6">Crie sua conta</h2>
+          
+          <form className="space-y-6" action={register}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
                 Seu email
@@ -30,6 +32,7 @@ export default function LoginPage() {
                 type="email"
                 required
                 className="input-field"
+                placeholder="exemplo@email.com"
               />
             </div>
 
@@ -43,6 +46,21 @@ export default function LoginPage() {
                 type="password"
                 required
                 className="input-field"
+                placeholder="Mínimo de 6 caracteres"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
+                Confirme sua senha
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                className="input-field"
+                placeholder="Digite a senha novamente"
               />
             </div>
 
@@ -51,22 +69,16 @@ export default function LoginPage() {
                 type="submit"
                 className="btn-primary w-full"
               >
-                Entrar
+                Criar conta
               </button>
             </div>
           </form>
           
-          <div className="mt-4 text-center">
-            <Link href="/auth/reset-password" className="text-sm text-primary hover:underline">
-              Esqueceu sua senha?
-            </Link>
-          </div>
-          
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-400">
-              Não tem uma conta?{' '}
-              <Link href="/auth/register" className="text-primary hover:underline">
-                Cadastre-se
+              Já tem uma conta?{' '}
+              <Link href="/auth/login" className="text-primary hover:underline">
+                Faça login
               </Link>
             </p>
           </div>

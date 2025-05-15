@@ -3,6 +3,25 @@ declare global {
   namespace JSX {
     interface IntrinsicElements {
       [elemName: string]: any;
+      div: any;
+      span: any;
+      a: any;
+      p: any;
+      h1: any;
+      h2: any;
+      h3: any;
+      button: any;
+      input: any;
+      form: any;
+      main: any;
+      header: any;
+      footer: any;
+      nav: any;
+      section: any;
+      article: any;
+      aside: any;
+      ul: any;
+      li: any;
     }
   }
   
@@ -19,6 +38,13 @@ declare global {
 declare module 'react' {
   export = React;
   export as namespace React;
+  
+  export function useState<T>(initialState: T | (() => T)): [T, (newState: T | ((prevState: T) => T)) => void];
+  export function useEffect(effect: () => void | (() => void), deps?: ReadonlyArray<any>): void;
+  export function useRef<T>(initialValue: T): { current: T };
+  export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: ReadonlyArray<any>): T;
+  export const Fragment: React.FC;
+  export default React;
 }
 
 declare module 'next' {

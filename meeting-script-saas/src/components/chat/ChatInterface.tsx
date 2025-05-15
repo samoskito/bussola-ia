@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+const { useState } = React;
 import Image from 'next/image';
 
 interface Agent {
@@ -12,7 +13,7 @@ interface ChatInterfaceProps {
   agents: Agent[];
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName, agents }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName, agents }: ChatInterfaceProps) => {
   const [message, setMessage] = useState('');
 
   return (
@@ -36,13 +37,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName, agents }) => {
           </svg>
           Buscar chats
         </button>
+        <a href="/dashboard/scripts" className="btn-primary flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+          </svg>
+          Gerar Script de Reunião
+        </a>
       </div>
 
       {/* Agents Section */}
       <div className="mb-8">
         <h2 className="text-primary font-semibold mb-4">Seus agentes</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {agents.map((agent) => (
+          {agents.map((agent: Agent) => (
             <button 
               key={agent.id}
               className={`flex items-center gap-2 p-3 rounded-md border ${

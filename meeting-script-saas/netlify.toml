@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+# Nota: As variáveis de ambiente do Supabase devem ser configuradas no painel do Netlify
+# e não neste arquivo para manter a segurança das credenciais
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -5,6 +5,19 @@ module.exports = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  safelist: [
+    'bg-primary',
+    'text-primary',
+    'border-primary',
+    'bg-dark-100',
+    'bg-dark-200',
+    'bg-dark-300',
+    'bg-dark-400',
+    'hover:bg-primary',
+    'hover:text-primary',
+    'hover:bg-orange-600',
+    'hover:bg-primary/10',
+  ],
   theme: {
     extend: {
       colors: {

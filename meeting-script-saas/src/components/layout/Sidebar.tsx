@@ -20,11 +20,11 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ projects, chats }: SidebarProps) => {
   return (
-    <aside className="w-64 h-screen bg-dark-200 flex flex-col">
+    <aside style={{ width: '16rem', height: '100vh', backgroundColor: '#222222', display: 'flex', flexDirection: 'column' }}>
       {/* Logo */}
-      <div className="p-4">
+      <div style={{ padding: '1rem' }}>
         <Link href="/dashboard">
-          <div className="flex items-center">
+          <div style={{ display: 'flex', alignItems: 'center' }}>
             <Image 
               src="/images/logo.svg" 
               alt="Bússola Executiva" 

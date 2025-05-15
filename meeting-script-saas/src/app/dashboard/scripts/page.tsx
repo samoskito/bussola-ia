@@ -11,6 +11,7 @@ import Header from '@/components/layout/Header';
 import ScriptGenerator from '@/components/scripts/ScriptGenerator';
 import ScriptViewer from '@/components/scripts/ScriptViewer';
 import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
 // Mock data - would come from database in real app
 const mockProjects = [
@@ -53,44 +54,115 @@ export default function ScriptsPage() {
   };
 
   return (
-    <div className="flex h-screen bg-dark-100 text-white overflow-hidden">
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#1A1A1A', color: 'white', overflow: 'hidden' }}>
       {/* Sidebar */}
       <Sidebar projects={mockProjects} chats={mockChats} />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header userName="Patrícia" />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">Gerador de Scripts para Reuniões</h1>
-            <p className="text-gray-400 mb-8">
+        <main style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+          <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
+            <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Gerador de Scripts para Reuniões</h1>
+            <p style={{ color: '#9ca3af', marginBottom: '2rem' }}>
               Crie scripts profissionais para suas reuniões em poucos minutos. Preencha as informações abaixo e nosso assistente de IA irá gerar um script personalizado para você.
             </p>
 
-            <div className="grid grid-cols-1 gap-8">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
               {!generatedScript ? (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+                  <div style={{ gridColumn: 'span 2' }}>
                     <ScriptGenerator
                       onScriptGenerated={handleScriptGenerated}
                       userId={userId || undefined}
                     />
                   </div>
 
-                  <div className="bg-dark-200 p-6 rounded-lg">
-                    <h2 className="text-xl font-bold text-primary mb-4">Scripts Salvos</h2>
+                  <div style={{ 
+                    backgroundColor: '#1E1E1E', 
+                    padding: '2rem', 
+                    borderRadius: '1rem', 
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+                    border: '1px solid #333333',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    {/* Efeito de gradiente no topo */}
+                    <div style={{ 
+                      position: 'absolute', 
+                      top: 0, 
+                      left: 0, 
+                      right: 0, 
+                      height: '4px', 
+                      background: 'linear-gradient(90deg, #FF6B00, #FF9D5C)' 
+                    }}></div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(255, 107, 0, 0.1)',
+                          color: '#FF6B00'
+                        }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16L21 8V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21Z" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M17 21V13H7V21" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M7 3V8H15" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#FF6B00' }}>Scripts Salvos</h2>
+                      </div>
+                    </div>
 
-                    <div className="space-y-4">
-                      <p className="text-gray-400">
+                    <div style={{ 
+                      backgroundColor: '#141414', 
+                      padding: '1.5rem', 
+                      borderRadius: '0.75rem', 
+                      border: '1px solid #2A2A2A',
+                      boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.3)',
+                      marginBottom: '1.5rem'
+                    }}>
+                      <p style={{ color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M12 8V12" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M12 16H12.01" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                         Seus scripts salvos aparecerão aqui. Você ainda não tem nenhum script salvo.
                       </p>
+                    </div>
 
-                      <div className="flex flex-col space-y-2">
-                        <a href="/dashboard/scripts/saved" className="btn-secondary w-full text-center">
-                          Ver Scripts Salvos
-                        </a>
-                      </div>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <a href="/dashboard/scripts/saved" style={{ 
+                        backgroundColor: 'rgba(255, 107, 0, 0.1)', 
+                        color: '#FF6B00', 
+                        border: '1px solid rgba(255, 107, 0, 0.3)', 
+                        fontWeight: '600', 
+                        padding: '0.75rem 1.5rem', 
+                        borderRadius: '0.75rem', 
+                        textAlign: 'center', 
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        justifyContent: 'center'
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 6H21" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M8 12H21" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M8 18H21" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M3 6H3.01" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M3 12H3.01" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M3 18H3.01" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Ver Scripts Salvos
+                      </a>
                     </div>
                   </div>
                 </div>

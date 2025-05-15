@@ -9,14 +9,45 @@
   --primary-color: 255, 107, 0;
 }
 
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: rgb(var(--background-start-rgb));
+  font-family: 'Inter', sans-serif;
+}
+
+/* Cores personalizadas */
+.bg-primary {
+  background-color: #FF6B00;
+}
+
+.text-primary {
+  color: #FF6B00;
+}
+
+.border-primary {
+  border-color: #FF6B00;
+}
+
+.bg-dark-100 {
+  background-color: #1A1A1A;
+}
+
+.bg-dark-200 {
+  background-color: #222222;
+}
+
+.bg-dark-300 {
+  background-color: #2A2A2A;
+}
+
+.bg-dark-400 {
+  background-color: #333333;
 }
 
 @layer components {

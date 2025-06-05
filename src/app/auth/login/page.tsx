@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import LoginForm from '@/components/auth/LoginForm';
 
 export default function LoginPage() {
@@ -16,20 +17,14 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col items-center justify-center p-8 z-10">
           <div className="w-full max-w-sm">
             <div className="mb-12 flex justify-center">
-              <div 
-                style={{
-                  width: '200px',
-                  height: '50px',
-                  backgroundColor: '#F47321',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  fontSize: '16px'
-                }}
-              >
-                BÚSSOLA EXECUTIVA
+              <div className="w-[200px]">
+                <Image 
+                  src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
+                  alt="Bússola Executiva" 
+                  width={200}
+                  height={73}
+                  priority
+                />
               </div>
             </div>
             
@@ -45,24 +40,14 @@ export default function LoginPage() {
         
         {/* Apresentadora para mobile */}
         <div className="absolute bottom-0 right-0 w-full h-1/3 z-0">
-          <div 
-            style={{
-              width: '100%',
-              height: '100%',
-              backgroundColor: '#9B1B30',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontWeight: 'bold',
-              fontSize: '24px',
-              textAlign: 'center',
-              padding: '20px'
-            }}
-          >
-            <div>APRESENTADORA</div>
-            <div style={{ fontSize: '16px', marginTop: '10px' }}>(Traje vermelho, microfone, fundo iluminado)</div>
+          <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+            <Image 
+              src="/assets/images/presenters/App_BussolaPrancheta-1-fotopat.png" 
+              alt="Apresentadora" 
+              fill
+              style={{ objectFit: 'cover', objectPosition: 'center 30%' }}
+              priority
+            />
           </div>
         </div>
       </div>
@@ -71,24 +56,14 @@ export default function LoginPage() {
       <div className="hidden md:flex w-full h-screen">
         {/* Coluna da esquerda (apresentadora) */}
         <div className="w-1/2 relative bg-[#2A2A2A]">
-          <div 
-            style={{
-              width: '100%',
-              height: '100%',
-              backgroundColor: '#9B1B30',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontWeight: 'bold',
-              fontSize: '24px',
-              textAlign: 'center',
-              padding: '20px'
-            }}
-          >
-            <div>APRESENTADORA</div>
-            <div style={{ fontSize: '16px', marginTop: '10px' }}>(Traje vermelho, microfone, fundo iluminado)</div>
+          <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+            <Image 
+              src="/assets/images/presenters/App_BussolaPrancheta-1-fotopat.png" 
+              alt="Apresentadora" 
+              fill
+              style={{ objectFit: 'cover', objectPosition: 'center 20%' }}
+              priority
+            />
           </div>
         </div>
         
@@ -97,20 +72,15 @@ export default function LoginPage() {
           <div className="w-full max-w-md">
             <div className="mb-12">
               <div className="mb-8">
-                <div 
-                  style={{
-                    backgroundColor: '#FF7A00',
-                    color: 'white',
-                    padding: '8px 16px',
-                    display: 'inline-block',
-                    fontWeight: 'bold',
-                    fontSize: '18px'
-                  }}
-                >
-                  BÚSSOLA EXECUTIVA
+                <div className="w-[250px]">
+                  <Image 
+                    src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
+                    alt="Bússola Executiva" 
+                    width={250}
+                    height={91}
+                    priority
+                  />
                 </div>
-                {/* Quando tiver o logo, use o código abaixo */}
-                {/* <img src="/assets/images/logos/logo.png" alt="Bússola Executiva" className="h-12" /> */}
               </div>
             </div>
             

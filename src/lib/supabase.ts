@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database, User, Chat, Script } from './database.types';
 
 // Usar os valores das credenciais do Supabase para o projeto Bússola Executiva
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iszynegxctqdfrmizila.supabase.co';

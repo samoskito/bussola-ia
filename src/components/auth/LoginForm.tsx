@@ -9,11 +9,15 @@ interface LoginFormProps {
 }
 
 export default function LoginForm({ className = '' }: LoginFormProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Valores padrão para desenvolvimento
+  const [email, setEmail] = useState('admin@bussola.com');
+  const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Flag para modo de desenvolvimento
+  const isDevelopment = process.env.NODE_ENV === 'development';
   
   // Removido o useEffect que verificava a sessão para evitar loop de redirecionamento
   // O middleware já cuida disso
@@ -23,14 +27,48 @@ export default function LoginForm({ className = '' }: LoginFormProps) {
     setLoading(true);
     setError(null);
     
+    console.log('Tentando fazer login com:', { email, passwordLength: password.length });
+    
+    // Modo de desenvolvimento - bypass da autenticação do Supabase
+    if (isDevelopment && (email === 'admin@bussola.com' && password === 'admin123')) {
+      console.log('Modo de desenvolvimento ativado - bypass da autenticação');
+      
+      // Criar uma sessão simulada para desenvolvimento
+      const mockSession = {
+        access_token: 'mock-token-for-development',
+        refresh_token: 'mock-refresh-token',
+        expires_in: 3600,
+        user: {
+          id: 'dev-user-id',
+          email: email,
+          role: 'authenticated'
+        }
+      };
+      
+      // Armazenar sessão simulada
+      sessionStorage.setItem('supabase.auth.token', JSON.stringify(mockSession));
+      localStorage.setItem('supabase.auth.token', JSON.stringify(mockSession));
+      
+      // Redirecionamento para dashboard
+      console.log('Redirecionando para /dashboard/chat (modo desenvolvimento)');
+      window.location.href = '/dashboard/chat';
+      return;
+    }
+    
     try {
-      // Usar diretamente o cliente Supabase para login
+      // Autenticação normal com Supabase
+      console.log('Chamando supabase.auth.signInWithPassword...');
+      console.log('URL do Supabase:', supabase.supabaseUrl);
+      
       const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
-      if (loginError) throw loginError;
+      if (loginError) {
+        console.error('Erro de login detalhado:', JSON.stringify(loginError));
+        throw loginError;
+      }
       
       console.log('Login bem-sucedido:', data);
       
@@ -39,21 +77,13 @@ export default function LoginForm({ className = '' }: LoginFormProps) {
         
         // Armazenar token na sessão para garantir persistência
         sessionStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
+        localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
         
-        // Usar múltiplas estratégias de redirecionamento
-        try {
-          // Estratégia 1: Next.js Router
-          router.push('/dashboard/chat');
-          
-          // Estratégia 2: Redirecionamento direto após um curto delay
-          setTimeout(() => {
-            window.location.href = '/dashboard/chat';
-          }, 500);
-        } catch (navError) {
-          console.error('Erro na navegação:', navError);
-          // Fallback final
-          window.location.href = '/dashboard/chat';
-        }
+        // Redirecionamento simples e direto
+        console.log('Redirecionando para /dashboard/chat');
+        
+        // Usar window.location para garantir um redirecionamento completo
+        window.location.href = '/dashboard/chat';
       } else {
         console.log('Sem sessão após login');
         throw new Error('Falha na autenticação');

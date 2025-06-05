@@ -13,11 +13,16 @@ export async function login(formData: FormData): Promise<void> {
       return;
     }
     
-    await signIn(email, password);
+    const authData = await signIn(email, password);
     
-    // Redirecionar para o dashboard após login bem-sucedido
-    redirect('/dashboard');
+    if (authData.session) {
+      // Redirecionar para a página de chats após login bem-sucedido
+      redirect('/dashboard/chat');
+    } else {
+      throw new Error('Falha na autenticação');
+    }
   } catch (error) {
     console.error('Erro ao fazer login:', error);
+    throw error; // Propagar o erro para que o componente de UI possa tratá-lo
   }
 }

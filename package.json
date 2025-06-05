@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.7.4",
-    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/supabase-js": "^2.49.10",
     "@types/uuid": "^10.0.0",
+    "dotenv": "^16.5.0",
     "next": "^13.4.7",
+    "node-fetch": "^2.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^4.10.1",

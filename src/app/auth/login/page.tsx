@@ -3,13 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { login } from './actions';
-import { supabase, getImageUrl, STORAGE_BUCKETS } from '@/lib/supabase';
+import LoginForm from '@/components/auth/LoginForm';
+import { getImageUrl, STORAGE_BUCKETS } from '@/lib/supabase';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [presenterImageUrl, setPresenterImageUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   
@@ -22,23 +19,6 @@ export default function LoginPage() {
     const logoImageUrl = getImageUrl(STORAGE_BUCKETS.ASSETS, 'logo.svg');
     setLogoUrl(logoImageUrl);
   }, []);
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    const formData = new FormData();
-    formData.append('email', email);
-    formData.append('password', password);
-    
-    try {
-      await login(formData);
-    } catch (error) {
-      console.error('Erro ao fazer login:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row">
@@ -60,47 +40,7 @@ export default function LoginPage() {
               />
             </div>
             
-            <form className="w-full space-y-6" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                  Seu email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-[#111111] border border-[#333333] rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                  Sua senha
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full bg-[#111111] border border-[#333333] rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-[#FF6B00] text-white font-medium py-3 px-4 rounded-md hover:bg-[#FF8534] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-opacity-50"
-                >
-                  {loading ? 'Entrando...' : 'Entrar'}
-                </button>
-              </div>
-            </form>
+            <LoginForm />
             
             <div className="mt-4 text-center">
               <Link href="/auth/reset-password" className="text-sm text-[#FF6B00] hover:underline">
@@ -159,47 +99,7 @@ export default function LoginPage() {
               />
             </div>
             
-            <form className="w-full space-y-6" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="desktop-email" className="block text-sm font-medium text-gray-300 mb-2">
-                  Seu email
-                </label>
-                <input
-                  id="desktop-email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-[#111111] border border-[#333333] rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="desktop-password" className="block text-sm font-medium text-gray-300 mb-2">
-                  Sua senha
-                </label>
-                <input
-                  id="desktop-password"
-                  name="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full bg-[#111111] border border-[#333333] rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-[#FF6B00] text-white font-medium py-3 px-4 rounded-md hover:bg-[#FF8534] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-opacity-50"
-                >
-                  {loading ? 'Entrando...' : 'Entrar'}
-                </button>
-              </div>
-            </form>
+            <LoginForm />
             
             <div className="mt-4 text-center">
               <Link href="/auth/reset-password" className="text-sm text-[#FF6B00] hover:underline">

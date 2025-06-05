@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Database, User, Chat, Script } from './database.types';
 
 // Usar os valores das credenciais do Supabase para o projeto Bússola Executiva
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iszynegxctqdfrmizila.supabase.co';
@@ -9,7 +10,69 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Supabase URL ou Anon Key não estão definidos');
 }
 
+// Cliente público para uso no front-end (com chave anônima)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// IMPORTANTE: Este cliente só deve ser usado em funções de servidor (Server Components, API Routes, etc.)
+// NUNCA expor este cliente no front-end
+export const createServerSupabaseClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase URL ou Service Role Key não estão definidos');
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+};
+
+// Função para uso exclusivo em componentes de servidor ou API routes
+export const getServerSupabaseClient = () => {
+  return createServerSupabaseClient();
+};
+
+// Tipos para as tabelas
+export type User = {
+  id: number;
+  nome: string;
+  email: string;
+  telefone?: string;
+  avatar?: string;
+  rua?: string;
+  numero?: string;
+  bairro?: string;
+  cep?: string;
+  cidade?: string;
+  estado?: string;
+  pais?: string;
+  nivel: 'admin' | 'user';
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type Chat = {
+  id: string;
+  user_id: number;
+  title: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type Script = {
+  id: number;
+  user_id: number;
+  input: string;
+  output?: string;
+  chatid: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 
 // Constantes para buckets de armazenamento
 export const STORAGE_BUCKETS = {

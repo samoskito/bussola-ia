@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from '@/lib/supabase';
+import { signIn, supabase } from '@/lib/supabase';
 
 interface LoginFormProps {
   className?: string;
@@ -14,6 +14,9 @@ export default function LoginForm({ className = '' }: LoginFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Removido o useEffect que verificava a sessão para evitar loop de redirecionamento
+  // O middleware já cuida disso
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -21,16 +24,42 @@ export default function LoginForm({ className = '' }: LoginFormProps) {
     setError(null);
     
     try {
-      // Tentar fazer login com a função signIn
-      const data = await signIn(email, password);
+      // Usar diretamente o cliente Supabase para login
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (loginError) throw loginError;
+      
+      console.log('Login bem-sucedido:', data);
       
       if (data.session) {
-        // Login bem-sucedido, redirecionar para a página de chats
-        router.push('/dashboard/chat');
+        console.log('Sessão encontrada, redirecionando...');
+        
+        // Armazenar token na sessão para garantir persistência
+        sessionStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
+        
+        // Usar múltiplas estratégias de redirecionamento
+        try {
+          // Estratégia 1: Next.js Router
+          router.push('/dashboard/chat');
+          
+          // Estratégia 2: Redirecionamento direto após um curto delay
+          setTimeout(() => {
+            window.location.href = '/dashboard/chat';
+          }, 500);
+        } catch (navError) {
+          console.error('Erro na navegação:', navError);
+          // Fallback final
+          window.location.href = '/dashboard/chat';
+        }
       } else {
+        console.log('Sem sessão após login');
         throw new Error('Falha na autenticação');
       }
     } catch (error: any) {
+      console.log('Erro capturado:', error);
       console.error('Erro ao fazer login:', error);
       
       // Mostrar mensagem de erro amigável

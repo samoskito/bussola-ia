@@ -18,20 +18,14 @@ export async function middleware(req: NextRequest) {
     // Verificar se o caminho é uma rota protegida
     const isProtectedRoute = path.startsWith('/dashboard');
     
-    // Verificar se o caminho é uma rota de autenticação
-    const isAuthRoute = path.startsWith('/auth');
-    
     // Se for uma rota protegida e o usuário não estiver autenticado, redirecionar para o login
     if (isProtectedRoute && !session) {
       const redirectUrl = new URL('/auth/login', req.url);
       return NextResponse.redirect(redirectUrl);
     }
     
-    // Se for uma rota de autenticação e o usuário já estiver autenticado, redirecionar para o dashboard
-    if (isAuthRoute && session && path !== '/auth/logout') {
-      const redirectUrl = new URL('/dashboard', req.url);
-      return NextResponse.redirect(redirectUrl);
-    }
+    // Removida a verificação que redirecionava usuários autenticados para evitar loops
+    // Isso permite que o usuário acesse a página de login mesmo estando autenticado
     
     return res;
   } catch (error) {

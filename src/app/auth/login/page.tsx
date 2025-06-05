@@ -1,25 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import React from 'react';
 import Link from 'next/link';
 import LoginForm from '@/components/auth/LoginForm';
-import { getImageUrl, STORAGE_BUCKETS } from '@/lib/supabase';
 
 export default function LoginPage() {
-  const [presenterImageUrl, setPresenterImageUrl] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  
-  useEffect(() => {
-    // Carregar a URL da imagem da apresentadora do Supabase
-    const presenterUrl = getImageUrl(STORAGE_BUCKETS.IMAGES, 'auth/presenter.jpg');
-    setPresenterImageUrl(presenterUrl);
-    
-    // Carregar a URL do logo do Supabase
-    const logoImageUrl = getImageUrl(STORAGE_BUCKETS.ASSETS, 'logo.svg');
-    setLogoUrl(logoImageUrl);
-  }, []);
-
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row">
       {/* Mobile layout (vertical) */}
@@ -31,13 +16,21 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col items-center justify-center p-8 z-10">
           <div className="w-full max-w-sm">
             <div className="mb-12 flex justify-center">
-              <Image 
-                src={logoUrl || "/images/logo.svg"} 
-                alt="BÚSSOLA EXECUTIVA" 
-                width={200} 
-                height={50} 
-                priority
-              />
+              <div 
+                style={{
+                  width: '200px',
+                  height: '50px',
+                  backgroundColor: '#F47321',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '16px'
+                }}
+              >
+                BÚSSOLA EXECUTIVA
+              </div>
             </div>
             
             <LoginForm />
@@ -50,53 +43,75 @@ export default function LoginPage() {
           </div>
         </div>
         
-        {/* Imagem de fundo para mobile */}
-        <div className="absolute bottom-0 left-0 right-0 h-1/2 z-0">
-          {presenterImageUrl && (
-            <Image 
-              src={presenterImageUrl}
-              alt="Apresentadora" 
-              fill
-              style={{ objectFit: 'cover', objectPosition: 'center 20%', opacity: 0.7 }}
-              priority
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] to-transparent"></div>
+        {/* Apresentadora para mobile */}
+        <div className="absolute bottom-0 right-0 w-full h-1/3 z-0">
+          <div 
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#9B1B30',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '24px',
+              textAlign: 'center',
+              padding: '20px'
+            }}
+          >
+            <div>APRESENTADORA</div>
+            <div style={{ fontSize: '16px', marginTop: '10px' }}>(Traje vermelho, microfone, fundo iluminado)</div>
+          </div>
         </div>
       </div>
-
+      
       {/* Desktop layout (horizontal) */}
       <div className="hidden md:flex w-full h-screen">
-        {/* Lado esquerdo - Imagem */}
-        <div className="w-1/2 relative">
-          {presenterImageUrl ? (
-            <Image 
-              src={presenterImageUrl}
-              alt="Apresentadora" 
-              fill
-              style={{ objectFit: 'cover' }}
-              priority
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#333333] to-[#1A1A1A] flex items-center justify-center">
-              <div className="text-[#FF6B00] text-opacity-30 text-xl">Carregando imagem...</div>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#1A1A1A] opacity-30"></div>
+        {/* Coluna da esquerda (apresentadora) */}
+        <div className="w-1/2 relative bg-[#2A2A2A]">
+          <div 
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#9B1B30',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '24px',
+              textAlign: 'center',
+              padding: '20px'
+            }}
+          >
+            <div>APRESENTADORA</div>
+            <div style={{ fontSize: '16px', marginTop: '10px' }}>(Traje vermelho, microfone, fundo iluminado)</div>
+          </div>
         </div>
         
-        {/* Lado direito - Formulário */}
-        <div className="w-1/2 flex items-center justify-center p-8" 
-          style={{ background: 'linear-gradient(to bottom, #1A1A1A, #2A2A2A)' }}>
+        {/* Coluna da direita (formulário) */}
+        <div className="w-1/2 flex items-center justify-center bg-[#1A1A1A] p-8">
           <div className="w-full max-w-md">
-            <div className="mb-12 flex justify-center">
-              <Image 
-                src={logoUrl || "/images/logo.svg"} 
-                alt="BÚSSOLA EXECUTIVA" 
-                width={220} 
-                height={55} 
-                priority
-              />
+            <div className="mb-12">
+              <div className="mb-8">
+                <div 
+                  style={{
+                    backgroundColor: '#FF7A00',
+                    color: 'white',
+                    padding: '8px 16px',
+                    display: 'inline-block',
+                    fontWeight: 'bold',
+                    fontSize: '18px'
+                  }}
+                >
+                  BÚSSOLA EXECUTIVA
+                </div>
+                {/* Quando tiver o logo, use o código abaixo */}
+                {/* <img src="/assets/images/logos/logo.png" alt="Bússola Executiva" className="h-12" /> */}
+              </div>
             </div>
             
             <LoginForm />

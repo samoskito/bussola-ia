@@ -1,0 +1,6 @@
+<svg width="500" height="100" xmlns="http://www.w3.org/2000/svg">
+  <rect width="500" height="100" fill="#1A1A1A"/>
+  <text x="150" y="60" font-family="Arial" font-size="40" font-weight="bold" fill="#FF6B00">BÚSSOLA EXECUTIVA</text>
+  <path d="M10,50 C40,40 60,10 100,20" stroke="#FF6B00" stroke-width="8" fill="none" />
+  <polygon points="90,10 110,20 100,40" fill="#FF6B00" />
+</svg>

@@ -1,0 +1,8 @@
+<svg width="500" height="700" xmlns="http://www.w3.org/2000/svg">
+  <rect width="500" height="700" fill="#2A2A2A"/>
+  <circle cx="250" cy="180" r="120" fill="#F5D0C1"/>
+  <path d="M150,300 C200,400 300,400 350,300" fill="#9B1B30"/>
+  <path d="M150,300 C150,600 350,600 350,300" fill="#9B1B30"/>
+  <rect x="200" y="350" width="100" height="50" fill="#FFFFFF"/>
+  <text x="120" y="650" font-family="Arial" font-size="30" font-weight="bold" fill="#FFFFFF">APRESENTADORA</text>
+</svg>

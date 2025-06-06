@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import { saveScript } from '@/lib/supabase';
 const { useState } = React;

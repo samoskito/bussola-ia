@@ -1,4 +1,5 @@
-import { cookies } from 'next/headers';
+'use client';
+
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 

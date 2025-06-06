@@ -16,8 +16,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 /**
  * Create a Supabase client for client-side usage
+ * Este código só deve ser executado no navegador
  */
 export function createClient() {
+  // Verificar se estamos no navegador
+  if (typeof window === 'undefined') {
+    throw new Error('createClient deve ser usado apenas no navegador');
+  }
+  
   return createBrowserClient<Database>(
     supabaseUrl,
     supabaseAnonKey,
@@ -262,8 +268,23 @@ export const signUp = async (email: string, password: string): Promise<AuthRespo
  */
 export const signOut = async (): Promise<{ error: Error | null }> => {
   try {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    // Verificar se estamos no navegador
+    if (typeof window === 'undefined') {
+      throw new Error('signOut deve ser usado apenas no navegador');
+    }
+    
+    // Usar nossa API personalizada de logout
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Erro ao fazer logout');
+    }
+    
     return { error: null };
   } catch (error) {
     console.error('Sign out error:', error);

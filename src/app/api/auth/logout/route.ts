@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST() {
+  const supabaseServerClient = createServerSupabaseClient();
   const cookieStore = await cookies();
   try {
     // Create a response with success status

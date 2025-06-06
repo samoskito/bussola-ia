@@ -1,6 +1,6 @@
 'use server';
 
-import { signUp } from '@/lib/supabase';
+import { serverSignUp } from '@/lib/supabase/server-auth';
 import { redirect } from 'next/navigation';
 
 export async function register(formData: FormData): Promise<void> {
@@ -19,7 +19,7 @@ export async function register(formData: FormData): Promise<void> {
       return;
     }
     
-    await signUp(email, password);
+    await serverSignUp(email, password);
     
     // Redirecionar para a página de login após o registro bem-sucedido
     redirect('/auth/login?registered=true');

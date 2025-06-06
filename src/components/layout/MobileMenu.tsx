@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import LogoutButton from '../auth/LogoutButton';
 
 interface MobileMenuProps {
@@ -13,7 +13,13 @@ interface MobileMenuProps {
 
 const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
   const router = useRouter();
-  const isActive = (path: string) => router.pathname === path;
+  // Simplificando a verificação de rota ativa usando window.location
+  const isActive = (path: string) => {
+    if (typeof window !== 'undefined') {
+      return window.location.pathname === path;
+    }
+    return false;
+  };
 
   if (!isOpen) return null;
 

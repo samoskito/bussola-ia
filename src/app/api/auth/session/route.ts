@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
@@ -30,7 +30,7 @@ export async function GET() {
     }
     
     // Initialize Supabase client
-    const supabase = createServerSupabaseClient(() => cookieStore);
+    const supabase = createServerSupabaseClient();
     
     // Get user data from the database
     const { data: user, error: userError } = await supabase

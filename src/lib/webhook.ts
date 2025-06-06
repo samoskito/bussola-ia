@@ -5,7 +5,10 @@
  * e receber as respostas geradas pela IA.
  */
 
-import { supabase } from './supabase';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+
+// Criar cliente Supabase para o servidor
+const supabase = createServerSupabaseClient();
 
 // URL do webhook do n8n
 const WEBHOOK_URL = 'https://webhook.bussolaexecutiva.com.br/webhook/inputs-bussola-script';

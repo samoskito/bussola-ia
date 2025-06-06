@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   const cookieStore = cookies();
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createServerSupabaseClient(() => cookieStore);
+    const supabase = createServerSupabaseClient();
     
     // Buscar usuário da tabela users
     const { data: user, error: userError } = await supabase

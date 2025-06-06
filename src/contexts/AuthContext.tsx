@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { clientCheckSession, clientLogin, clientLogout } from '@/lib/supabase/client-utils';
 
 // Define user type
 type AppUser = {
@@ -24,6 +25,7 @@ export type AuthContextType = {
   signIn: (email: string, password: string) => Promise<AuthError>;
   signOut: () => Promise<void>;
   error: string | null;
+  setUser: (user: AppUser) => void;
 };
 
 // Create the context with a default value
@@ -33,6 +35,7 @@ export const AuthContext = createContext<AuthContextType>({
   error: null,
   signIn: async () => ({ error: 'Context not initialized' }),
   signOut: async () => {},
+  setUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -46,13 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkSession = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/auth/session');
+        const { user, error } = await clientCheckSession();
         
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
+        if (user) {
+          setUser(user);
         } else {
           setUser(null);
+          if (error) {
+            console.error('Erro ao verificar sessão:', error);
+          }
         }
       } catch (err) {
         console.error('Erro ao verificar sessão:', err);
@@ -71,23 +76,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: email.trim().toLowerCase(), 
-          password 
-        }),
-      });
+      const { user, error } = await clientLogin(email.trim().toLowerCase(), password);
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        setError(data.error || 'Falha ao fazer login');
-        return { error: data.error || 'Falha ao fazer login' };
+      if (error) {
+        setError(error);
+        return { error };
       }
       
-      setUser(data.user);
+      if (!user) {
+        const errorMsg = 'Falha ao fazer login';
+        setError(errorMsg);
+        return { error: errorMsg };
+      }
+      
+      setUser(user);
       router.push('/dashboard');
       return null;
     } catch (err) {
@@ -103,7 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setLoading(true);
-      await fetch('/api/auth/logout', { method: 'POST' });
+      const { success, error } = await clientLogout();
+      
+      if (!success) {
+        console.error('Erro ao fazer logout:', error);
+        setError('Falha ao fazer logout');
+        return;
+      }
+      
       setUser(null);
       router.push('/auth/login');
     } catch (err) {
@@ -121,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     signIn,
     signOut,
+    setUser,
   };
 
   return (

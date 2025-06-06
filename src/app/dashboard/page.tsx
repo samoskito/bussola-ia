@@ -1,12 +1,10 @@
 "use client";
 
-// @ts-ignore - Desativando verificações de tipo para JSX
-// @ts-nocheck
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import ChatInterface from '@/components/chat/ChatInterface';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Mock data - would come from database in real app
 const mockChats = Array(10).fill(0).map((_, i) => ({
@@ -15,6 +13,19 @@ const mockChats = Array(10).fill(0).map((_, i) => ({
 }));
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const [userName, setUserName] = useState('Usuário');
+  
+  useEffect(() => {
+    if (user && user.nome) {
+      setUserName(user.nome);
+    } else if (user && user.email) {
+      // Se não tiver nome, usa a parte antes do @ do email
+      const emailName = user.email.split('@')[0];
+      setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
+    }
+  }, [user]);
+  
   return (
     <div className="flex h-screen w-full bg-dark-100 text-white overflow-hidden">
       {/* Sidebar */}
@@ -22,10 +33,10 @@ export default function DashboardPage() {
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header userName="Patrícia" />
+        <Header userName={userName} />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <ChatInterface userName="Patrícia" />
+          <ChatInterface userName={userName} />
         </main>
       </div>
     </div>

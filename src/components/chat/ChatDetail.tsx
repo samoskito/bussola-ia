@@ -10,6 +10,16 @@ interface Message {
   timestamp: Date;
 }
 
+interface ScriptMessage {
+  id: string;
+  user_id: string;
+  chat_id: string;
+  input: string;
+  output: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ChatDetailProps {
   chatId: string;
   userName: string;
@@ -30,16 +40,75 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
   
   // Efeito para carregar mensagens do chat quando o componente montar
   useEffect(() => {
-    // Aqui você implementaria a lógica para carregar as mensagens do chat do backend
-    // Por enquanto, vamos simular uma mensagem inicial do sistema
-    setMessages([
-      {
-        id: 'system-welcome',
-        content: `Olá! Este é o início da sua conversa. ID do Chat: ${chatId}`,
-        role: 'assistant',
-        timestamp: new Date()
+    const fetchChatMessages = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/chats/${chatId}/messages`);
+        
+        if (!response.ok) {
+          throw new Error('Erro ao carregar mensagens do chat');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.messages) {
+          // Converter as mensagens do formato da API para o formato usado pelo componente
+          const formattedMessages: Message[] = [];
+          
+          data.messages.forEach((msg: ScriptMessage) => {
+            // Adicionar mensagem do usuário
+            formattedMessages.push({
+              id: `user-${msg.id}`,
+              content: msg.input,
+              role: 'user',
+              timestamp: new Date(msg.created_at)
+            });
+            
+            // Adicionar resposta da IA se existir
+            if (msg.output) {
+              formattedMessages.push({
+                id: `assistant-${msg.id}`,
+                content: msg.output,
+                role: 'assistant',
+                timestamp: new Date(msg.updated_at)
+              });
+            }
+          });
+          
+          setMessages(formattedMessages);
+        } else {
+          // Se não houver mensagens, mostrar mensagem de boas-vindas
+          setMessages([
+            {
+              id: 'system-welcome',
+              content: `Olá! Este é o início da sua conversa. ID do Chat: ${chatId}`,
+              role: 'assistant',
+              timestamp: new Date()
+            }
+          ]);
+        }
+      } catch (err: any) {
+        console.error('Erro ao buscar mensagens:', err);
+        setError(err.message || 'Ocorreu um erro ao carregar as mensagens');
+        // Mostrar mensagem de boas-vindas mesmo em caso de erro
+        setMessages([
+          {
+            id: 'system-welcome',
+            content: `Olá! Este é o início da sua conversa. ID do Chat: ${chatId}`,
+            role: 'assistant',
+            timestamp: new Date()
+          }
+        ]);
+      } finally {
+        setIsLoading(false);
       }
-    ]);
+    };
+    
+    if (chatId) {
+      fetchChatMessages();
+    }
   }, [chatId]);
   
   // Rolar para o final quando as mensagens mudarem
@@ -50,20 +119,17 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    // Não enviar mensagem vazia
-    if (!message.trim()) return;
+    if (!message.trim() || isLoading) return;
     
-    // Resetar erro
-    setError(null);
-    
-    // Adicionar mensagem do usuário à lista local
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: message,
-      role: 'user',
+    // Criar objeto de mensagem do usuário
+    const userMessage = {
+      id: 'user-' + Date.now().toString(),
+      content: message.trim(),
+      role: 'user' as const,
       timestamp: new Date()
     };
     
+    // Adicionar mensagem do usuário à lista
     setMessages(prev => [...prev, userMessage]);
     
     // Limpar campo de mensagem
@@ -73,7 +139,7 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
     setIsLoading(true);
     
     try {
-      // Enviar mensagem para o webhook
+      // Enviar mensagem para a API
       const response = await fetch('/api/chats/message', {
         method: 'POST',
         headers: {
@@ -90,6 +156,8 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
         throw new Error(errorData.error || 'Erro ao enviar mensagem');
       }
       
+      const responseData = await response.json();
+      
       // Adicionar mensagem de confirmação
       setMessages(prev => [
         ...prev, 
@@ -101,6 +169,11 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
         }
       ]);
       
+      // Iniciar polling para verificar se a resposta da IA já está disponível
+      if (responseData.scriptId) {
+        checkForAIResponse(responseData.scriptId);
+      }
+      
     } catch (err: any) {
       console.error('Erro ao enviar mensagem:', err);
       setError(err.message || 'Ocorreu um erro ao enviar sua mensagem');
@@ -108,6 +181,65 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
       setIsLoading(false);
     }
   };
+  
+  // Função para verificar se a resposta da IA já está disponível
+  const checkForAIResponse = async (scriptId: string) => {
+    let attempts = 0;
+    const maxAttempts = 30; // Tentar por até 5 minutos (30 tentativas com 10 segundos de intervalo)
+    
+    const checkResponse = async () => {
+      try {
+        if (attempts >= maxAttempts) {
+          setError('Tempo limite excedido ao aguardar resposta da IA');
+          return;
+        }
+        
+        attempts++;
+        
+        // Buscar mensagens atualizadas
+        const response = await fetch(`/api/chats/${chatId}/messages`);
+        
+        if (!response.ok) {
+          throw new Error('Erro ao verificar resposta da IA');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.messages) {
+          // Procurar pelo script com o ID específico
+          const script = data.messages.find((msg: ScriptMessage) => msg.id === scriptId);
+          
+          if (script && script.output) {
+            // Resposta da IA encontrada, atualizar a interface
+            setMessages(prev => {
+              // Remover a mensagem de "aguardando resposta"
+              const filteredMessages = prev.filter(msg => !msg.id.includes('system-'));
+              
+              // Adicionar a resposta da IA
+              return [...filteredMessages, {
+                id: `assistant-${scriptId}`,
+                content: script.output,
+                role: 'assistant',
+                timestamp: new Date(script.updated_at)
+              }];
+            });
+            return; // Encerrar o polling
+          }
+        }
+        
+        // Se ainda não tiver resposta, continuar verificando
+        setTimeout(checkResponse, 10000); // Verificar a cada 10 segundos
+        
+      } catch (err) {
+        console.error('Erro ao verificar resposta da IA:', err);
+        // Continuar tentando mesmo em caso de erro
+        setTimeout(checkResponse, 10000);
+      }
+    };
+    
+    // Iniciar o processo de verificação
+    setTimeout(checkResponse, 5000); // Primeira verificação após 5 segundos
+  }
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

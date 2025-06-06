@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
-import ChatDetail from '@/components/chat/ChatDetail';
+import { ChatDetail } from '@/components/chat';
 
 
 type ChatPageProps = {
@@ -16,7 +16,8 @@ type ChatPageProps = {
 
 export default function ChatPage({ params }: ChatPageProps) {
   const { user, loading } = useAuth();
-  const chatId = params.chatId;
+  // Desestruturar chatId diretamente de params para compatibilidade com Next.js 15
+  const { chatId } = params;
   const [chatTitle, setChatTitle] = useState<string>('Carregando...');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export default function ChatPage({ params }: ChatPageProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
+    <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
       <Sidebar />
       
       <div className="flex flex-col flex-1 overflow-hidden">

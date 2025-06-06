@@ -70,12 +70,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao buscar dados do usuário' }, { status: 500 });
     }
     
+    // Salvar a mensagem do usuário na tabela scripts
+    const { data: scriptData, error: scriptError } = await supabase
+      .from('scripts')
+      .insert([
+        {
+          user_id: userId,
+          chatid: chatId,
+          input: message,
+          output: null // A resposta será atualizada quando o webhook responder
+        }
+      ])
+      .select();
+
+    if (scriptError) {
+      console.error('Erro ao salvar mensagem na tabela scripts:', scriptError);
+      return NextResponse.json({ error: 'Erro ao salvar mensagem' }, { status: 500 });
+    }
+
     // Enviar dados para o webhook
     const webhookUrl = 'https://webhook.bussolaexecutiva.com.br/webhook/91bb0137-006c-41d8-aba3-e29883ed46dc';
     
     const webhookPayload = {
       chatId: chatId,
       message: message,
+      scriptId: scriptData[0].id, // Enviar o ID do script para o webhook
       user: {
         id: userData.id,
         email: userData.email,
@@ -101,7 +120,8 @@ export async function POST(request: Request) {
       // Resposta bem-sucedida do webhook
       return NextResponse.json({ 
         success: true, 
-        message: 'Mensagem enviada com sucesso'
+        message: 'Mensagem enviada com sucesso',
+        scriptId: scriptData[0].id
       });
       
     } catch (webhookError) {

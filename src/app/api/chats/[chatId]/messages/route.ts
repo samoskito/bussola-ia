@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
 
 export async function GET(
@@ -8,9 +7,6 @@ export async function GET(
   { params }: { params: { chatId: string } }
 ) {
   try {
-    // Usar a desestruturação para acessar chatId no Next.js 15
-    const { chatId } = params;
-    
     // Obter as variáveis de ambiente do Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -21,8 +17,9 @@ export async function GET(
     }
     
     // Obter o token de autenticação do cookie
-    const cookieStore = await cookies();
-    const token = cookieStore.get('auth_token')?.value;
+    const cookieHeader = request.headers.get('cookie') || '';
+    const tokenMatch = cookieHeader.match(/auth_token=([^;]+)/);
+    const token = tokenMatch ? tokenMatch[1] : '';
     
     if (!token) {
       return NextResponse.json({ error: 'Usuário não autenticado' }, { status: 401 });
@@ -36,34 +33,45 @@ export async function GET(
     }
     
     const userId = decoded.userId;
+    // Usar await para acessar params no Next.js 15
+    const { chatId } = params;
     
     // Criar cliente do Supabase com a chave de serviço
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Buscar detalhes do chat
-    const { data: chat, error } = await supabase
+    // Verificar se o chat pertence ao usuário
+    const { data: chatData, error: chatError } = await supabase
       .from('chats')
-      .select('id, title, created_at, user_id')
+      .select('id, user_id')
       .eq('id', chatId)
       .single();
     
-    if (error) {
-      console.error('Erro ao buscar chat:', error);
+    if (chatError || !chatData) {
+      console.error('Erro ao verificar chat:', chatError);
       return NextResponse.json({ error: 'Chat não encontrado' }, { status: 404 });
     }
     
     // Verificar se o chat pertence ao usuário autenticado
-    if (chat.user_id !== userId) {
+    if (chatData.user_id !== userId) {
       return NextResponse.json({ error: 'Não autorizado a acessar este chat' }, { status: 403 });
+    }
+    
+    // Buscar mensagens do chat na tabela scripts
+    const { data: messages, error: messagesError } = await supabase
+      .from('scripts')
+      .select('*')
+      .eq('chatid', chatId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    
+    if (messagesError) {
+      console.error('Erro ao buscar mensagens:', messagesError);
+      return NextResponse.json({ error: 'Erro ao buscar mensagens' }, { status: 500 });
     }
     
     return NextResponse.json({ 
       success: true, 
-      chat: {
-        id: chat.id,
-        title: chat.title,
-        created_at: chat.created_at
-      }
+      messages: messages 
     });
     
   } catch (error) {

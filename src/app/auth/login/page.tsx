@@ -12,10 +12,12 @@ export default function LoginPage() {
   
   useEffect(() => {
     // Get search params from URL after component mounts
-    const params = new URLSearchParams(window.location.search);
-    const redirectParam = params.get('redirectedFrom');
-    if (redirectParam) {
-      setRedirectedFrom(redirectParam);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const redirectParam = params.get('redirectedFrom');
+      if (redirectParam) {
+        setRedirectedFrom(redirectParam);
+      }
     }
   }, []);
   return (

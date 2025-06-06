@@ -85,12 +85,13 @@ export default function LoginForm({ className = '', redirectTo = '/dashboard' }:
     setIsSubmitting(true);
     
     try {
-      const { error } = await signIn(email.trim().toLowerCase(), password);
+      const result = await signIn(email.trim().toLowerCase(), password);
       
-      if (error) {
+      // Se signIn retornar um objeto com propriedade error
+      if (result !== null && result !== undefined && typeof result === 'object' && 'error' in result && result.error) {
         // Focus on password field on error
         passwordInputRef.current?.focus();
-        throw new Error(error);
+        throw new Error(result.error);
       }
       
       // Success state will be handled by the auth state change in AuthContext

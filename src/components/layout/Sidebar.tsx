@@ -19,13 +19,13 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ chats }: SidebarProps) => {
   return (
-    <aside className="w-64 h-screen bg-gray-800 flex flex-col">
+    <aside className="w-64 h-screen bg-gray-800 flex flex-col overflow-hidden">
       {/* Logo */}
       <div className="p-4">
         <Link href="/dashboard">
           <div className="flex items-center">
             <Image 
-              src="/images/logo.svg" 
+              src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
               alt="Bússola Executiva" 
               width={150} 
               height={40} 

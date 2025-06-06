@@ -30,26 +30,26 @@ const Header: React.FC<HeaderProps> = ({ userName }) => {
   }, []);
   
   return (
-    <header className="relative z-50 flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 shadow-sm">
+    <header className="relative z-50 flex items-center justify-between p-3 md:p-4 bg-gray-900 border-b border-gray-800 shadow-sm w-full">
       <div className="flex items-center">
         {/* Botão de menu - visível apenas em mobile */}
         <button 
-          className="lg:hidden mr-4 p-2 rounded-lg bg-primary-500/10 hover:bg-primary-500/20 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-primary-500"
+          className="lg:hidden mr-3 p-2 rounded-lg bg-[#FF6B00]/10 hover:bg-[#FF6B00]/20 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-[#FF6B00]"
           onClick={() => setIsMenuOpen(true)}
           aria-label="Abrir menu"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary-500">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#FF6B00]">
             <path d="M4 6H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M4 12H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M4 18H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
-        <div className="flex items-center gap-2 bg-primary-500/5 px-3 py-2 rounded-lg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary-500">
+        <div className="flex items-center gap-2 bg-[#FF6B00]/5 px-3 py-2 rounded-lg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#FF6B00]">
             <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="text-primary-500 font-bold">Bússola Executiva</span>
+          <span className="text-[#FF6B00] font-bold">Bússola Executiva</span>
         </div>
       </div>
 

@@ -44,48 +44,52 @@ export default function SavedScriptsPage() {
   // const scripts = await getScripts(userId);
   
   return (
-    <div className="flex h-screen bg-dark-100 text-white overflow-hidden">
+    <div className="flex h-screen w-full bg-dark-100 text-white overflow-hidden">
       {/* Sidebar */}
-      <Sidebar projects={mockProjects} chats={mockChats} />
+      <Sidebar chats={mockChats} />
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header userName="Patrícia" />
         
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold">Scripts Salvos</h1>
-              <Link href="/dashboard/scripts" className="btn-primary py-2 px-4">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="max-w-6xl mx-auto w-full">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 md:mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold text-white">Scripts Salvos</h1>
+              <Link href="/dashboard/scripts" className="bg-[#FF6B00] hover:bg-[#E05E00] text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 5V19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 Criar Novo Script
               </Link>
             </div>
             
-            <div className="bg-dark-200 rounded-lg p-6">
+            <div className="bg-gray-800 rounded-xl p-5 md:p-6 shadow-lg border border-gray-700">
               {mockScripts.length > 0 ? (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:gap-5">
                   {mockScripts.map((script) => (
-                    <div key={script.id} className="bg-dark-300 p-4 rounded-md">
-                      <div className="flex justify-between items-start">
+                    <div key={script.id} className="bg-gray-900 p-4 md:p-5 rounded-lg border border-gray-700 hover:border-[#FF6B00]/50 transition-all duration-200">
+                      <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
                         <div>
-                          <h3 className="text-xl font-semibold text-primary">{script.title}</h3>
+                          <h3 className="text-xl font-semibold text-[#FF6B00] mb-1">{script.title}</h3>
                           <p className="text-sm text-gray-400">
                             Criado em: {new Date(script.created_at).toLocaleDateString('pt-BR')}
                           </p>
                         </div>
-                        <div className="flex space-x-2">
-                          <button className="btn-secondary py-1 px-3 text-sm">
+                        <div className="flex flex-wrap gap-2">
+                          <button className="bg-gray-800 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200">
                             Visualizar
                           </button>
-                          <button className="btn-secondary py-1 px-3 text-sm">
+                          <button className="bg-gray-800 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200">
                             Editar
                           </button>
-                          <button className="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded-md text-sm">
+                          <button className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200">
                             Excluir
                           </button>
                         </div>
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-3 md:mt-4">
                         <p className="text-gray-300 line-clamp-2">
                           {script.content.substring(0, 150)}...
                         </p>
@@ -94,9 +98,22 @@ export default function SavedScriptsPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-400 mb-4">Você ainda não tem scripts salvos.</p>
-                  <Link href="/dashboard/scripts" className="btn-primary py-2 px-4">
+                <div className="text-center py-12">
+                  <div className="flex justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-[#FF6B00]/10 flex items-center justify-center text-[#FF6B00]">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16L21 8V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M17 21V13H7V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M7 3V8H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-gray-400 mb-6 text-lg">Você ainda não tem scripts salvos.</p>
+                  <Link href="/dashboard/scripts" className="bg-[#FF6B00] hover:bg-[#E05E00] text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 inline-flex items-center justify-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 5V19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     Criar Seu Primeiro Script
                   </Link>
                 </div>

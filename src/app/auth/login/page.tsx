@@ -28,12 +28,12 @@ export default function LoginPage() {
           <div className="w-full max-w-sm">
             <div className="mb-12 flex justify-center">
               <div className="w-[200px]">
-                <Image 
-                  src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
+                <img 
+                  src="/images/Logo.webp" 
                   alt="Bússola Executiva" 
-                  width={200}
-                  height={73}
-                  priority
+                  width="200"
+                  height="73"
+                  style={{maxWidth: '100%', height: 'auto'}}
                 />
               </div>
             </div>
@@ -51,12 +51,15 @@ export default function LoginPage() {
         {/* Apresentadora para mobile */}
         <div className="absolute bottom-0 right-0 w-full h-1/3 z-0">
           <div className="relative w-full h-full overflow-hidden">
-            <Image 
-              src="/assets/images/presenters/App_BussolaPrancheta-1-fotopat.png" 
+            <img 
+              src="/images/Apresentadora.png" 
               alt="Apresentadora" 
-              fill
-              className="object-cover object-center-[30%]"
-              priority
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 30%'
+              }}
             />
           </div>
         </div>
@@ -67,12 +70,15 @@ export default function LoginPage() {
         {/* Coluna da esquerda (apresentadora) */}
         <div className="w-1/2 relative bg-gray-800">
           <div className="relative w-full h-full overflow-hidden">
-            <Image 
-              src="/assets/images/presenters/App_BussolaPrancheta-1-fotopat.png" 
+            <img 
+              src="/images/Apresentadora.png" 
               alt="Apresentadora" 
-              fill
-              className="object-cover object-center-[20%]"
-              priority
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 20%'
+              }}
             />
           </div>
         </div>
@@ -83,12 +89,12 @@ export default function LoginPage() {
             <div className="mb-12">
               <div className="mb-8">
                 <div className="w-[250px]">
-                  <Image 
-                    src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
+                  <img 
+                    src="/images/Logo.webp" 
                     alt="Bússola Executiva" 
-                    width={250}
-                    height={91}
-                    priority
+                    width="250"
+                    height="91"
+                    style={{maxWidth: '100%', height: 'auto'}}
                   />
                 </div>
               </div>

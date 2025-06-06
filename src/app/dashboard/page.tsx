@@ -6,11 +6,7 @@ import Header from '@/components/layout/Header';
 import ChatInterface from '@/components/chat/ChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Mock data - would come from database in real app
-const mockChats = Array(10).fill(0).map((_, i) => ({
-  id: `chat-${i + 1}`,
-  title: 'Lorem ipsum dolor...',
-}));
+// Os chats agora são carregados diretamente do Supabase no componente Sidebar
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -29,7 +25,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-screen w-full bg-dark-100 text-white overflow-hidden">
       {/* Sidebar */}
-      <Sidebar chats={mockChats} />
+      <Sidebar />
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">

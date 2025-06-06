@@ -23,7 +23,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
       {/* Welcome Header */}
       <div className="mb-10 md:mb-12 text-center">
         <h1 className="text-3xl md:text-4xl font-bold">
-          Seja bem-vinda, <span className="text-[#FF6B00]">{userName}.</span>
+          Olá, <span className="text-[#FF6B00]">{userName}.</span>
         </h1>
         <p className="text-gray-400 mt-2">Como está seu dia hoje?</p>
       </div>

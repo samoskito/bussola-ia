@@ -13,6 +13,11 @@ export async function middleware(request: NextRequest) {
       '/auth/reset-password',
     ];
     
+    // Permitir acesso a arquivos estáticos e imagens
+    if (path.startsWith('/images/')) {
+      return NextResponse.next();
+    }
+    
     // Check if the current path is public
     const isPublicRoute = publicRoutes.some(route => 
       path === route || path.startsWith(`${route}/`)

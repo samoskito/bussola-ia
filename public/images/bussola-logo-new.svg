@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="300" viewBox="0 0 1000 300">
-  <!-- Seta curva laranja -->
-  <path d="M50,200 C100,150 150,100 200,80" stroke="#F47321" stroke-width="30" fill="none" stroke-linecap="round"/>
-  <polygon points="180,60 220,70 200,110" fill="#F47321"/>
-  
-  <!-- Texto "BÚSSOLA" -->
-  <text x="400" y="150" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="#F47321">BÚSSOLA</text>
-</svg>

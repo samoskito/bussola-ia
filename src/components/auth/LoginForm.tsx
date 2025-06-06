@@ -178,12 +178,6 @@ export default function LoginForm({ className = '', redirectTo = '/dashboard' }:
               >
                 Sua senha
               </label>
-              <a 
-                href="/auth/reset-password" 
-                className="text-sm text-orange-400 hover:text-orange-300 hover:underline focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-gray-900 rounded"
-              >
-                Esqueceu a senha?
-              </a>
             </div>
             <input
               id={passwordInputId}

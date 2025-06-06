@@ -1,6 +1,7 @@
-import * as React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 
 type Project = {
   id: string;
@@ -11,13 +12,44 @@ type Project = {
 type Chat = {
   id: string;
   title: string;
+  created_at?: string;
 };
 
 interface SidebarProps {
-  chats: Chat[];
+  initialChats?: Chat[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ chats }: SidebarProps) => {
+const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }: SidebarProps) => {
+  const [chats, setChats] = useState<Chat[]>(initialChats);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const loadChats = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const { chats: userChats, error } = await fetchUserChats();
+        
+        if (error) {
+          setError(error);
+          return;
+        }
+        
+        if (userChats && userChats.length > 0) {
+          setChats(userChats);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar chats:', err);
+        setError('Não foi possível carregar seus chats');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadChats();
+  }, []);
   return (
     <aside className="w-64 h-screen bg-gray-800 flex flex-col overflow-hidden">
       {/* Logo */}
@@ -107,24 +139,53 @@ const Sidebar: React.FC<SidebarProps> = ({ chats }: SidebarProps) => {
           </button>
         </div>
         <div className="space-y-1 max-h-64 overflow-y-auto">
-          {chats.map((chat: Chat) => (
-            <Link 
-              key={chat.id} 
-              href={`/dashboard/chat/${chat.id}`}
-              className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200 group"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-              </svg>
-              <span className="truncate">{chat.title}</span>
-            </Link>
-          ))}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#FF6B00]"></div>
+              <span className="ml-2 text-sm text-gray-400">Carregando...</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-3">
+              <p className="text-sm text-red-400">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="mt-2 text-xs text-[#FF6B00] hover:text-[#FF8C33] transition-colors duration-200"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : chats.length === 0 ? (
+            <div className="text-center py-3">
+              <p className="text-sm text-gray-400">Nenhum chat encontrado</p>
+              <Link 
+                href="/dashboard" 
+                className="mt-2 text-xs text-[#FF6B00] hover:text-[#FF8C33] transition-colors duration-200 block"
+              >
+                Iniciar novo chat
+              </Link>
+            </div>
+          ) : (
+            chats.map((chat: Chat) => (
+              <Link 
+                key={chat.id} 
+                href={`/dashboard/chat/${chat.id}`}
+                className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-200 group"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate">{chat.title}</span>
+              </Link>
+            ))
+          )}
         </div>
-        <div className="mt-2 text-center">
-          <button className="text-xs text-gray-400 hover:text-white transition-colors duration-200">
-            Ver mais
-          </button>
-        </div>
+        {!isLoading && !error && chats.length > 10 && (
+          <div className="mt-2 text-center">
+            <button className="text-xs text-gray-400 hover:text-white transition-colors duration-200">
+              Ver mais
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Logout Button */}

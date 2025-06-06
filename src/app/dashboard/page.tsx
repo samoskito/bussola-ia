@@ -14,15 +14,6 @@ const mockChats = Array(10).fill(0).map((_, i) => ({
   title: 'Lorem ipsum dolor...',
 }));
 
-const mockAgents = [
-  { id: '1', name: 'BússolaScriptIA', isActive: true },
-  { id: '2', name: 'BússolaScriptIA' },
-  { id: '3', name: 'BússolaScriptIA' },
-  { id: '4', name: 'BússolaScriptIA' },
-  { id: '5', name: 'BússolaScriptIA' },
-  { id: '6', name: 'BússolaScriptIA' },
-];
-
 export default function DashboardPage() {
   return (
     <div className="flex h-screen w-full bg-dark-100 text-white overflow-hidden">
@@ -34,7 +25,7 @@ export default function DashboardPage() {
         <Header userName="Patrícia" />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <ChatInterface userName="Patrícia" agents={mockAgents} />
+          <ChatInterface userName="Patrícia" />
         </main>
       </div>
     </div>

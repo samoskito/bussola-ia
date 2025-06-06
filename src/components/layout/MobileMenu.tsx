@@ -27,20 +27,20 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
     <div className="fixed inset-0 z-50 lg:hidden">
       {/* Overlay */}
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
         aria-hidden="true"
       />
       
       {/* Menu */}
-      <div className="fixed left-0 top-0 bottom-0 w-72 bg-gray-800 flex flex-col z-50 overflow-y-auto transform transition-transform duration-300 ease-in-out">
+      <div className="fixed left-0 top-0 bottom-0 w-72 bg-gray-900 flex flex-col z-50 overflow-y-auto transform transition-all duration-300 ease-in-out shadow-xl border-r border-gray-800">
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center justify-between">
             <Link href="/dashboard" className="flex items-center">
               <img 
-                src="/images/logo.svg" 
+                src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
                 alt="Bússola Executiva" 
-                className="h-10 w-auto"
+                className="h-10 w-auto object-contain"
               />
             </Link>
             <button 

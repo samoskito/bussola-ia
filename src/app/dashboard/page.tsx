@@ -23,7 +23,7 @@ export default function DashboardPage() {
   }, [user]);
   
   return (
-    <div className="flex h-screen w-full bg-dark-100 text-white overflow-hidden">
+    <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
       {/* Sidebar */}
       <Sidebar />
       
@@ -31,8 +31,10 @@ export default function DashboardPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header userName={userName} />
         
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <ChatInterface userName={userName} />
+        <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950">
+          <div className="h-full max-w-7xl mx-auto w-full">
+            <ChatInterface userName={userName} />
+          </div>
         </main>
       </div>
     </div>

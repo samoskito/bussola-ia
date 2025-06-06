@@ -1,19 +1,7 @@
 'use client';
 
-import * as React from 'react';
-const { useState, useEffect } = React;
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-
-interface Agent {
-  id: string;
-  name: string;
-  isActive?: boolean;
-}
-
-interface ChatInterfaceProps {
-  userName: string;
-  agents?: Agent[];
-}
 
 interface Message {
   id: string;
@@ -22,13 +10,42 @@ interface Message {
   timestamp: Date;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterfaceProps) => {
+interface ChatDetailProps {
+  chatId: string;
+  userName: string;
+}
+
+const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  
+  // Função para rolar para o final das mensagens
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
+  // Efeito para carregar mensagens do chat quando o componente montar
+  useEffect(() => {
+    // Aqui você implementaria a lógica para carregar as mensagens do chat do backend
+    // Por enquanto, vamos simular uma mensagem inicial do sistema
+    setMessages([
+      {
+        id: 'system-welcome',
+        content: `Olá! Este é o início da sua conversa. ID do Chat: ${chatId}`,
+        role: 'assistant',
+        timestamp: new Date()
+      }
+    ]);
+  }, [chatId]);
+  
+  // Rolar para o final quando as mensagens mudarem
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
   
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -56,28 +73,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
     setIsLoading(true);
     
     try {
-      // Enviar mensagem para API
-      const response = await fetch('/api/chats/create', {
+      // Enviar mensagem para o webhook
+      const response = await fetch('/api/chats/message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userMessage.content }),
+        body: JSON.stringify({ 
+          chatId: chatId,
+          message: userMessage.content 
+        }),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Erro ao enviar mensagem');
-      }
-      
-      const data = await response.json();
-      
-      // Armazenar ID do chat atual
-      if (data.chat && data.chat.id) {
-        setCurrentChatId(data.chat.id);
-        
-        // Redirecionar para a página do chat específico
-        router.push(`/dashboard/chat/${data.chat.id}`);
       }
       
       // Adicionar mensagem de confirmação
@@ -107,52 +117,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
   };
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-80px)] w-full">
-      {/* Welcome Header */}
-      <div className="mb-8 md:mb-10 text-center py-8 bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800">
-        <h1 className="text-3xl md:text-4xl font-bold">
-          Olá, <span className="text-[#FF6B00]">{userName}.</span>
-        </h1>
-        <p className="text-gray-400 mt-2 text-lg">
-          Como posso ajudar você hoje?
-        </p>
-      </div>
-      
+    <div className="flex flex-col h-full max-h-[calc(100vh-80px)] w-full px-0">
       {/* Messages Area */}
-      <div className="flex-grow overflow-y-auto space-y-4 px-4 md:px-6 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+      <div className="flex-grow overflow-y-auto space-y-4 px-6 md:px-8 py-6 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
         {messages.length === 0 && !isLoading && (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center text-gray-400 max-w-md mx-auto">
-              <div className="mb-6">
-                <div className="w-24 h-24 mx-auto bg-[#FF6B00]/10 rounded-full flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-[#FF6B00]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                  </svg>
-                </div>
+            <div className="text-center text-gray-400">
+              <div className="mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
               </div>
-              <h3 className="text-2xl font-medium mb-3">Inicie uma nova conversa</h3>
-              <p className="mb-6">Envie uma mensagem para começar a conversar com a Bússola IA</p>
-              <div className="space-y-3 text-left bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm font-medium text-gray-300">Sugestões:</p>
-                <button 
-                  onClick={() => setMessage("Como posso melhorar minha liderança?")} 
-                  className="block w-full text-left px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-md text-sm transition-colors"
-                >
-                  Como posso melhorar minha liderança?
-                </button>
-                <button 
-                  onClick={() => setMessage("Preciso de ajuda com gestão de tempo")} 
-                  className="block w-full text-left px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-md text-sm transition-colors"
-                >
-                  Preciso de ajuda com gestão de tempo
-                </button>
-                <button 
-                  onClick={() => setMessage("Quais são as tendências de mercado para 2025?")} 
-                  className="block w-full text-left px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-md text-sm transition-colors"
-                >
-                  Quais são as tendências de mercado para 2025?
-                </button>
-              </div>
+              <h3 className="text-xl font-medium mb-2">Inicie uma nova conversa</h3>
+              <p>Envie uma mensagem para começar a conversar com a Bússola IA</p>
             </div>
           </div>
         )}
@@ -178,7 +155,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
               </p>
             </div>
             {msg.role === 'user' && (
-              <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center ml-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center ml-2 flex-shrink-0 mt-1">
                 <span className="text-white text-xs font-bold">EU</span>
               </div>
             )}
@@ -199,13 +176,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
             </div>
           </div>
         )}
+        
+        {/* Elemento invisível para rolar para o final */}
+        <div ref={messagesEndRef} className="h-4" />
       </div>
       
       {/* Error message */}
       {error && (
         <div className="px-4 py-2 bg-gray-900 border-t border-gray-800">
-          <div className="bg-red-500 bg-opacity-10 border border-red-500 text-red-500 px-4 py-2 rounded-lg">
-            {error}
+          <div className="bg-red-500 bg-opacity-10 border border-red-500 text-red-500 px-4 py-2 rounded-lg flex items-center justify-between">
+            <span>{error}</span>
             <button 
               onClick={() => setError(null)} 
               className="ml-2 text-red-400 hover:text-red-300"
@@ -217,8 +197,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
       )}
 
       {/* Chat Input */}
-      <div className="w-full px-4 py-4 bg-gray-900 border-t border-gray-800">
-        <form onSubmit={handleSendMessage} className="relative max-w-5xl mx-auto w-full">
+      <div className="w-full px-6 md:px-8 py-4 bg-gray-900 border-t border-gray-800">
+        <form onSubmit={handleSendMessage} className="relative w-full">
           <input
             type="text"
             className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] text-white rounded-lg py-3 px-4 pr-20 outline-none transition-colors duration-200 shadow-lg"
@@ -241,8 +221,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
             </button>
             <button 
               type="submit"
-              className={`p-2 rounded-full ${isLoading ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white transition-colors duration-200`}
+              className={`p-2 rounded-full ${isLoading ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white transition-colors duration-200 shadow-md`}
               disabled={isLoading || !message.trim()}
+              title="Enviar mensagem"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
@@ -255,4 +236,4 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
   );
 };
 
-export default ChatInterface;
+export default ChatDetail;

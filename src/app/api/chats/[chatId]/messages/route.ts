@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 
 export async function GET(
   request: Request,
-  { params }: { params: { chatId: string } }
+  context: { params: { chatId: string } }
 ) {
   try {
     // Obter as variáveis de ambiente do Supabase
@@ -33,8 +33,8 @@ export async function GET(
     }
     
     const userId = decoded.userId;
-    // Usar await para acessar params no Next.js 15
-    const { chatId } = params;
+    // Usar context.params para acessar parâmetros no Next.js 15
+    const { chatId } = context.params;
     
     // Criar cliente do Supabase com a chave de serviço
     const supabase = createClient(supabaseUrl, supabaseKey);

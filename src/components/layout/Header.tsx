@@ -7,7 +7,7 @@ import LogoutButton from '../auth/LogoutButton';
 import MobileMenu from './MobileMenu';
 
 interface HeaderProps {
-  userName: string;
+  userName?: string;
   title?: string;
 }
 
@@ -16,7 +16,7 @@ interface Chat {
   title: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ userName, title }) => {
+const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   

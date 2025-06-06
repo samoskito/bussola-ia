@@ -1,39 +1,133 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createBrowserClient } from '@supabase/supabase-js'
+import { Database } from '@/types/supabase'
 
-// Usar os valores das credenciais do Supabase para o projeto Bússola Executiva
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iszynegxctqdfrmizila.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzenluZWd4Y3RxZGZybWl6aWxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY5MjIwODAsImV4cCI6MjA2MjQ5ODA4MH0.zkxYGj0jiGcoK_04FwHYkP_gsMnjHY8GioGEJNapBEI';
-
-// Verificar se as URLs e chaves estão definidas
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase URL ou Anon Key não estão definidos');
+// Create a type for the Supabase client
+type SupabaseClient = ReturnType<typeof createBrowserClient<Database>>
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string
+          updated_at?: string | null
+          username: string | null
+          full_name: string | null
+          avatar_url: string | null
+          website: string | null
+        }
+        Insert: {
+          id: string
+          updated_at?: string | null
+          username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          website?: string | null
+        }
+        Update: {
+          id?: string
+          updated_at?: string | null
+          username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          website?: string | null
+        }
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+  }
 }
 
-// Cliente público para uso no front-end (com chave anônima)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-// IMPORTANTE: Este cliente só deve ser usado em funções de servidor (Server Components, API Routes, etc.)
-// NUNCA expor este cliente no front-end
-export const createServerSupabaseClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Supabase URL ou Service Role Key não estão definidos');
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing Supabase environment variables. Please check your .env.local file.'
+  )
+}
+
+// Client-side Supabase client
+export const createClient = () => {
+  // Check if we're in the browser
+  if (typeof window === 'undefined') {
+    // Server-side: Return a dummy client that will be overridden by the server client
+    return {
+      auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        getUser: async () => ({ data: { user: null }, error: null }),
+        signInWithPassword: async () => ({ data: { session: null, user: null }, error: null }),
+        signUp: async () => ({ data: { session: null, user: null }, error: null }),
+        signOut: async () => ({ error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      },
+    } as any
   }
-  
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-};
 
-// Função para uso exclusivo em componentes de servidor ou API routes
-export const getServerSupabaseClient = () => {
-  return createServerSupabaseClient();
-};
+  // Browser: Create a new client with browser-specific options
+  const client = createBrowserClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      global: {
+        headers: {},
+      },
+    }
+  )
+
+  // Return the client with proper typing
+  return client as unknown as SupabaseClient
+}
+
+// Create a single instance for client-side usage
+export const supabase = createBrowserClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+)
+
+// Server-side Supabase client
+export const createServerSupabaseClient = (cookies: () => any) => {
+  const cookieStore = cookies()
+  
+  return createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    }
+  )
+  
+  const client = createClientComponent(
+    supabaseUrl,
+    supabaseServiceKey
+  )
+  
+  // Return the client with proper typing
+  return client as unknown as SupabaseClient
+}
+
+// Alias for backward compatibility
+export const getServerSupabaseClient = createServerSupabaseClient
 
 // Tipos para as tabelas
 export type User = {

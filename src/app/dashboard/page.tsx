@@ -9,13 +9,6 @@ import Header from '@/components/layout/Header';
 import ChatInterface from '@/components/chat/ChatInterface';
 
 // Mock data - would come from database in real app
-const mockProjects = [
-  { id: '1', name: 'Projeto X' },
-  { id: '2', name: 'Projeto Y' },
-  { id: '3', name: 'Projeto Z', isActive: true },
-  { id: '4', name: 'Projeto W' },
-];
-
 const mockChats = Array(10).fill(0).map((_, i) => ({
   id: `chat-${i + 1}`,
   title: 'Lorem ipsum dolor...',
@@ -34,7 +27,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-screen bg-dark-100 text-white overflow-hidden">
       {/* Sidebar */}
-      <Sidebar projects={mockProjects} chats={mockChats} />
+      <Sidebar chats={mockChats} />
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">

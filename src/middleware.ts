@@ -1,61 +1,55 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+import { NextResponse, type NextRequest } from 'next/server';
+import { updateSession } from '@/utils/supabase/middleware';
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  
+export async function middleware(request: NextRequest) {
   try {
-    // Verificar se estamos em modo de desenvolvimento
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    // Verificar se existe uma sessão simulada para desenvolvimento
-    const hasMockSession = req.cookies.get('supabase-auth-token') || 
-                          req.headers.get('authorization')?.startsWith('Bearer mock-token');
-    
-    // Criar cliente do Supabase para o middleware
-    const supabase = createMiddlewareClient({ req, res });
-  
-    // Verificar se o usuário está autenticado
-    const { data: { session } } = await supabase.auth.getSession();
+    // Usar o utilitário de atualização de sessão
+    const response = await updateSession(request);
     
     // Obter o caminho da URL
-    const path = req.nextUrl.pathname;
+    const path = request.nextUrl.pathname;
     
     // Verificar se o caminho é uma rota protegida
     const isProtectedRoute = path.startsWith('/dashboard');
-    // Verificar se é a rota de login ou página inicial
-    const isLoginPage = path === '/auth/login' || path === '/';
+    const isAuthRoute = path.startsWith('/auth');
     
-    // Em modo de desenvolvimento, permitir acesso às rotas protegidas se houver sessão simulada
-    if (isDevelopment && isProtectedRoute && hasMockSession) {
-      console.log('Modo de desenvolvimento: permitindo acesso à rota protegida');
-      return res;
-    }
+    // Verificar se o usuário está autenticado
+    const isAuthenticated = request.cookies.has('sb-access-token') || 
+                          request.cookies.has('sb-refresh-token') ||
+                          request.headers.get('authorization')?.startsWith('Bearer ');
     
     // Se for uma rota protegida e o usuário não estiver autenticado, redirecionar para o login
-    if (isProtectedRoute && !session) {
-      console.log('Usuário não autenticado tentando acessar rota protegida');
-      const redirectUrl = new URL('/auth/login', req.url);
+    if (isProtectedRoute && !isAuthenticated) {
+      const redirectUrl = new URL('/auth/login', request.url);
+      redirectUrl.searchParams.set('redirectedFrom', path);
       return NextResponse.redirect(redirectUrl);
     }
     
-    // Se o usuário estiver autenticado e tentar acessar a página de login ou a página inicial,
-    // redirecionar para o dashboard/chat
-    if (isLoginPage && (session || (isDevelopment && hasMockSession))) {
-      console.log('Usuário autenticado tentando acessar login, redirecionando para dashboard');
-      const redirectUrl = new URL('/dashboard/chat', req.url);
-      return NextResponse.redirect(redirectUrl);
+    // Se for uma rota de autenticação e o usuário já estiver autenticado, redirecionar para o dashboard
+    if (isAuthRoute && isAuthenticated && path !== '/auth/logout') {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
     }
     
-    return res;
+    return response;
   } catch (error) {
     console.error('Erro no middleware:', error);
-    return res;
+    // Em caso de erro, permitir acesso para evitar bloqueios
+    return NextResponse.next();
   }
 }
 
-// Configurar quais rotas o middleware deve ser executado
+// Match all request paths except for the ones starting with:
+// - _next/static (static files)
+// - _next/image (image optimization files)
+// - favicon.ico (favicon file)
+// - auth/ (auth pages)
+// - api/ (API routes)
+// - public/ (public files)
+// - robots.txt
+// - sitemap.xml
+// - manifest.json
 export const config = {
-  matcher: ['/dashboard/:path*', '/auth/:path*'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|auth/|api/|public/|robots.txt|sitemap.xml|manifest.json).*)',
+  ],
 };

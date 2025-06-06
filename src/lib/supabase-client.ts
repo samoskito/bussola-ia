@@ -1,25 +1,21 @@
-import { createBrowserClient } from '@supabase/ssr'
-import type { Database } from '@/types/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Database } from '@/types/supabase'
 
-export function createClient() {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-        storageKey: 'sb-auth-token',
-      },
-      global: {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
-    }
-  )
-}
+// Create the Supabase client
+const supabase = createClientComponentClient<Database>({
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  options: {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+    db: {
+      schema: 'public',
+    },
+  },
+})
 
-export const supabase = createClient()
+export { supabase };
+export default supabase;

@@ -1,11 +1,35 @@
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthContext, type AuthContextType } from '@/contexts/AuthContext';
+import { getCurrentUser, login as loginService, logout as logoutService } from '@/lib/auth-utils';
 
 // Fallback for pathname in case usePathname is not available
 const useSafePathname = () => {
   if (typeof window === 'undefined') return '';
   return window.location.pathname;
+};
+
+// Custom hook to sync auth state with server
+export const useAuthSync = () => {
+  const [loading, setLoading] = useState(true);
+  const { setUser } = useAuth();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = await getCurrentUser();
+        setUser(user);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [setUser]);
+
+  return { loading };
 };
 
 /**
@@ -28,7 +52,16 @@ export const useAuth = () => {
  */
 export const useIsAuthenticated = () => {
   const { user, loading } = useAuth();
-  return { isAuthenticated: !!user, loading };
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  return { 
+    isAuthenticated: isClient && !!user, 
+    loading 
+  };
 };
 
 /**
@@ -39,11 +72,15 @@ export const useIsAuthenticated = () => {
 export const useRequireAuth = (redirectTo?: string) => {
   const { user, loading } = useAuth();
   const router = useRouter();
-  // Use the safe pathname hook
   const pathname = useSafePathname();
+  const [isClient, setIsClient] = useState(false);
   
   useEffect(() => {
-    if (!loading && !user) {
+    setIsClient(true);
+  }, []);
+  
+  useEffect(() => {
+    if (!loading && !user && isClient) {
       // If not logged in, redirect to login page
       const searchParams = new URLSearchParams();
       if (redirectTo) {

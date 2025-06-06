@@ -1,285 +1,345 @@
-import { createClient as createBrowserClient } from '@supabase/supabase-js'
-import { Database } from '@/types/supabase'
-
-// Create a type for the Supabase client
-type SupabaseClient = ReturnType<typeof createBrowserClient<Database>>
-  public: {
-    Tables: {
-      profiles: {
-        Row: {
-          id: string
-          updated_at?: string | null
-          username: string | null
-          full_name: string | null
-          avatar_url: string | null
-          website: string | null
-        }
-        Insert: {
-          id: string
-          updated_at?: string | null
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          website?: string | null
-        }
-        Update: {
-          id?: string
-          updated_at?: string | null
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          website?: string | null
-        }
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-  }
-}
+import { createBrowserClient } from '@supabase/ssr';
+import type { Database } from './database.types';
+import type { CookieOptions } from '@supabase/ssr';
 
 // Environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
     'Missing Supabase environment variables. Please check your .env.local file.'
-  )
+  );
 }
 
-// Client-side Supabase client
-export const createClient = () => {
-  // Check if we're in the browser
-  if (typeof window === 'undefined') {
-    // Server-side: Return a dummy client that will be overridden by the server client
-    return {
-      auth: {
-        getSession: async () => ({ data: { session: null }, error: null }),
-        getUser: async () => ({ data: { user: null }, error: null }),
-        signInWithPassword: async () => ({ data: { session: null, user: null }, error: null }),
-        signUp: async () => ({ data: { session: null, user: null }, error: null }),
-        signOut: async () => ({ error: null }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      },
-    } as any
-  }
-
-  // Browser: Create a new client with browser-specific options
-  const client = createBrowserClient(
+/**
+ * Create a Supabase client for client-side usage
+ */
+export function createClient() {
+  return createBrowserClient<Database>(
     supabaseUrl,
     supabaseAnonKey,
     {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-      },
-      global: {
-        headers: {},
-      },
+      cookies: {
+        get(name: string) {
+          // Get the cookie value
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop()?.split(';').shift();
+          return '';
+        },
+        set(name: string, value: string, options: CookieOptions = {}) {
+          // Set the cookie with options
+          let cookieString = `${name}=${value}; path=${options.path || '/'};`;
+          if (options.maxAge) cookieString += ` max-age=${options.maxAge};`;
+          if (options.domain) cookieString += ` domain=${options.domain};`;
+          if (options.secure) cookieString += ' secure;';
+          if (options.httpOnly) cookieString += ' HttpOnly;';
+          if (options.sameSite) cookieString += ` samesite=${options.sameSite};`;
+          document.cookie = cookieString;
+        },
+        remove(name: string, options: CookieOptions = {}) {
+          // Remove the cookie by setting an expired date
+          document.cookie = `${name}=; path=${options.path || '/'}; expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+        }
+      }
     }
-  )
-
-  // Return the client with proper typing
-  return client as unknown as SupabaseClient
+  );
 }
 
 // Create a single instance for client-side usage
-export const supabase = createBrowserClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  }
-)
+export const supabase = createClient();
 
-// Server-side Supabase client
-export const createServerSupabaseClient = (cookies: () => any) => {
-  const cookieStore = cookies()
-  
+/**
+ * Create a Supabase client for server-side usage
+ */
+export function createServerSupabaseClient(cookies: () => any) {
   return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    }
-  )
-  
-  const client = createClientComponent(
     supabaseUrl,
-    supabaseServiceKey
-  )
-  
-  // Return the client with proper typing
-  return client as unknown as SupabaseClient
+    supabaseServiceKey,
+    {
+      cookies: {
+        get(name: string) {
+          return cookies().get(name)?.value || '';
+        },
+        set(name: string, value: string, options: CookieOptions = {}) {
+          cookies().set(name, value, options);
+        },
+        remove(name: string, options: CookieOptions = {}) {
+          cookies().delete(name, options);
+        }
+      }
+    }
+  );
 }
 
 // Alias for backward compatibility
-export const getServerSupabaseClient = createServerSupabaseClient
+export const getServerSupabaseClient = createServerSupabaseClient;
 
-// Tipos para as tabelas
-export type User = {
-  id: number;
-  nome: string;
-  email: string;
-  telefone?: string;
-  avatar?: string;
-  rua?: string;
-  numero?: string;
-  bairro?: string;
-  cep?: string;
-  cidade?: string;
-  estado?: string;
-  pais?: string;
-  nivel: 'admin' | 'user';
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type Chat = {
+// Types for database tables
+export interface User {
   id: string;
-  user_id: number;
+  email: string;
+  nome: string;
+  telefone?: string | null;
+  avatar?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cep?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  pais?: string | null;
+  nivel: 'admin' | 'user';
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface Chat {
+  id: string;
+  user_id: string;
   title: string;
-  created_at?: string;
-  updated_at?: string;
-};
+  created_at: string;
+  updated_at?: string | null;
+}
 
-export type Script = {
-  id: number;
-  user_id: number;
+export interface Script {
+  id: string;
+  user_id: string;
   input: string;
-  output?: string;
+  output?: string | null;
   chatid: string;
-  created_at?: string;
-  updated_at?: string;
-};
+  created_at: string;
+  updated_at?: string | null;
+}
 
-
-// Constantes para buckets de armazenamento
+// Storage bucket constants
 export const STORAGE_BUCKETS = {
   PROFILE_IMAGES: 'profile_images',
   CHAT_FILES: 'chat_files',
   IMAGES: 'images',
   ASSETS: 'assets',
   DOCUMENTS: 'documents'
-};
+} as const;
 
-// Funções para gerenciar o armazenamento de imagens
-export const uploadImage = async (bucket: string, filePath: string, file: File) => {
+type StorageBucket = typeof STORAGE_BUCKETS[keyof typeof STORAGE_BUCKETS];
+
+// File with metadata for upload
+export interface UploadFile extends File {
+  path?: string;
+  preview?: string;
+}
+
+/**
+ * Upload a file to Supabase Storage
+ */
+export async function uploadFile(
+  bucket: StorageBucket,
+  filePath: string,
+  file: File,
+  options: {
+    cacheControl?: string;
+    upsert?: boolean;
+    contentType?: string;
+  } = {}
+) {
   try {
     const { data, error } = await supabase.storage
       .from(bucket)
       .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true
+        cacheControl: options.cacheControl || '3600',
+        upsert: options.upsert !== false,
+        contentType: options.contentType || file.type,
       });
     
     if (error) throw error;
-    return data;
+    return { data, error: null };
   } catch (error) {
-    console.error('Erro ao fazer upload da imagem:', error);
-    throw error;
+    console.error('Error uploading file:', error);
+    return { 
+      data: null, 
+      error: error instanceof Error ? error : new Error('Failed to upload file')
+    };
   }
-};
+}
 
-export const getImageUrl = (bucket: string, filePath: string) => {
+/**
+ * Get public URL for a file in storage
+ */
+export function getFileUrl(bucket: StorageBucket, filePath: string): string {
   try {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    const { data } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(filePath);
     return data.publicUrl;
   } catch (error) {
-    console.error('Erro ao obter URL da imagem:', error);
-    return null;
+    console.error('Error getting file URL:', error);
+    return '';
   }
 };
 
-export const deleteImage = async (bucket: string, filePath: string) => {
+/**
+ * Delete a file from storage
+ */
+export const deleteFile = async (bucket: StorageBucket, filePath: string) => {
   try {
-    const { error } = await supabase.storage.from(bucket).remove([filePath]);
+    const { error } = await supabase.storage
+      .from(bucket)
+      .remove([filePath]);
+    
     if (error) throw error;
-    return true;
+    return { success: true, error: null };
   } catch (error) {
-    console.error('Erro ao excluir imagem:', error);
-    throw error;
+    console.error('Error deleting file:', error);
+    return { success: false, error };
   }
 };
 
-export const listImages = async (bucket: string, folderPath?: string) => {
+/**
+ * List files in a storage bucket
+ */
+export const listFiles = async (bucket: StorageBucket, path = '') => {
   try {
-    const { data, error } = await supabase.storage.from(bucket).list(folderPath || '');
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .list(path);
+    
     if (error) throw error;
-    return data;
+    return { data, error: null };
   } catch (error) {
-    console.error('Erro ao listar imagens:', error);
-    throw error;
+    console.error('Error listing files:', error);
+    return { data: null, error };
   }
 };
 
-// Funções de autenticação
-export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  
-  if (error) throw error;
-  return data;
+// Authentication functions
+
+interface AuthResponse {
+  user: any | null;
+  error: Error | null;
+}
+
+/**
+ * Sign in with email and password
+ */
+export const signIn = async (email: string, password: string): Promise<AuthResponse> => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    
+    if (error) throw error;
+    return { user: data.user, error: null };
+  } catch (error) {
+    console.error('Sign in error:', error);
+    return { user: null, error: error as Error };
+  }
 };
 
-export const signUp = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-  
-  if (error) throw error;
-  return data;
+/**
+ * Sign up with email and password
+ */
+export const signUp = async (email: string, password: string): Promise<AuthResponse> => {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    
+    if (error) throw error;
+    return { user: data.user, error: null };
+  } catch (error) {
+    console.error('Sign up error:', error);
+    return { user: null, error: error as Error };
+  }
 };
 
-export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+/**
+ * Sign out the current user
+ */
+export const signOut = async (): Promise<{ error: Error | null }> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    console.error('Sign out error:', error);
+    return { error: error as Error };
+  }
 };
 
-// Funções para gerenciar scripts
-export const saveScript = async (userId: string, title: string, content: string) => {
-  const { data, error } = await supabase
-    .from('scripts')
-    .insert([
-      { user_id: userId, title, content, created_at: new Date() }
-    ]);
-  
-  if (error) throw error;
-  return data;
+// Script management functions
+
+/**
+ * Save a new script
+ */
+export const saveScript = async (
+  userId: string,
+  title: string,
+  content: string
+): Promise<{ data: any | null; error: Error | null }> => {
+  try {
+    const { data, error } = await supabase
+      .from('scripts')
+      .insert([
+        { 
+          user_id: userId, 
+          title: title.trim(), 
+          content,
+          updated_at: new Date().toISOString()
+        }
+      ])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error saving script:', error);
+    return { data: null, error: error as Error };
+  }
 };
 
-export const getScripts = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('scripts')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-  
-  if (error) throw error;
-  return data;
+/**
+ * Get all scripts for a user
+ */
+export const getScripts = async (
+  userId: string
+): Promise<{ data: Script[] | null; error: Error | null }> => {
+  try {
+    const { data, error } = await supabase
+      .from('scripts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+    
+    if (error) throw error;
+    return { data: data as Script[], error: null };
+  } catch (error) {
+    console.error('Error fetching scripts:', error);
+    return { data: null, error: error as Error };
+  }
 };
 
-export const deleteScript = async (scriptId: string) => {
-  const { error } = await supabase
-    .from('scripts')
-    .delete()
-    .eq('id', scriptId);
-  
-  if (error) throw error;
+/**
+ * Delete a script by ID
+ */
+export const deleteScript = async (
+  scriptId: string
+): Promise<{ success: boolean; error: Error | null }> => {
+  try {
+    const { error } = await supabase
+      .from('scripts')
+      .delete()
+      .eq('id', scriptId);
+    
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error deleting script:', error);
+    return { success: false, error: error as Error };
+  }
 };

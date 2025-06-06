@@ -15,7 +15,7 @@ export async function login(formData: FormData): Promise<void> {
     
     const authData = await signIn(email, password);
     
-    if (authData.session) {
+    if (authData.user) {
       // Redirecionar para a página de chats após login bem-sucedido
       redirect('/dashboard/chat');
     } else {

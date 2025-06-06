@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 import { useRouter } from 'next/navigation';
+import LogoutButton from '@/components/auth/LogoutButton';
 
 type Chat = {
   id: string;
@@ -195,15 +196,10 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
       
       {/* Logout Button */}
       <div className="mt-auto p-4 border-t border-gray-800">
-        <Link 
-          href="/auth/logout"
-          className="flex items-center px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-md transition-colors duration-200"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
-          </svg>
-          <span>Sair da conta</span>
-        </Link>
+        <LogoutButton 
+          variant="text" 
+          className="w-full flex items-center px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-md transition-colors duration-200"
+        />
       </div>
     </aside>
   );

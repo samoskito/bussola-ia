@@ -1,19 +1,10 @@
 "use client";
 
-import React from 'react';
-// @ts-ignore - Ignorando erros de tipagem para permitir a build
-const { useState, useEffect } = React;
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import { supabase } from '@/lib/supabase';
-
-// Mock data - would come from database in real app
-const mockProjects = [
-  { id: '1', name: 'Projeto X' },
-  { id: '2', name: 'Projeto Y' },
-  { id: '3', name: 'Projeto Z', isActive: true },
-  { id: '4', name: 'Projeto W' },
-];
+import Image from 'next/image';
 
 const mockChats = Array(10).fill(0).map((_, i) => ({
   id: `chat-${i + 1}`,
@@ -23,10 +14,18 @@ const mockChats = Array(10).fill(0).map((_, i) => ({
 interface ProfileFormData {
   name: string;
   email: string;
-  company: string;
-  role: string;
   phone: string;
-  position: string;
+  avatar_url: string;
+  street: string;
+  number: string;
+  district: string;
+  zip_code: string;
+  city: string;
+  state: string;
+  country: string;
+  position: string; // cargo
+  company: string; // empresa
+  age: string; // idade
 }
 
 export default function ProfilePage() {
@@ -35,13 +34,31 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState<ProfileFormData>({
     name: '',
     email: '',
-    company: '',
-    role: '',
     phone: '',
-    position: ''
+    avatar_url: '',
+    street: '',
+    number: '',
+    district: '',
+    zip_code: '',
+    city: '',
+    state: '',
+    country: '',
+    position: '',
+    company: '',
+    age: ''
   });
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordError, setPasswordError] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const getUser = async () => {
@@ -52,36 +69,48 @@ export default function ProfilePage() {
         if (session?.user) {
           setUser(session.user);
           
-          // Buscar dados adicionais do usuário (em uma implementação real)
-          // const { data: profile } = await supabase
-          //   .from('profiles')
-          //   .select('*')
-          //   .eq('id', session.user.id)
-          //   .single();
+          // Buscar dados do usuário na tabela users
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
           
-          // Dados simulados para demonstração
-          setTimeout(() => {
-            const mockUserData = {
-              id: '123',
-              name: 'Patrícia Silva',
-              email: 'patricia.silva@exemplo.com',
-              company: 'Empresa ABC',
-              role: 'Gerente de Marketing',
-              phone: '(11) 98765-4321',
-              position: 'Gerente de Marketing'
-            };
-            
-            setUser(mockUserData);
+          if (error) {
+            console.error('Erro ao buscar dados do usuário:', error);
+            throw error;
+          }
+          
+          if (userData) {
+            // Preencher o formulário com os dados do usuário
             setFormData({
-              name: mockUserData.name,
-              email: mockUserData.email,
-              company: mockUserData.company,
-              role: mockUserData.role,
-              phone: mockUserData.phone,
-              position: mockUserData.position
+              name: userData.name || '',
+              email: userData.email || session.user.email || '',
+              phone: userData.phone || '',
+              avatar_url: userData.avatar_url || '',
+              street: userData.street || '',
+              number: userData.number || '',
+              district: userData.district || '',
+              zip_code: userData.zip_code || '',
+              city: userData.city || '',
+              state: userData.state || '',
+              country: userData.country || '',
+              position: userData.position || '',
+              company: userData.company || '',
+              age: userData.age || ''
             });
-            setLoading(false);
-          }, 1500);
+            
+            // Se houver avatar, definir a preview
+            if (userData.avatar_url) {
+              setAvatarPreview(userData.avatar_url);
+            }
+          } else {
+            // Se não houver dados do usuário, preencher apenas o email
+            setFormData(prev => ({
+              ...prev,
+              email: session.user.email || ''
+            }));
+          }
         }
       } catch (error) {
         console.error('Erro ao buscar dados do usuário:', error);
@@ -93,9 +122,33 @@ export default function ProfilePage() {
     getUser();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setAvatarFile(file);
+      
+      // Criar preview da imagem
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setAvatarPreview(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({
       ...prev,
       [name]: value
     }));
@@ -107,19 +160,49 @@ export default function ProfilePage() {
     try {
       setIsSaving(true);
       
-      // Em uma implementação real, salvaríamos os dados no Supabase
-      // await supabase
-      //   .from('profiles')
-      //   .upsert({
-      //     id: user.id,
-      //     name: formData.name,
-      //     company: formData.company,
-      //     role: formData.role,
-      //     updated_at: new Date()
-      //   });
+      // Upload do avatar se houver um novo arquivo
+      let avatarUrl = formData.avatar_url;
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const fileName = `${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `avatars/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('user-avatars')
+          .upload(filePath, avatarFile);
+          
+        if (uploadError) {
+          throw uploadError;
+        }
+        
+        // Obter a URL pública do avatar
+        const { data } = supabase.storage.from('user-avatars').getPublicUrl(filePath);
+        avatarUrl = data.publicUrl;
+      }
       
-      // Simulação de salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Atualizar os dados do usuário na tabela users
+      const { error } = await supabase
+        .from('users')
+        .upsert({
+          id: user.id,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          avatar_url: avatarUrl,
+          street: formData.street,
+          number: formData.number,
+          district: formData.district,
+          zip_code: formData.zip_code,
+          city: formData.city,
+          state: formData.state,
+          country: formData.country,
+          position: formData.position,
+          company: formData.company,
+          age: formData.age,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
       
       setIsEditing(false);
       alert('Perfil atualizado com sucesso!');
@@ -130,11 +213,48 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   };
+  
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    
+    // Validar se as senhas coincidem
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('As senhas não coincidem');
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      
+      // Atualizar a senha do usuário
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+      
+      if (error) throw error;
+      
+      // Limpar o formulário de senha
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      
+      setIsChangingPassword(false);
+      alert('Senha atualizada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar senha:', error);
+      setPasswordError('Erro ao atualizar senha. Verifique sua senha atual.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="flex h-screen w-full bg-dark-100 text-white overflow-hidden">
       {/* Sidebar */}
-      <Sidebar chats={mockChats} />
+      <Sidebar initialChats={mockChats} />
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -193,7 +313,59 @@ export default function ProfilePage() {
                   )}
                 </div>
                 
-                <form id="profile-form" onSubmit={handleSubmit} className="space-y-6">
+                <form id="profile-form" onSubmit={handleSubmit} className="space-y-8">
+                  {/* Avatar/Foto do Usuário */}
+                  <div className="md:col-span-2 flex flex-col items-center sm:items-start">
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Foto do Perfil</label>
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                      <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-primary-500 bg-gray-900">
+                        {avatarPreview || formData.avatar_url ? (
+                          <Image 
+                            src={avatarPreview || formData.avatar_url}
+                            alt="Foto de perfil"
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M12 11C14.2091 11 16 9.20914 16 7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7C8 9.20914 9.79086 11 12 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {isEditing && (
+                        <div className="flex flex-col gap-2">
+                          <input
+                            type="file"
+                            id="avatar"
+                            name="avatar"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                            ref={fileInputRef}
+                            disabled={isSaving}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                            disabled={isSaving}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M17 8L12 3L7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            Alterar foto
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Nome */}
                     <div className="md:col-span-2">
@@ -239,6 +411,20 @@ export default function ProfilePage() {
                       />
                     </div>
                     
+                    {/* Idade */}
+                    <div>
+                      <label htmlFor="age" className="block text-sm font-medium text-gray-300 mb-2">Idade</label>
+                      <input
+                        type="number"
+                        id="age"
+                        name="age"
+                        value={formData.age}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                      />
+                    </div>
+                    
                     {/* Empresa */}
                     <div>
                       <label htmlFor="company" className="block text-sm font-medium text-gray-300 mb-2">Empresa</label>
@@ -261,6 +447,110 @@ export default function ProfilePage() {
                         id="position"
                         name="position"
                         value={formData.position}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                      />
+                    </div>
+                    
+                    {/* Endereço - Título */}
+                    <div className="md:col-span-2 mt-4">
+                      <h3 className="text-lg font-semibold text-[#FF6B00] mb-3">Endereço</h3>
+                    </div>
+                    
+                    {/* Rua */}
+                    <div className="md:col-span-2">
+                      <label htmlFor="street" className="block text-sm font-medium text-gray-300 mb-2">Rua</label>
+                      <input
+                        type="text"
+                        id="street"
+                        name="street"
+                        value={formData.street}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                      />
+                    </div>
+                    
+                    {/* Número */}
+                    <div>
+                      <label htmlFor="number" className="block text-sm font-medium text-gray-300 mb-2">Número</label>
+                      <input
+                        type="text"
+                        id="number"
+                        name="number"
+                        value={formData.number}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                      />
+                    </div>
+                    
+                    {/* Bairro */}
+                    <div>
+                      <label htmlFor="district" className="block text-sm font-medium text-gray-300 mb-2">Bairro</label>
+                      <input
+                        type="text"
+                        id="district"
+                        name="district"
+                        value={formData.district}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                      />
+                    </div>
+                    
+                    {/* CEP */}
+                    <div>
+                      <label htmlFor="zip_code" className="block text-sm font-medium text-gray-300 mb-2">CEP</label>
+                      <input
+                        type="text"
+                        id="zip_code"
+                        name="zip_code"
+                        value={formData.zip_code}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                        placeholder="00000-000"
+                      />
+                    </div>
+                    
+                    {/* Cidade */}
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-2">Cidade</label>
+                      <input
+                        type="text"
+                        id="city"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                      />
+                    </div>
+                    
+                    {/* Estado */}
+                    <div>
+                      <label htmlFor="state" className="block text-sm font-medium text-gray-300 mb-2">Estado</label>
+                      <input
+                        type="text"
+                        id="state"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        disabled={!isEditing || isSaving}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"
+                      />
+                    </div>
+                    
+                    {/* País */}
+                    <div>
+                      <label htmlFor="country" className="block text-sm font-medium text-gray-300 mb-2">País</label>
+                      <input
+                        type="text"
+                        id="country"
+                        name="country"
+                        value={formData.country}
                         onChange={handleChange}
                         disabled={!isEditing || isSaving}
                         className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:border-[#FF6B00] disabled:opacity-60 transition-all duration-200"

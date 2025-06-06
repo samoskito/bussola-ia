@@ -73,7 +73,7 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title }) => {
           <span className="hidden sm:inline">Configurações</span>
         </Link>
         
-        <div className="flex items-center gap-3 px-3 py-2 bg-primary-500/10 rounded-lg">
+        <Link href="/dashboard/profile" className="flex items-center gap-3 px-3 py-2 bg-primary-500/10 rounded-lg hover:bg-primary-500/20 transition-colors duration-200">
           <div className="relative w-9 h-9 rounded-full overflow-hidden border-2 border-primary-500">
             <Image 
               src="/images/avatar.png" 
@@ -83,7 +83,7 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title }) => {
             />
           </div>
           <span className="text-sm font-medium text-white hidden md:inline">{userName}</span>
-        </div>
+        </Link>
         
         <div className="hidden md:block">
           <LogoutButton />

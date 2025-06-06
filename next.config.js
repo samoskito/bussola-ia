@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Desativar o indicador de erros do Next.js na interface
+  devIndicators: {
+    buildActivity: false,
+    buildActivityPosition: 'bottom-right',
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',

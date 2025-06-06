@@ -3,17 +3,25 @@ import { cookies } from 'next/headers';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST() {
-  const supabaseServerClient = createServerSupabaseClient();
-  const cookieStore = await cookies();
   try {
-    // Create a response with success status
+    const cookieStore = cookies();
+    const supabaseServerClient = createServerSupabaseClient();
+    
+    // Fazer logout no Supabase
+    await supabaseServerClient.auth.signOut();
+    
+    // Criar uma resposta com status de sucesso
     const response = NextResponse.json(
       { success: true },
       { status: 200 }
     );
     
-    // Clear the auth cookie
+    // Limpar todos os cookies relacionados à autenticação
     response.cookies.delete('auth_token');
+    response.cookies.delete('supabase-auth-token');
+    
+    // Definir cabeçalhos para evitar cache
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
     
     return response;
     

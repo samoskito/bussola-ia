@@ -3,8 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   // Desativar o indicador de erros do Next.js na interface
   devIndicators: {
-    buildActivity: false,
-    buildActivityPosition: 'bottom-right',
+    position: 'bottom-right',
   },
   experimental: {
     serverActions: {
@@ -75,17 +74,8 @@ const nextConfig = {
     return config;
   },
   // Otimizações para produção
-  swcMinify: true,
-  compress: true,
   poweredByHeader: false,
   generateEtags: true,
-  // Configuração para cache e otimização
-  onDemandEntries: {
-    // Período em ms em que a página será mantida em buffer
-    maxInactiveAge: 25 * 1000,
-    // Número de páginas que devem ser mantidas simultaneamente sem serem descartadas
-    pagesBufferLength: 2,
-  },
 };
 
 module.exports = nextConfig;

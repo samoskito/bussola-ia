@@ -61,23 +61,39 @@ export async function clientCheckSession(): Promise<{ user: any | null; error?: 
  */
 export async function clientLogin(email: string, password: string): Promise<{ user: any | null; error?: string }> {
   try {
+    console.log('[CLIENT] Iniciando processo de login para:', email);
+    
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
+      // Importante para garantir que os cookies sejam enviados e recebidos
+      credentials: 'include'
     });
     
+    console.log('[CLIENT] Resposta do servidor:', response.status, response.statusText);
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Erro ao fazer login');
+      let errorMessage = 'Erro ao fazer login';
+      
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (parseError) {
+        console.error('[CLIENT] Erro ao analisar resposta de erro:', parseError);
+      }
+      
+      console.error('[CLIENT] Erro de login:', errorMessage);
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
+    console.log('[CLIENT] Login bem-sucedido, dados do usuário recebidos');
     return { user: data.user || null };
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('[CLIENT] Erro no processo de login:', error);
     return { 
       user: null, 
       error: error instanceof Error ? error.message : 'Erro desconhecido' 

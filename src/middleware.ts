@@ -11,10 +11,11 @@ export async function middleware(request: NextRequest) {
       '/auth/register',
       '/auth/forgot-password',
       '/auth/reset-password',
+      '/auth/update-password',
     ];
     
     // Permitir acesso a arquivos estáticos e imagens
-    if (path.startsWith('/images/')) {
+    if (path.startsWith('/images/') || path.startsWith('/api/')) {
       return NextResponse.next();
     }
     
@@ -31,8 +32,14 @@ export async function middleware(request: NextRequest) {
     // Check for auth token in cookies
     const token = request.cookies.get('auth_token')?.value;
     
+    // Log para depuração (apenas em desenvolvimento)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[MIDDLEWARE] Path: ${path}, Token: ${token ? 'Presente' : 'Ausente'}`);
+    }
+    
     // If no token and not a public route, redirect to login
     if (!token) {
+      console.log(`[MIDDLEWARE] Redirecionando para login. Path: ${path}`);
       const loginUrl = new URL('/auth/login', request.url);
       loginUrl.searchParams.set('redirectedFrom', path);
       return NextResponse.redirect(loginUrl);

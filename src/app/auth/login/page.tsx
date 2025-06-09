@@ -23,10 +23,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row">
       {/* Mobile layout (vertical) */}
-      <div className="flex flex-col w-full h-screen md:hidden relative bg-gradient-to-b from-gray-900 to-gray-800">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 z-10">
+      <div className="flex flex-col w-full h-screen md:hidden bg-gradient-to-b from-gray-900 to-gray-800 overflow-auto">
+        {/* Conteúdo do formulário */}
+        <div className="flex flex-col items-center justify-start pt-12 px-8 pb-8">
           <div className="w-full max-w-sm">
-            <div className="mb-12 flex justify-center">
+            <div className="mb-8 flex justify-center">
               <div className="w-[200px]">
                 <img 
                   src="/images/Logo.webp" 
@@ -48,17 +49,16 @@ export default function LoginPage() {
           </div>
         </div>
         
-        {/* Apresentadora para mobile */}
-        <div className="absolute bottom-0 right-0 w-full h-1/3 z-0">
-          <div className="relative w-full h-full overflow-hidden">
+        {/* Apresentadora para mobile - agora abaixo do formulário */}
+        <div className="w-full mt-auto">
+          <div className="relative w-full overflow-hidden">
             <img 
               src="/images/Apresentadora.png" 
               alt="Apresentadora" 
+              className="w-full h-auto"
               style={{
-                width: '100%',
-                height: '100%',
                 objectFit: 'cover',
-                objectPosition: 'center 30%'
+                objectPosition: 'center top'
               }}
             />
           </div>

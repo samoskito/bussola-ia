@@ -1,9 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import LogoutButton from '../auth/LogoutButton';
+import Image from 'next/image';
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -13,6 +14,44 @@ interface MobileMenuProps {
 
 const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
   const router = useRouter();
+  
+  // Log para verificar os chats recebidos pelo MobileMenu
+  useEffect(() => {
+    if (isOpen) {
+      console.log('MobileMenu aberto - chats recebidos:', chats);
+    }
+  }, [isOpen, chats]);
+  
+  // Fechar o menu quando pressionar ESC
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
+  // Prevenir rolagem do body quando o menu estiver aberto
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   // Simplificando a verificação de rota ativa usando window.location
   const isActive = (path: string) => {
     if (typeof window !== 'undefined') {
@@ -25,21 +64,23 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
 
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
-      {/* Overlay */}
+      {/* Overlay com efeito de fade */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
         aria-hidden="true"
       />
       
-      {/* Menu */}
+      {/* Menu lateral com efeito de slide */}
       <div className="fixed left-0 top-0 bottom-0 w-72 bg-gray-900 flex flex-col z-50 overflow-y-auto transform transition-all duration-300 ease-in-out shadow-xl border-r border-gray-800">
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center justify-between">
-            <Link href="/dashboard" className="flex items-center">
-              <img 
+            <Link href="/dashboard" className="flex items-center" onClick={onClose}>
+              <Image 
                 src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
                 alt="Bússola Executiva" 
+                width={150}
+                height={55}
                 className="h-10 w-auto object-contain"
               />
             </Link>
@@ -89,28 +130,6 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
             </svg>
             Scripts Salvos
           </Link>
-
-          <Link 
-            href="/dashboard/profile"
-            className={`flex items-center px-4 py-3 rounded-md text-base font-medium ${isActive('/dashboard/profile') ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
-            onClick={onClose}
-          >
-            <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            Perfil
-          </Link>
-
-          <Link 
-            href="/dashboard/help"
-            className={`flex items-center px-4 py-3 rounded-md text-base font-medium ${isActive('/dashboard/help') ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
-            onClick={onClose}
-          >
-            <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Ajuda
-          </Link>
         </nav>
 
         {/* Chats Section */}
@@ -118,37 +137,34 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
           <div className="px-4 py-2">
             <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Seus chats</h3>
             <div className="space-y-1">
-              {chats.map((chat) => (
-                <Link
-                  key={chat.id}
-                  href={`/dashboard/chat/${chat.id}`}
-                  className={`flex items-center px-3 py-2 text-sm rounded-md ${isActive(`/dashboard/chat/${chat.id}`) ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
-                  onClick={onClose}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-2 group-hover:text-white" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                  </svg>
-                  <span className="truncate">{chat.title}</span>
-                </Link>
-              ))}
+              {chats && chats.length > 0 ? (
+                chats.map((chat) => (
+                  <Link
+                    key={chat.id}
+                    href={`/dashboard/chat/${chat.id}`}
+                    className={`flex items-center px-3 py-2 text-sm rounded-md ${isActive(`/dashboard/chat/${chat.id}`) ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                    onClick={onClose}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-2 group-hover:text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                    </svg>
+                    <span className="truncate">{chat.title || 'Chat sem título'}</span>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-sm text-gray-400 py-2">Nenhum chat encontrado</div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Logout Button */}
         <div className="p-4 border-t border-gray-700">
-          <button
-            onClick={() => {
-              // Implementar lógica de logout aqui
-              router.push('/auth/logout');
-            }}
+          <LogoutButton 
+            variant="full" 
             className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-md transition-colors duration-200"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
-            </svg>
-            Sair da conta
-          </button>
+            onClick={onClose}
+          />
         </div>
       </div>
     </div>

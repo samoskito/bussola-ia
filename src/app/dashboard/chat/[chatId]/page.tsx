@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
+import MobileMenu from '@/components/layout/MobileMenu';
 import { ChatDetail } from '@/components/chat';
+import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 
 
 type ChatPageProps = {
@@ -21,6 +23,44 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [chatTitle, setChatTitle] = useState<string>('Carregando...');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [chats, setChats] = useState<Array<{ id: string; title: string }>>([]);
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
+  
+  // Função para controlar a abertura/fechamento do menu mobile
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  // Função para fechar o menu mobile
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+  
+  // Carregar os chats do usuário para o menu mobile
+  useEffect(() => {
+    const loadChats = async () => {
+      try {
+        setIsLoadingChats(true);
+        const { chats: userChats, error } = await fetchUserChats();
+        
+        if (error) {
+          console.error('Erro ao carregar chats:', error);
+          return;
+        }
+        
+        if (userChats && userChats.length > 0) {
+          setChats(userChats);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar chats:', err);
+      } finally {
+        setIsLoadingChats(false);
+      }
+    };
+    
+    loadChats();
+  }, []);
 
   useEffect(() => {
     // Função para buscar detalhes do chat
@@ -64,10 +104,24 @@ export default function ChatPage({ params }: ChatPageProps) {
 
   return (
     <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
-      <Sidebar />
+      {/* Sidebar - visível apenas em desktop */}
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
+      
+      {/* Menu Mobile */}
+      <MobileMenu 
+        isOpen={isMobileMenuOpen} 
+        onClose={closeMobileMenu} 
+        chats={chats}
+      />
       
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header userName={user?.nome || 'Usuário'} title={chatTitle} />
+        <Header 
+          userName={user?.nome || 'Usuário'} 
+          title={chatTitle} 
+          onMenuToggle={toggleMobileMenu}
+        />
         
         <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950">
           <div className="h-full w-full">

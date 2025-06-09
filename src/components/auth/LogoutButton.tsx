@@ -7,15 +7,20 @@ import { signOut } from '@/lib/supabase';
 interface LogoutButtonProps {
   className?: string;
   variant?: 'icon' | 'text' | 'full';
+  onClick?: () => void;
 }
 
-export default function LogoutButton({ className = '', variant = 'icon' }: LogoutButtonProps) {
+export default function LogoutButton({ className = '', variant = 'icon', onClick }: LogoutButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
     try {
       setLoading(true);
+      // Executar a função onClick se existir
+      if (onClick) {
+        onClick();
+      }
       await signOut();
       // Limpar sessão manual se existir
       if (typeof window !== 'undefined') {

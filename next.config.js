@@ -31,7 +31,7 @@ const nextConfig = {
   
   // Configuração para permitir imagens de qualquer origem e otimização
   images: {
-    unoptimized: true, // Configuração para o Netlify
+    domains: ['iszynegxctqdfrmizila.supabase.co'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -61,8 +61,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Configurar para o Netlify
-  trailingSlash: true,
   // Configuração para melhorar o carregamento de módulos
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -75,6 +73,18 @@ const nextConfig = {
       };
     }
     return config;
+  },
+  // Otimizações para produção
+  swcMinify: true,
+  compress: true,
+  poweredByHeader: false,
+  generateEtags: true,
+  // Configuração para cache e otimização
+  onDemandEntries: {
+    // Período em ms em que a página será mantida em buffer
+    maxInactiveAge: 25 * 1000,
+    // Número de páginas que devem ser mantidas simultaneamente sem serem descartadas
+    pagesBufferLength: 2,
   },
 };
 

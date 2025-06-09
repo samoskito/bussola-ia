@@ -29,22 +29,21 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzenluZWd4Y3RxZGZybWl6aWxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY5MjIwODAsImV4cCI6MjA2MjQ5ODA4MH0.zkxYGj0jiGcoK_04FwHYkP_gsMnjHY8GioGEJNapBEI',
   },
   
-  // Configuração para permitir imagens de qualquer origem
+  // Configuração para permitir imagens de qualquer origem e otimização
   images: {
+    unoptimized: true, // Configuração para o Netlify
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**',
       },
-    ],
-  },
-  // Configuração para o Netlify
-  images: {
-    unoptimized: true,
-    remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'iszynegxctqdfrmizila.supabase.co',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
       },
     ],
   },

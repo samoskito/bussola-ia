@@ -70,12 +70,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao criar chat' }, { status: 500 });
     }
     
+    // Salvar a mensagem inicial na tabela scripts
+    const { data: scriptData, error: scriptError } = await supabase
+      .from('scripts')
+      .insert([
+        {
+          user_id: userId,
+          chatid: chatData.id,
+          input: message,
+          output: null // A resposta será atualizada quando o webhook responder
+        }
+      ])
+      .select();
+
+    if (scriptError) {
+      console.error('Erro ao salvar mensagem na tabela scripts:', scriptError);
+      // Não retornamos erro aqui para não bloquear a criação do chat, mas logamos o problema
+    } else {
+      console.log('Mensagem inicial salva com sucesso na tabela scripts, ID:', scriptData[0]?.id);
+    }
+    
     // Enviar dados para o webhook
     const webhookUrl = 'https://webhook.bussolaexecutiva.com.br/webhook/91bb0137-006c-41d8-aba3-e29883ed46dc';
     
     const webhookPayload = {
       chatId: chatData.id,
       message: message,
+      scriptId: scriptData?.[0]?.id, // Incluir o ID do script para rastreamento
       user: {
         id: userData.id,
         email: userData.email,

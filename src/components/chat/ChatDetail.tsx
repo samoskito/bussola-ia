@@ -8,6 +8,7 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
+  isTyping?: boolean; // Indica se a mensagem é uma animação de digitação
 }
 
 interface ScriptMessage {
@@ -30,7 +31,9 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasPendingMessages, setHasPendingMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   
   // Função para rolar para o final das mensagens
@@ -38,61 +41,76 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
-  // Efeito para carregar mensagens do chat quando o componente montar
-  useEffect(() => {
-    const fetchChatMessages = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+  // Função para buscar mensagens do chat
+  const fetchChatMessages = async () => {
+    try {
+      setError(null);
+      
+      const response = await fetch(`/api/chats/${chatId}/messages`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar mensagens do chat');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.messages) {
+        // Converter as mensagens do formato da API para o formato usado pelo componente
+        const formattedMessages: Message[] = [];
+        let pendingMessages = false;
+        let lastUserMessageWithoutResponse = false;
         
-        const response = await fetch(`/api/chats/${chatId}/messages`);
-        
-        if (!response.ok) {
-          throw new Error('Erro ao carregar mensagens do chat');
-        }
-        
-        const data = await response.json();
-        
-        if (data.success && data.messages) {
-          // Converter as mensagens do formato da API para o formato usado pelo componente
-          const formattedMessages: Message[] = [];
-          
-          data.messages.forEach((msg: ScriptMessage) => {
-            // Adicionar mensagem do usuário
-            formattedMessages.push({
-              id: `user-${msg.id}`,
-              content: msg.input,
-              role: 'user',
-              timestamp: new Date(msg.created_at)
-            });
-            
-            // Adicionar resposta da IA se existir
-            if (msg.output) {
-              formattedMessages.push({
-                id: `assistant-${msg.id}`,
-                content: msg.output,
-                role: 'assistant',
-                timestamp: new Date(msg.updated_at)
-              });
-            }
+        data.messages.forEach((msg: ScriptMessage) => {
+          // Adicionar mensagem do usuário
+          formattedMessages.push({
+            id: `user-${msg.id}`,
+            content: msg.input,
+            role: 'user',
+            timestamp: new Date(msg.created_at)
           });
           
-          setMessages(formattedMessages);
-        } else {
-          // Se não houver mensagens, mostrar mensagem de boas-vindas
-          setMessages([
-            {
-              id: 'system-welcome',
-              content: `Olá! Este é o início da sua conversa. ID do Chat: ${chatId}`,
+          // Adicionar resposta da IA se existir
+          if (msg.output) {
+            formattedMessages.push({
+              id: `assistant-${msg.id}`,
+              content: msg.output,
               role: 'assistant',
-              timestamp: new Date()
-            }
-          ]);
+              timestamp: new Date(msg.updated_at)
+            });
+            lastUserMessageWithoutResponse = false;
+          } else {
+            // Se não houver resposta, marcar como pendente
+            pendingMessages = true;
+            lastUserMessageWithoutResponse = true;
+          }
+        });
+        
+        // Se a última mensagem do usuário não tem resposta, adicionar a animação de digitação
+        if (lastUserMessageWithoutResponse) {
+          formattedMessages.push({
+            id: `typing-${Date.now()}`,
+            content: '...',
+            role: 'assistant',
+            timestamp: new Date(),
+            isTyping: true
+          });
         }
-      } catch (err: any) {
-        console.error('Erro ao buscar mensagens:', err);
-        setError(err.message || 'Ocorreu um erro ao carregar as mensagens');
-        // Mostrar mensagem de boas-vindas mesmo em caso de erro
+        
+        setMessages(formattedMessages);
+        setHasPendingMessages(pendingMessages);
+        
+        // Se não há mais mensagens pendentes, podemos parar o polling
+        if (!pendingMessages && pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        
+        // Se há mensagens pendentes e não há polling ativo, iniciar polling
+        if (pendingMessages && !pollingIntervalRef.current) {
+          startPolling();
+        }
+      } else {
+        // Se não houver mensagens, mostrar mensagem de boas-vindas
         setMessages([
           {
             id: 'system-welcome',
@@ -101,14 +119,40 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
             timestamp: new Date()
           }
         ]);
-      } finally {
-        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar mensagens:', err);
+      setError('Não foi possível carregar as mensagens do chat');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para iniciar o polling
+  const startPolling = () => {
+    // Limpar qualquer intervalo existente
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    
+    // Iniciar novo intervalo de polling (verificar a cada 2 segundos)
+    pollingIntervalRef.current = setInterval(() => {
+      console.log('Verificando novas respostas...');
+      fetchChatMessages();
+    }, 2000);
+  };
+  
+  // Efeito para carregar mensagens do chat quando o componente montar
+  useEffect(() => {
+    setIsLoading(true);
+    fetchChatMessages();
+    
+    // Limpar o intervalo quando o componente for desmontado
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
       }
     };
-    
-    if (chatId) {
-      fetchChatMessages();
-    }
   }, [chatId]);
   
   // Rolar para o final quando as mensagens mudarem
@@ -163,9 +207,10 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
         ...prev, 
         {
           id: 'system-' + Date.now().toString(),
-          content: 'Mensagem enviada com sucesso! Aguardando resposta...',
+          content: '...',
           role: 'assistant',
-          timestamp: new Date()
+          timestamp: new Date(),
+          isTyping: true // Marcador para identificar que é uma mensagem de "pensando"
         }
       ]);
       
@@ -281,7 +326,15 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
                 ? 'bg-[#FF6B00] text-white' 
                 : 'bg-gray-800 text-white border border-gray-700'}`}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.isTyping ? (
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></div>
+                  <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
               <p className="text-xs opacity-70 mt-2 text-right">
                 {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </p>
@@ -294,20 +347,7 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
           </div>
         ))}
         
-        {isLoading && (
-          <div className="flex justify-start animate-fadeIn">
-            <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center mr-2 flex-shrink-0">
-              <span className="text-white text-xs font-bold">IA</span>
-            </div>
-            <div className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 shadow-md">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-pulse"></div>
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-pulse delay-100"></div>
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-pulse delay-200"></div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Removido o indicador de carregamento redundante, pois agora usamos a animação nas mensagens */}
         
         {/* Elemento invisível para rolar para o final */}
         <div ref={messagesEndRef} className="h-4" />

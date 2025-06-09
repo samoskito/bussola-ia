@@ -64,8 +64,8 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
               src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
               alt="Bússola Executiva" 
               width={150} 
-              height={40} 
-              className="object-contain"
+              height={55} 
+              className="object-contain w-auto h-auto"
               priority
             />
           </div>

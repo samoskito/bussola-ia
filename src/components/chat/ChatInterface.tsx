@@ -20,6 +20,7 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
+  isTyping?: boolean; // Indica se a mensagem é uma animação de digitação
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterfaceProps) => {
@@ -76,8 +77,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
       if (data.chat && data.chat.id) {
         setCurrentChatId(data.chat.id);
         
-        // Redirecionar para a página do chat específico
-        router.push(`/dashboard/chat/${data.chat.id}`);
+        // Redirecionar para a página do chat específico com parâmetro indicando novo chat
+        router.push(`/dashboard/chat/${data.chat.id}?new=true`);
       }
       
       // Adicionar mensagem de confirmação
@@ -85,9 +86,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
         ...prev, 
         {
           id: 'system-' + Date.now().toString(),
-          content: 'Mensagem enviada com sucesso! Aguardando resposta...',
+          content: '...',
           role: 'assistant',
-          timestamp: new Date()
+          timestamp: new Date(),
+          isTyping: true // Marcador para identificar que é uma mensagem de "pensando"
         }
       ]);
       
@@ -172,7 +174,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
                 ? 'bg-[#FF6B00] text-white' 
                 : 'bg-gray-800 text-white border border-gray-700'}`}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.isTyping ? (
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></div>
+                  <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
               <p className="text-xs opacity-70 mt-2 text-right">
                 {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </p>
@@ -185,20 +195,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
           </div>
         ))}
         
-        {isLoading && (
-          <div className="flex justify-start animate-fadeIn">
-            <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center mr-2 flex-shrink-0">
-              <span className="text-white text-xs font-bold">IA</span>
-            </div>
-            <div className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 shadow-md">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-pulse"></div>
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-pulse delay-100"></div>
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-pulse delay-200"></div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Removido o indicador de carregamento redundante, pois agora usamos a animação nas mensagens */}
       </div>
       
       {/* Error message */}

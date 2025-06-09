@@ -1,11 +1,14 @@
 'use client';
 
 import React from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { toast } from 'react-hot-toast';
 
 export default function ResetPasswordForm() {
   const [email, setEmail] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const supabase = createClientComponentClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -13,19 +16,32 @@ export default function ResetPasswordForm() {
     setMessage(null);
 
     try {
-      // Simulando uma requisição de redefinição de senha
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Configurar URL de redirecionamento para a página de atualização de senha
+      const redirectTo = `${window.location.origin}/auth/update-password`;
+      
+      // Enviar email de redefinição de senha via Supabase
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo
+      });
+      
+      if (error) {
+        console.error('Erro ao enviar email de redefinição:', error);
+        throw error;
+      }
       
       setMessage({
         type: 'success',
         text: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.'
       });
       setEmail('');
+      toast.success('Email de redefinição enviado com sucesso!');
     } catch (error) {
+      console.error('Erro ao processar solicitação:', error);
       setMessage({
         type: 'error',
         text: 'Ocorreu um erro ao tentar enviar o e-mail de redefinição. Tente novamente mais tarde.'
       });
+      toast.error('Falha ao enviar email de redefinição');
     } finally {
       setLoading(false);
     }

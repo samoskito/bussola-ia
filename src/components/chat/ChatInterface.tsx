@@ -133,28 +133,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
                 </div>
               </div>
               <h3 className="text-2xl font-medium mb-3">Inicie uma nova conversa</h3>
-              <p className="mb-6">Envie uma mensagem para começar a conversar com a Bússola IA</p>
-              <div className="space-y-2 md:space-y-3 text-left bg-gray-800/50 p-3 md:p-4 rounded-lg border border-gray-700">
-                <p className="text-sm font-medium text-gray-300">Sugestões:</p>
-                <button 
-                  onClick={() => setMessage("Como posso melhorar minha liderança?")} 
-                  className="block w-full text-left px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-md text-sm transition-colors"
-                >
-                  Como posso melhorar minha liderança?
-                </button>
-                <button 
-                  onClick={() => setMessage("Preciso de ajuda com gestão de tempo")} 
-                  className="block w-full text-left px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-md text-sm transition-colors"
-                >
-                  Preciso de ajuda com gestão de tempo
-                </button>
-                <button 
-                  onClick={() => setMessage("Quais são as tendências de mercado para 2025?")} 
-                  className="block w-full text-left px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-md text-sm transition-colors"
-                >
-                  Quais são as tendências de mercado para 2025?
-                </button>
-              </div>
+              <p>Envie uma mensagem para começar a conversar com a Bússola Script IA</p>
             </div>
           </div>
         )}

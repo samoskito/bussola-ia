@@ -1,6 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+
+// Configuração para desativar a pré-renderização estática
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
+
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';

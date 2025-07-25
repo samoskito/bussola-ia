@@ -34,16 +34,19 @@ export default function ScriptPage() {
   useEffect(() => {
     const loadChats = async () => {
       try {
-        setIsLoadingChats(true);
-        const { chats: userChats, error } = await fetchUserChats();
-        
-        if (error) {
-          console.error('Erro ao carregar chats:', error);
-          return;
-        }
-        
-        if (userChats && userChats.length > 0) {
-          setChats(userChats);
+        // Garantir que estamos no navegador antes de fazer a chamada
+        if (typeof window !== 'undefined') {
+          setIsLoadingChats(true);
+          const { chats: userChats, error } = await fetchUserChats();
+          
+          if (error) {
+            console.error('Erro ao carregar chats:', error);
+            return;
+          }
+          
+          if (userChats && userChats.length > 0) {
+            setChats(userChats);
+          }
         }
       } catch (err) {
         console.error('Erro ao carregar chats:', err);
@@ -52,7 +55,7 @@ export default function ScriptPage() {
       }
     };
     
-    if (user) {
+    if (user && typeof window !== 'undefined') {
       loadChats();
     }
   }, [user]);

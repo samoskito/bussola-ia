@@ -7,11 +7,11 @@ export default function RedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirecionamento direto para o dashboard/chat
-    console.log('Página de redirecionamento - redirecionando para /dashboard/chat');
+    // Redirecionamento direto para o dashboard (página de seleção de agentes)
+    console.log('Página de redirecionamento - redirecionando para /dashboard');
     
     // Usar router.push para navegação no lado do cliente
-    router.push('/dashboard/chat');
+    router.push('/dashboard');
   }, [router]);
 
   return (

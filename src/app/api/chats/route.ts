@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // Obter as variáveis de ambiente do Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,29 +34,22 @@ export async function GET() {
     // Criar cliente do Supabase com a chave de serviço
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Buscar apenas os chats do usuário autenticado
+    // Buscar todos os chats do usuário
     const { data: chats, error } = await supabase
       .from('chats')
       .select('id, title, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-
+      
     if (error) {
       console.error('Erro ao buscar chats:', error);
       return NextResponse.json({ error: 'Erro ao buscar chats' }, { status: 500 });
     }
-
-    // Se não houver chats, retornar array vazio
-    if (!chats || chats.length === 0) {
-      return NextResponse.json({ chats: [] });
-    }
-
+    
     return NextResponse.json({ chats });
+    
   } catch (error) {
     console.error('Erro ao processar requisição:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

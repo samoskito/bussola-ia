@@ -10,7 +10,7 @@ interface Agent {
   isActive?: boolean;
 }
 
-interface ChatInterfaceProps {
+interface ApresentacaoInterfaceProps {
   userName: string;
   agents?: Agent[];
 }
@@ -23,7 +23,7 @@ interface Message {
   isTyping?: boolean; // Indica se a mensagem é uma animação de digitação
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterfaceProps) => {
+const ApresentacaoInterface: React.FC<ApresentacaoInterfaceProps> = ({ userName }: ApresentacaoInterfaceProps) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +31,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const router = useRouter();
   
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
@@ -58,7 +65,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
     
     try {
       // Enviar mensagem para API
-      const response = await fetch('/api/chats/create', {
+      const response = await fetch('/api/chats/create-apresentacao', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,7 +85,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
         setCurrentChatId(data.chat.id);
         
         // Redirecionar para a página do chat específico com parâmetro indicando novo chat
-        router.push(`/dashboard/chat/${data.chat.id}?new=true`);
+        router.push(`/dashboard/chat/${data.chat.id}?new=true&type=apresentacao`);
       }
       
       // Adicionar mensagem de confirmação
@@ -100,13 +107,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
       setIsLoading(false);
     }
   };
-  
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -116,7 +116,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
           Olá, <span className="text-[#FF6B00]">{userName}.</span>
         </h1>
         <p className="text-gray-400 mt-2 text-base md:text-lg">
-          Como posso ajudar você hoje?
+          Como posso ajudar você com a apresentação de resultados hoje?
         </p>
       </div>
       
@@ -133,7 +133,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
                 </div>
               </div>
               <h3 className="text-2xl font-medium mb-4">Inicie uma nova conversa</h3>
-              <p className="text-lg">Envie uma mensagem para começar a conversar com a Bússola Script IA</p>
+              <p className="text-lg">Envie uma mensagem para começar a conversar com o assistente de Apresentação de Resultado</p>
             </div>
           </div>
         )}
@@ -231,4 +231,4 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
   );
 };
 
-export default ChatInterface;
+export default ApresentacaoInterface;

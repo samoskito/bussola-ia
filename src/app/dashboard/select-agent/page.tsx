@@ -1,12 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import Image from 'next/image';
-import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 
 // Definição dos agentes disponíveis
 const agents = [
@@ -15,7 +13,7 @@ const agents = [
     name: 'ScriptIA',
     description: 'Gere scripts personalizados para suas necessidades',
     icon: '/assets/images/icons/script-icon.svg',
-    path: '/script'
+    path: '/dashboard'
   },
   {
     id: 'apresentacao-resultados',
@@ -26,80 +24,23 @@ const agents = [
   }
 ];
 
-export default function DashboardPage() {
-  const { user, loading } = useAuth();
+export default function AgentSelectionPage() {
   const router = useRouter();
-  const [chats, setChats] = useState([]);
-  const [isLoadingChats, setIsLoadingChats] = useState(false);
-  
-  // Redirecionar para login se não estiver autenticado
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login');
-    }
-  }, [user, loading, router]);
-  
-  // Carregar chats do usuário
-  useEffect(() => {
-    const loadChats = async () => {
-      try {
-        setIsLoadingChats(true);
-        const { chats: userChats, error } = await fetchUserChats();
-        
-        if (error) {
-          console.error('Erro ao carregar chats:', error);
-          return;
-        }
-        
-        if (userChats && userChats.length > 0) {
-          setChats(userChats);
-        }
-      } catch (err) {
-        console.error('Erro ao carregar chats:', err);
-      } finally {
-        setIsLoadingChats(false);
-      }
-    };
-    
-    if (user) {
-      loadChats();
-    }
-  }, [user]);
 
   const handleAgentSelection = (path: string) => {
     router.push(path);
   };
-  
-  // Mostrar loading enquanto verifica autenticação
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-      </div>
-    );
-  }
-  
-  // Se não estiver autenticado, não renderizar nada (será redirecionado)
-  if (!user) {
-    return null;
-  }
-  
+
   return (
-    <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
-      {/* Sidebar - visível apenas em desktop */}
-      <div className="hidden lg:flex lg:w-64 xl:w-72 2xl:w-80 border-r border-gray-800 shadow-xl">
-        <Sidebar initialChats={chats} />
-      </div>
+    <div className="flex h-screen bg-dark-100 text-white overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar />
       
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden w-full">
-        <Header 
-          userName={user.nome || user.email} 
-          title="Selecione um Agente" 
-          onMenuToggle={() => {}} 
-        />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header userName="Usuário" />
         
-        <main className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-950 w-full p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-6xl mx-auto">
             <h1 className="text-3xl font-bold mb-8 text-center">Selecione um Agente</h1>
             
@@ -108,9 +49,9 @@ export default function DashboardPage() {
                 <div 
                   key={agent.id}
                   onClick={() => handleAgentSelection(agent.path)}
-                  className="bg-gray-800 rounded-lg p-6 flex flex-col items-center cursor-pointer hover:bg-gray-700 transition-colors duration-200 border border-gray-700 hover:border-orange-500 shadow-lg"
+                  className="bg-gray-800 rounded-lg p-6 flex flex-col items-center cursor-pointer hover:bg-gray-700 transition-colors duration-200 border border-gray-700 hover:border-orange-500"
                 >
-                  <div className="w-24 h-24 bg-gray-700 rounded-full flex items-center justify-center mb-4 shadow-md">
+                  <div className="w-24 h-24 bg-gray-700 rounded-full flex items-center justify-center mb-4">
                     {agent.icon ? (
                       <Image 
                         src={agent.icon} 

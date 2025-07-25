@@ -5,12 +5,9 @@ import * as jwt from 'jsonwebtoken';
 
 export async function GET(
   request: Request,
-  { params }: { params: { chatId: string } }
+  context: { params: { chatId: string } }
 ) {
   try {
-    // Usar a desestruturação para acessar chatId no Next.js 15
-    const { chatId } = params;
-    
     // Obter as variáveis de ambiente do Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -36,6 +33,7 @@ export async function GET(
     }
     
     const userId = decoded.userId;
+    const { chatId } = context.params;
     
     // Criar cliente do Supabase com a chave de serviço
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -43,28 +41,21 @@ export async function GET(
     // Buscar detalhes do chat
     const { data: chat, error } = await supabase
       .from('chats')
-      .select('id, title, created_at, user_id')
+      .select('*')
       .eq('id', chatId)
+      .eq('user_id', userId)
       .single();
-    
+      
     if (error) {
-      console.error('Erro ao buscar chat:', error);
+      console.error('Erro ao buscar detalhes do chat:', error);
+      return NextResponse.json({ error: 'Erro ao buscar detalhes do chat' }, { status: 500 });
+    }
+    
+    if (!chat) {
       return NextResponse.json({ error: 'Chat não encontrado' }, { status: 404 });
     }
     
-    // Verificar se o chat pertence ao usuário autenticado
-    if (chat.user_id !== userId) {
-      return NextResponse.json({ error: 'Não autorizado a acessar este chat' }, { status: 403 });
-    }
-    
-    return NextResponse.json({ 
-      success: true, 
-      chat: {
-        id: chat.id,
-        title: chat.title,
-        created_at: chat.created_at
-      }
-    });
+    return NextResponse.json({ chat });
     
   } catch (error) {
     console.error('Erro ao processar requisição:', error);

@@ -24,9 +24,60 @@ interface ScriptMessage {
 interface ChatDetailProps {
   chatId: string;
   userName: string;
+  chatType?: 'script' | 'apresentacao';
 }
 
-const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
+const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) => {
+  // Determinar o tipo de chat a partir da URL se não for fornecido como prop
+  const [chatTypeState, setChatTypeState] = useState<'script' | 'apresentacao' | undefined>(chatType);
+  
+  useEffect(() => {
+    if (!chatTypeState) {
+      // Verificar se há parâmetro de tipo na URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const typeParam = urlParams.get('type');
+      
+      if (typeParam === 'apresentacao') {
+        console.log(`[ChatDetail] Detectado tipo de chat: apresentacao (da URL)`); 
+        setChatTypeState('apresentacao');
+      } else {
+        // Padrão é script
+        console.log(`[ChatDetail] Detectado tipo de chat: script (padrão)`); 
+        setChatTypeState('script');
+      }
+    } else {
+      console.log(`[ChatDetail] Usando tipo de chat definido por props: ${chatTypeState}`);
+    }
+  }, [chatTypeState]);
+  
+  // Efeito para verificar o tipo de chat quando o componente montar
+  useEffect(() => {
+    // Verificar o tipo de chat a partir dos dados do chat
+    const fetchChatType = async () => {
+      try {
+        const response = await fetch(`/api/chats/${chatId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Verificar se o título do chat contém informação sobre o tipo
+          if (data.chat && data.chat.title) {
+            const title = data.chat.title.toLowerCase();
+            
+            if (title.includes('apresentação') || title.includes('reuniao')) {
+              console.log(`[ChatDetail] Detectado tipo de chat: apresentacao (do título)`); 
+              setChatTypeState('apresentacao');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar tipo de chat:', error);
+      }
+    };
+    
+    // Tentar detectar o tipo de chat a partir dos dados do chat
+    fetchChatType();
+  }, [chatId]);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -183,8 +234,15 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
     setIsLoading(true);
     
     try {
+      // Determinar o endpoint correto com base no tipo de chat
+      const endpoint = chatTypeState === 'apresentacao' 
+        ? '/api/chats/message-apresentacao'
+        : '/api/chats/message';
+      
+      console.log(`Enviando mensagem para endpoint: ${endpoint} (tipo: ${chatTypeState})`);
+      
       // Enviar mensagem para a API
-      const response = await fetch('/api/chats/message', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -294,19 +352,19 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
   };
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-80px)] w-full">
+    <div className="flex flex-col h-full min-h-[calc(100vh-80px)] w-full">
       {/* Messages Area */}
       <div className="flex-grow overflow-y-auto space-y-3 md:space-y-4 px-3 md:px-6 py-3 md:py-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
         {messages.length === 0 && !isLoading && (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center text-gray-400">
-              <div className="mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="text-center text-gray-400 max-w-md mx-auto px-4">
+              <div className="mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-medium mb-2">Inicie uma nova conversa</h3>
-              <p>Envie uma mensagem para começar a conversar com a Bússola Script IA</p>
+              <h3 className="text-2xl font-medium mb-3">Inicie uma nova conversa</h3>
+              <p className="text-gray-400">Envie uma mensagem para começar a conversar com a {chatType === 'apresentacao' ? 'Apresentação de Resultado' : 'Bússola Script IA'}</p>
             </div>
           </div>
         )}
@@ -314,49 +372,47 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
         {messages.map((msg) => (
           <div 
             key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn mb-4`}
           >
             {msg.role === 'assistant' && (
-              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-orange-600 flex items-center justify-center mr-2 flex-shrink-0">
-                <span className="text-white text-xs font-bold">IA</span>
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-orange-600 flex items-center justify-center mr-2 md:mr-3 flex-shrink-0 shadow-lg">
+                <span className="text-white text-xs md:text-sm font-bold">IA</span>
               </div>
             )}
             <div 
-              className={`max-w-[75%] md:max-w-[80%] rounded-lg px-3 py-2 md:px-4 md:py-3 shadow-md ${msg.role === 'user' 
+              className={`max-w-[75%] md:max-w-[80%] rounded-2xl px-4 py-3 md:px-5 md:py-4 shadow-lg ${msg.role === 'user' 
                 ? 'bg-[#FF6B00] text-white' 
                 : 'bg-gray-800 text-white border border-gray-700'}`}
             >
               {msg.isTyping ? (
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1 py-2">
                   <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></div>
                   <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 </div>
               ) : (
-                <p className="whitespace-pre-wrap text-sm md:text-base">{msg.content}</p>
+                <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{msg.content}</p>
               )}
-              <p className="text-[10px] md:text-xs opacity-70 mt-1 md:mt-2 text-right">
+              <p className="text-[10px] md:text-xs opacity-70 mt-2 text-right">
                 {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </p>
             </div>
             {msg.role === 'user' && (
-              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-700 flex items-center justify-center ml-2 flex-shrink-0">
-                <span className="text-white text-xs font-bold">EU</span>
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-700 flex items-center justify-center ml-2 md:ml-3 flex-shrink-0 shadow-lg">
+                <span className="text-white text-xs md:text-sm font-bold">EU</span>
               </div>
             )}
           </div>
         ))}
         
-        {/* Removido o indicador de carregamento redundante, pois agora usamos a animação nas mensagens */}
-        
         {/* Elemento invisível para rolar para o final */}
-        <div ref={messagesEndRef} className="h-4" />
+        <div ref={messagesEndRef} className="h-8" />
       </div>
       
       {/* Error message */}
       {error && (
-        <div className="px-4 py-2 bg-gray-900 border-t border-gray-800">
-          <div className="bg-red-500 bg-opacity-10 border border-red-500 text-red-500 px-4 py-2 rounded-lg flex items-center justify-between">
+        <div className="px-4 py-3 bg-gray-900 border-t border-gray-800">
+          <div className="bg-red-500 bg-opacity-10 border border-red-500 text-red-500 px-4 py-3 rounded-lg flex items-center justify-between">
             <span>{error}</span>
             <button 
               onClick={() => setError(null)} 
@@ -369,21 +425,21 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
       )}
 
       {/* Chat Input */}
-      <div className="w-full px-2 sm:px-4 md:px-6 py-3 md:py-4 bg-gray-900 border-t border-gray-800">
-        <form onSubmit={handleSendMessage} className="relative w-full">
+      <div className="w-full px-3 sm:px-5 md:px-8 py-4 md:py-6 bg-gray-900 border-t border-gray-800 sticky bottom-0">
+        <form onSubmit={handleSendMessage} className="relative w-full max-w-4xl mx-auto">
           <input
             type="text"
-            className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] text-white rounded-lg py-2 md:py-3 px-3 md:px-4 pr-16 md:pr-20 text-sm md:text-base outline-none transition-colors duration-200 shadow-lg"
+            className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-full py-3 md:py-4 px-5 md:px-6 pr-16 md:pr-24 text-sm md:text-base outline-none transition-colors duration-200 shadow-lg"
             placeholder="Envie uma mensagem..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
-          <div className="absolute right-1 md:right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1 md:gap-2">
+          <div className="absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2 md:gap-3">
             <button 
               type="button"
-              className="p-1 text-gray-400 hover:text-[#FF6B00] transition-colors duration-200"
+              className="p-1.5 md:p-2 text-gray-400 hover:text-[#FF6B00] transition-colors duration-200"
               disabled={isLoading}
               title="Anexar arquivo"
             >
@@ -393,11 +449,11 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName }) => {
             </button>
             <button 
               type="submit"
-              className={`p-1.5 md:p-2 rounded-full ${isLoading ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white transition-colors duration-200 shadow-md`}
+              className={`p-2 md:p-3 rounded-full ${isLoading ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white transition-colors duration-200 shadow-lg`}
               disabled={isLoading || !message.trim()}
               title="Enviar mensagem"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </button>

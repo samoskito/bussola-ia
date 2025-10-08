@@ -8,7 +8,7 @@ import { Analytics } from "@vercel/analytics/next"
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Bússola Executiva - Gerador de Scripts para Reuniões',
+  title: 'ExecutivIA - Gerador de Scripts para Reuniões',
   description: 'Gere scripts profissionais para suas reuniões com IA',
 }
 

@@ -14,12 +14,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 
 const mockAgents = [
-  { id: '1', name: 'Apresentação de Resultado', isActive: true },
-  { id: '2', name: 'Apresentação de Resultado' },
-  { id: '3', name: 'Apresentação de Resultado' },
-  { id: '4', name: 'Apresentação de Resultado' },
-  { id: '5', name: 'Apresentação de Resultado' },
-  { id: '6', name: 'Apresentação de Resultado' },
+  { id: '1', name: 'Apresentação para Reunião de Resultados', isActive: true },
+  { id: '2', name: 'Apresentação para Reunião de Resultados' },
+  { id: '3', name: 'Apresentação para Reunião de Resultados' },
+  { id: '4', name: 'Apresentação para Reunião de Resultados' },
+  { id: '5', name: 'Apresentação para Reunião de Resultados' },
+  { id: '6', name: 'Apresentação para Reunião de Resultados' },
 ];
 
 export default function ApresentacaoPage() {
@@ -90,7 +90,7 @@ export default function ApresentacaoPage() {
       <div className="flex-1 flex flex-col overflow-hidden w-full">
         <Header 
           userName={user.nome || user.email} 
-          title="Apresentação de Resultado" 
+          title="Apresentação para Reunião de Resultados" 
           onMenuToggle={() => {}} 
         />
         

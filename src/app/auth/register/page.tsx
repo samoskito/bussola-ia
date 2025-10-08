@@ -11,10 +11,10 @@ export default function RegisterPage() {
         <div className="max-w-md mx-auto w-full">
           <div className="mb-8">
             <Image 
-              src="/images/logo.svg" 
-              alt="Bússola Executiva" 
+              src="/images/executivia-logo.png" 
+              alt="ExecutivIA" 
               width={200} 
-              height={50} 
+              height={200} 
               className="mx-auto md:mx-0"
             />
           </div>

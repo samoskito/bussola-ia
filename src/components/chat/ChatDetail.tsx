@@ -364,7 +364,7 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
                 </svg>
               </div>
               <h3 className="text-2xl font-medium mb-3">Inicie uma nova conversa</h3>
-              <p className="text-gray-400">Envie uma mensagem para começar a conversar com a {chatType === 'apresentacao' ? 'Apresentação de Resultado' : 'Bússola Script IA'}</p>
+              <p className="text-gray-400">Envie uma mensagem para começar a conversar com {chatType === 'apresentacao' ? 'a Apresentação para Reunião de Resultados' : 'a Comunicação Executiva'}</p>
             </div>
           </div>
         )}

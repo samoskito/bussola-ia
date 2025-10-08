@@ -87,7 +87,7 @@ const ScriptGeneratorChat: React.FC<ScriptGeneratorChatProps> = ({
     } else if (userMessage.toLowerCase().includes('reunião')) {
       return `Para preparar sua reunião, posso ajudar com um script estruturado. Me conte mais sobre o contexto da reunião e seus objetivos principais.`;
     } else {
-      return `Olá! Sou o assistente de geração de scripts da Bússola Executiva. Posso ajudar você a criar scripts para reuniões, apresentações e outros eventos profissionais. Como posso ajudar hoje?`;
+      return `Olá! Sou o assistente de geração de scripts da ExecutivIA. Posso ajudar você a criar scripts para reuniões, apresentações e outros eventos profissionais. Como posso ajudar hoje?`;
     }
   };
 

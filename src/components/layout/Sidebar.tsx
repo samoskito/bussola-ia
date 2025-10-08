@@ -57,14 +57,14 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
   return (
     <aside className="w-64 h-screen bg-gray-900 flex flex-col overflow-hidden border-r border-gray-800 shadow-lg">
       {/* Logo */}
-      <div className="p-4 bg-gray-800">
+      <div className="p-3" style={{ backgroundColor: '#010811' }}>
         <Link href="/dashboard">
           <div className="flex items-center justify-center">
             <Image 
-              src="/assets/images/logos/LOGO-BUSSOLA-LARANJA-E-BRANCO-1024x373.webp" 
-              alt="Bússola Executiva" 
-              width={150} 
-              height={55} 
+              src="/images/executivia-logo.png" 
+              alt="ExecutivIA" 
+              width={100} 
+              height={100} 
               className="object-contain w-auto h-auto"
               priority
             />
@@ -102,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
         </div>
         
         {/* Chat List */}
-        <div className="overflow-y-auto max-h-[calc(100vh-280px)] pr-1 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+        <div className="overflow-y-auto max-h-[250px] pr-1 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
           {isLoading ? (
             <div className="flex justify-center items-center h-20">
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-[#FF6B00]"></div>
@@ -188,7 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <span className="ml-3">Apresentação de Resultado</span>
+              <span className="ml-3">Apresentação para Reunião de Resultados</span>
             </Link>
           </li>
         </ul>

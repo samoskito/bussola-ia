@@ -10,8 +10,14 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 // Criar cliente Supabase para o servidor
 const supabase = createServerSupabaseClient();
 
-// URL do webhook do n8n
-const WEBHOOK_URL = 'https://webhook.bussolaexecutiva.com.br/webhook/inputs-bussola-script';
+// URLs dos webhooks do n8n por tipo de agente
+const WEBHOOK_URLS = {
+  scriptia: 'https://webhookbussola.palmup.com.br/webhook/ia/bussolascript',
+  apresentacao: 'https://webhookbussola.palmup.com.br/webhook/ia/bussolascriptresultado'
+};
+
+// Tipo de agente
+export type AgentType = 'scriptia' | 'apresentacao';
 
 /**
  * Interface para os dados do usuário
@@ -67,6 +73,7 @@ interface WebhookResponse {
  * @param userId ID do usuário
  * @param chatId ID do chat
  * @param input Texto enviado pelo usuário
+ * @param agentType Tipo de agente (scriptia ou apresentacao)
  * @param files Arquivos enviados pelo usuário (opcional)
  * @returns Resposta do webhook
  */
@@ -74,6 +81,7 @@ export const sendToWebhook = async (
   userId: string,
   chatId: string,
   input: string,
+  agentType: AgentType = 'scriptia',
   files?: FileData[]
 ): Promise<WebhookResponse> => {
   try {
@@ -134,8 +142,9 @@ export const sendToWebhook = async (
       throw new Error(`Erro ao registrar output: ${outputError.message}`);
     }
 
-    // Enviar dados para o webhook
-    const response = await fetch(WEBHOOK_URL, {
+    // Enviar dados para o webhook do agente especificado
+    const webhookUrl = WEBHOOK_URLS[agentType];
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

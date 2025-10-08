@@ -93,9 +93,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Enviar dados para o webhook
+    // Enviar dados para o webhook do agente Apresentação para Reunião de Resultados
     try {
-      const webhookUrl = 'https://webhook.bussolaexecutiva.com.br/webhook/bussolascript/ia_reuniao';
+      const webhookUrl = 'https://webhookbussola.palmup.com.br/webhook/ia/bussolascriptresultado';
       
       const webhookPayload = {
         chatId: chatId,

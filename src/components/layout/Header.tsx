@@ -65,10 +65,14 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
         </button>
 
         <div className="flex items-center gap-2 bg-[#FF6B00]/10 px-3 py-2 rounded-lg shadow-inner">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#FF6B00]">
-            <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="font-medium text-sm md:text-base">Bússola IA</span>
+          <Image 
+            src="/images/executivia-logo.png" 
+            alt="ExecutivIA Logo" 
+            width={28} 
+            height={28}
+            className="object-contain"
+          />
+          <span className="font-medium text-sm md:text-base">ExecutivIA</span>
         </div>
         
         {title && (

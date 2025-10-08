@@ -137,7 +137,7 @@ export default function HelpPage() {
               
               <div className="space-y-4">
                 <p className="text-gray-300">
-                  A Bússola Executiva foi projetada para facilitar a criação de scripts de reunião profissionais em poucos minutos. Siga os passos abaixo para criar seu primeiro script:
+                  A ExecutivIA foi projetada para facilitar a criação de scripts de reunião profissionais em poucos minutos. Siga os passos abaixo para criar seu primeiro script:
                 </p>
                 
                 <ol className="list-decimal pl-5 space-y-2 text-gray-300">

@@ -1,8 +1,8 @@
-# Bússola Executiva - Gerador de Scripts para Reuniões
+# ExecutivIA - Gerador de Scripts para Reuniões
 
-![Bússola Executiva](public/images/logo.svg)
+![ExecutivIA](public/images/executivia-logo.png)
 
-Bússola Executiva é uma aplicação SaaS que utiliza inteligência artificial para gerar scripts profissionais para reuniões, ajudando profissionais a conduzirem reuniões mais eficientes e produtivas.
+ExecutivIA é uma aplicação SaaS que utiliza inteligência artificial para gerar scripts profissionais para reuniões, ajudando profissionais a conduzirem reuniões mais eficientes e produtivas.
 
 ## Tecnologias Utilizadas
 
@@ -42,8 +42,8 @@ JWT_SECRET=sua_chave_secreta_jwt
 
 1. Clone o repositório
    ```bash
-   git clone https://github.com/samoskito/bussola-ia.git
-   cd bussola-ia
+   git clone https://github.com/samoskito/executivia.git
+   cd executivia
    ```
 
 2. Instale as dependências
@@ -171,4 +171,4 @@ Este projeto está licenciado sob a licença MIT - veja o arquivo LICENSE para m
 
 ## Contato
 
-Para mais informações, entre em contato através do email: contato@bussolaexecutiva.com
+Para mais informações, entre em contato através do email: contato@executivia.com

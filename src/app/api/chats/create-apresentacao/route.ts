@@ -91,8 +91,8 @@ export async function POST(request: Request) {
       console.log('Mensagem inicial salva com sucesso na tabela scripts, ID:', scriptData[0]?.id);
     }
     
-    // Enviar dados para o webhook de apresentação de resultados
-    const webhookUrl = 'https://webhook.bussolaexecutiva.com.br/webhook/bussolascript/ia_reuniao';
+    // Enviar dados para o webhook do agente Apresentação para Reunião de Resultados
+    const webhookUrl = 'https://webhookbussola.palmup.com.br/webhook/ia/bussolascriptresultado';
     
     const webhookPayload = {
       chatId: chatData.id,

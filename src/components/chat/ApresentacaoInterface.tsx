@@ -133,7 +133,7 @@ const ApresentacaoInterface: React.FC<ApresentacaoInterfaceProps> = ({ userName 
                 </div>
               </div>
               <h3 className="text-2xl font-medium mb-4">Inicie uma nova conversa</h3>
-              <p className="text-lg">Envie uma mensagem para começar a conversar com o assistente de Apresentação de Resultado</p>
+              <p className="text-lg">Envie uma mensagem para começar a conversar com o assistente de Apresentação para Reunião de Resultados</p>
             </div>
           </div>
         )}

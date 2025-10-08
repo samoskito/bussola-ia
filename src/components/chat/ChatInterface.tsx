@@ -133,7 +133,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
                 </div>
               </div>
               <h3 className="text-2xl font-medium mb-4">Inicie uma nova conversa</h3>
-              <p className="text-lg">Envie uma mensagem para começar a conversar com a Bússola Script IA</p>
+              <p className="text-lg">Envie uma mensagem para começar a conversar com a Comunicação Executiva</p>
             </div>
           </div>
         )}

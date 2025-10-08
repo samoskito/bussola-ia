@@ -30,10 +30,10 @@ export default function LoginPage() {
             <div className="mb-8 flex justify-center">
               <div className="w-[200px]">
                 <img 
-                  src="/images/Logo.webp" 
-                  alt="Bússola Executiva" 
+                  src="/images/executivia-logo.png" 
+                  alt="ExecutivIA" 
                   width="200"
-                  height="73"
+                  height="200"
                   style={{maxWidth: '100%', height: 'auto'}}
                 />
               </div>
@@ -90,10 +90,10 @@ export default function LoginPage() {
               <div className="mb-8">
                 <div className="w-[250px]">
                   <img 
-                    src="/images/Logo.webp" 
-                    alt="Bússola Executiva" 
+                    src="/images/executivia-logo.png" 
+                    alt="ExecutivIA" 
                     width="250"
-                    height="91"
+                    height="250"
                     style={{maxWidth: '100%', height: 'auto'}}
                   />
                 </div>

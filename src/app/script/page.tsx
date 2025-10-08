@@ -15,12 +15,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 
 const mockAgents = [
-  { id: '1', name: 'BússolaScriptIA', isActive: true },
-  { id: '2', name: 'BússolaScriptIA' },
-  { id: '3', name: 'BússolaScriptIA' },
-  { id: '4', name: 'BússolaScriptIA' },
-  { id: '5', name: 'BússolaScriptIA' },
-  { id: '6', name: 'BússolaScriptIA' },
+  { id: '1', name: 'Comunicação Executiva', isActive: true },
+  { id: '2', name: 'Comunicação Executiva' },
+  { id: '3', name: 'Comunicação Executiva' },
+  { id: '4', name: 'Comunicação Executiva' },
+  { id: '5', name: 'Comunicação Executiva' },
+  { id: '6', name: 'Comunicação Executiva' },
 ];
 
 export default function ScriptPage() {

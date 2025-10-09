@@ -13,6 +13,9 @@ import Header from '@/components/layout/Header';
 import ChatInterface from '@/components/chat/ChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
+import { verificarAcessoIA } from '@/lib/access-control';
+import AccessDenied from '@/components/access/AccessDenied';
+import AccessWarning from '@/components/access/AccessWarning';
 
 const mockAgents = [
   { id: '1', name: 'Comunicação Executiva', isActive: true },
@@ -80,6 +83,21 @@ export default function ScriptPage() {
     return null;
   }
   
+  // Verificar acesso à IA de Comunicação Executiva
+  const resultadoAcesso = verificarAcessoIA(user, 'Comunicação Executiva');
+  
+  // Se não tem acesso, mostrar tela de bloqueio
+  if (!resultadoAcesso.acesso) {
+    return (
+      <AccessDenied
+        motivo={resultadoAcesso.motivo || 'Você não tem acesso a esta IA'}
+        expirado={resultadoAcesso.expirado}
+        nomeIA="Comunicação Executiva"
+        dataExpiracao={user.data_expiracao}
+      />
+    );
+  }
+  
   return (
     <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
       {/* Sidebar - visível apenas em desktop */}
@@ -93,6 +111,12 @@ export default function ScriptPage() {
           userName={user.nome || user.email} 
           title="Novo Chat" 
           onMenuToggle={() => {}} 
+        />
+        
+        {/* Aviso de Expiração Próxima */}
+        <AccessWarning 
+          diasRestantes={resultadoAcesso.diasRestantes}
+          dataExpiracao={user.data_expiracao}
         />
         
         <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950 w-full">

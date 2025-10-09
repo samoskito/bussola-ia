@@ -35,7 +35,7 @@ export async function GET() {
     // Get user data from the database
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, email, nome, telefone, avatar, created_at, updated_at')
+      .select('id, email, nome, telefone, avatar, created_at, updated_at, data_expiracao, plano')
       .eq('id', decoded.userId)
       .single();
     
@@ -49,6 +49,14 @@ export async function GET() {
       response.cookies.delete('auth_token');
       return response;
     }
+    
+    // Log para debug do controle de acesso
+    console.log('[SESSION] Dados do usuário:', {
+      id: user.id,
+      email: user.email,
+      plano: user.plano,
+      data_expiracao: user.data_expiracao
+    });
     
     return NextResponse.json(
       { user },

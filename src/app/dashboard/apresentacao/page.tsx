@@ -12,6 +12,9 @@ import Header from '@/components/layout/Header';
 import ApresentacaoInterface from '@/components/chat/ApresentacaoInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
+import { verificarAcessoIA } from '@/lib/access-control';
+import AccessDenied from '@/components/access/AccessDenied';
+import AccessWarning from '@/components/access/AccessWarning';
 
 const mockAgents = [
   { id: '1', name: 'Apresentação para Reunião de Resultados', isActive: true },
@@ -79,6 +82,21 @@ export default function ApresentacaoPage() {
     return null;
   }
   
+  // Verificar acesso à IA de Apresentação para Reunião de Resultados
+  const resultadoAcesso = verificarAcessoIA(user, 'Apresentação para Reunião de Resultados');
+  
+  // Se não tem acesso, mostrar tela de bloqueio
+  if (!resultadoAcesso.acesso) {
+    return (
+      <AccessDenied
+        motivo={resultadoAcesso.motivo || 'Você não tem acesso a esta IA'}
+        expirado={resultadoAcesso.expirado}
+        nomeIA="Apresentação para Reunião de Resultados"
+        dataExpiracao={user.data_expiracao}
+      />
+    );
+  }
+  
   return (
     <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
       {/* Sidebar - visível apenas em desktop */}
@@ -92,6 +110,12 @@ export default function ApresentacaoPage() {
           userName={user.nome || user.email} 
           title="Apresentação para Reunião de Resultados" 
           onMenuToggle={() => {}} 
+        />
+        
+        {/* Aviso de Expiração Próxima */}
+        <AccessWarning 
+          diasRestantes={resultadoAcesso.diasRestantes}
+          dataExpiracao={user.data_expiracao}
         />
         
         <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950 w-full">

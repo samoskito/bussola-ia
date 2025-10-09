@@ -13,6 +13,8 @@ type AppUser = {
   avatar?: string | null;
   created_at: string;
   updated_at?: string | null;
+  data_expiracao?: string | null;
+  plano?: 'Comunicação Executiva' | 'Apresentação para Reunião de Resultados' | 'Ambas' | null;
 } | null;
 
 type AuthError = {

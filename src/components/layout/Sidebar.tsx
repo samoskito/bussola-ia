@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
+import { useAuth } from '@/contexts/AuthContext';
+import { getMensagemAviso } from '@/lib/access-control';
 import { useRouter } from 'next/navigation';
 import LogoutButton from '@/components/auth/LogoutButton';
 
@@ -11,6 +13,7 @@ type Chat = {
   id: string;
   title: string;
   created_at?: string;
+  agent_type?: 'comunicacao' | 'apresentacao' | null;
 };
 
 interface SidebarProps {
@@ -22,6 +25,22 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { user } = useAuth();
+  const [expiredByApi, setExpiredByApi] = useState<boolean>(false);
+  const [apiDiasRestantes, setApiDiasRestantes] = useState<number | undefined>(undefined);
+  const [apiDataExpiracao, setApiDataExpiracao] = useState<string | undefined>(undefined);
+  
+  // Calcular aviso de expiração (compacto)
+  let diasRestantes: number | undefined;
+  if (user?.data_expiracao) {
+    const hoje = new Date();
+    hoje.setHours(0,0,0,0);
+    const exp = new Date(user.data_expiracao);
+    exp.setHours(0,0,0,0);
+    const diff = Math.ceil((exp.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    diasRestantes = diff;
+  }
+  const aviso = getMensagemAviso(diasRestantes);
   
   useEffect(() => {
     const loadChats = async () => {
@@ -29,16 +48,19 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
         setIsLoading(true);
         setError(null);
         
-        const { chats: userChats, error } = await fetchUserChats();
+        const { chats: userChats, error, expirado, diasRestantes: apiDias, dataExpiracao } = await fetchUserChats();
         
         if (error) {
           setError(error);
           return;
         }
         
-        if (userChats && userChats.length > 0) {
-          setChats(userChats);
+        if (Array.isArray(userChats)) {
+          setChats(userChats as Chat[]);
         }
+        setExpiredByApi(Boolean(expirado));
+        setApiDiasRestantes(apiDias);
+        setApiDataExpiracao(dataExpiracao ?? undefined);
       } catch (err) {
         console.error('Erro ao carregar chats:', err);
         setError('Não foi possível carregar seus chats');
@@ -71,6 +93,18 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
           </div>
         </Link>
       </div>
+
+      {/* Aviso de expiração compacto */}
+      {aviso && (
+        <div className={`mx-3 mt-3 mb-0 rounded-md text-xs px-3 py-2 border ${diasRestantes && diasRestantes <= 3 ? 'bg-red-500/10 border-red-500/40 text-red-300' : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300'}`}>
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M10.29 3.86l-7.6 13.15A1.5 1.5 0 003.9 19.5h16.2a1.5 1.5 0 001.31-2.49L13.81 3.86a1.5 1.5 0 00-2.62 0z" />
+            </svg>
+            <span>{aviso}</span>
+          </div>
+        </div>
+      )}
       
       {/* New Chat Button */}
       <div className="px-3 py-3">
@@ -118,12 +152,36 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
               </button>
             </div>
           ) : chats.length === 0 ? (
-            <div className="text-gray-500 text-sm py-3 px-2 bg-gray-800/50 rounded-md border border-gray-700/50 text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              Nenhum chat encontrado
-            </div>
+            expiredByApi ? (
+              <div className="text-sm py-3 px-3 rounded-md border bg-red-500/10 border-red-500/40 text-red-300 text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M10.29 3.86l-7.6 13.15A1.5 1.5 0 003.9 19.5h16.2a1.5 1.5 0 001.31-2.49L13.81 3.86a1.5 1.5 0 00-2.62 0z" />
+                  </svg>
+                  <span>
+                    Seu histórico está indisponível porque seu plano expirou
+                    { (apiDataExpiracao || user?.data_expiracao) ? ` em ${new Date(apiDataExpiracao || (user?.data_expiracao as string)).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}` : '' }.
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <Link
+                    href="https://app.bussolaexecutiva.com.br/renovar-executivia"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-3 py-1.5 rounded-md bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs font-medium"
+                  >
+                    Renovar Acesso
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-500 text-sm py-3 px-2 bg-gray-800/50 rounded-md border border-gray-700/50 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Nenhum chat encontrado
+              </div>
+            )
           ) : (
             <ul className="space-y-1">
               {chats.map((chat) => {
@@ -141,7 +199,14 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
                       </svg>
                       <div className="ml-2 flex-1 overflow-hidden">
                         <div className="truncate font-medium">{chat.title || `Chat ${chat.id.slice(0, 8)}`}</div>
-                        <div className="text-xs text-gray-500 truncate">{formattedDate}</div>
+                        <div className="text-xs text-gray-500 truncate flex items-center gap-2">
+                          <span>{formattedDate}</span>
+                          <span className={`${chat.agent_type === 'apresentacao' 
+                            ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-300' 
+                            : 'bg-[#FF6B00]/20 border border-[#FF6B00]/30 text-[#FF6B00]'} px-2 py-0.5 rounded-full` }>
+                            {chat.agent_type === 'apresentacao' ? 'Apresentação' : 'Comunicação'}
+                          </span>
+                        </div>
                       </div>
                     </Link>
                   </li>
@@ -189,6 +254,17 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
                 <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               <span className="ml-3">Apresentação para Reunião de Resultados</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/dashboard/profile"
+              className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white rounded-md transition-colors duration-200 group"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
+              </svg>
+              <span className="ml-3">Meu Perfil</span>
             </Link>
           </li>
         </ul>

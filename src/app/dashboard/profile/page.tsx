@@ -1,16 +1,408 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import Sidebar from '@/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
+import { useAuth } from '@/contexts/AuthContext';
+
+type Profile = {
+  nome: string;
+  email: string;
+  telefone: string;
+  avatar?: string | null;
+};
 
 export default function ProfilePage() {
-  const router = useRouter();
-  
+  const { user, loading, setUser } = useAuth();
+  const [profile, setProfile] = useState<Profile>({ nome: '', email: '', telefone: '' });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdMsg, setPwdMsg] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Helpers
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    window.clearTimeout((showToast as any)._t);
+    (showToast as any)._t = window.setTimeout(() => setToast(null), 4500);
+  };
+
+  const formatPhoneBR = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
+
+  const telefoneDigits = useMemo(() => profile.telefone.replace(/\D/g, ''), [profile.telefone]);
+
+  // Password validations
+  const pwdRules = useMemo(() => ({
+    length: newPassword.length >= 8,
+    upper: /[A-Z]/.test(newPassword),
+    lower: /[a-z]/.test(newPassword),
+    digit: /\d/.test(newPassword),
+    match: newPassword.length > 0 && newPassword === confirmPassword,
+    different: currentPassword.length > 0 && newPassword !== currentPassword,
+  }), [newPassword, confirmPassword, currentPassword]);
+
+  // Carregar perfil atual
   useEffect(() => {
-    // Redirecionar para a página principal do dashboard
-    router.push('/dashboard');
-  }, [router]);
-  
-  // Retorna null enquanto redireciona
-  return null;
+    const loadProfile = async () => {
+      try {
+        const res = await fetch('/api/user/profile', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.user) {
+          setProfile({
+            nome: data.user.nome || '',
+            email: data.user.email || '',
+            telefone: data.user.telefone || '',
+            avatar: data.user.avatar || null,
+          });
+        }
+      } catch (e) {
+        // noop
+      }
+    };
+    if (user) loadProfile();
+  }, [user]);
+
+  // Salvar perfil (nome/email/telefone)
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveMsg(null);
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          nome: profile.nome.trim(),
+          email: profile.email.trim().toLowerCase(),
+          telefone: telefoneDigits,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+      setSaveMsg('Dados atualizados com sucesso.');
+      // Atualizar AuthContext para refletir no Header imediatamente
+      if (user) {
+        setUser({ ...user, nome: profile.nome, email: profile.email, telefone: telefoneDigits });
+      }
+      showToast('success', 'Perfil atualizado com sucesso.');
+    } catch (err: any) {
+      setSaveMsg(err.message || 'Falha ao salvar');
+      showToast('error', err.message || 'Falha ao atualizar perfil');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Alterar senha
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdMsg(null);
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPwdMsg('Preencha todos os campos.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdMsg('A confirmação da senha não confere.');
+      return;
+    }
+    if (!(pwdRules.length && pwdRules.upper && pwdRules.lower && pwdRules.digit && pwdRules.different)) {
+      setPwdMsg('A senha não atende aos requisitos mínimos.');
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      const res = await fetch('/api/user/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Erro ao alterar senha');
+      setPwdMsg('Senha alterada com sucesso.');
+      showToast('success', 'Senha alterada com sucesso.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setPwdMsg(err.message || 'Falha ao alterar senha');
+      showToast('error', err.message || 'Falha ao alterar senha');
+    } finally {
+      setPwdSaving(false);
+    }
+  };
+
+  // Upload avatar
+  const handleUploadAvatar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAvatarMsg(null);
+    if (!avatarFile) {
+      setAvatarMsg('Selecione uma imagem.');
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      // Crop para quadrado 512x512 antes de enviar
+      const cropToSquare = (file: File, size = 512): Promise<File> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error('Canvas não suportado');
+
+                const w = img.naturalWidth || img.width;
+                const h = img.naturalHeight || img.height;
+                const side = Math.min(w, h);
+                const sx = Math.floor((w - side) / 2);
+                const sy = Math.floor((h - side) / 2);
+                canvas.width = size;
+                canvas.height = size;
+                ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+
+                canvas.toBlob((blob) => {
+                  if (!blob) {
+                    // Fallback usando dataURL
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    const byteString = atob(dataUrl.split(',')[1]);
+                    const ab = new ArrayBuffer(byteString.length);
+                    const ia = new Uint8Array(ab);
+                    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                    const fallbackBlob = new Blob([ab], { type: 'image/jpeg' });
+                    resolve(new File([fallbackBlob], 'avatar.jpg', { type: 'image/jpeg' }));
+                    return;
+                  }
+                  resolve(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }));
+                }, 'image/jpeg', 0.9);
+              } catch (err) {
+                reject(err);
+              }
+            };
+            img.onerror = reject;
+            img.src = reader.result as string;
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      };
+
+      const croppedFile = await cropToSquare(avatarFile, 512).catch(() => avatarFile);
+
+      const form = new FormData();
+      form.append('avatar', croppedFile, croppedFile.name || 'avatar.jpg');
+      const res = await fetch('/api/user/avatar', {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Erro ao enviar avatar');
+      setAvatarMsg('Foto atualizada com sucesso.');
+      setProfile((p) => ({ ...p, avatar: data.url || p.avatar }));
+      if (user) {
+        setUser({ ...user, avatar: data.url || user.avatar });
+      }
+      showToast('success', 'Foto atualizada com sucesso.');
+    } catch (err: any) {
+      setAvatarMsg(err.message || 'Falha ao enviar avatar');
+      showToast('error', err.message || 'Falha ao enviar foto');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  return (
+    <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
+      {/* Sidebar */}
+      <div className="hidden lg:flex lg:w-64 xl:w-72 2xl:w-80 border-r border-gray-800 shadow-xl">
+        <Sidebar />
+      </div>
+
+      <div className="flex flex-col flex-1 overflow-hidden w-full">
+        <Header userName={user?.nome || user?.email} title="Meu Perfil" onMenuToggle={() => {}} />
+
+        <main className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-950 w-full p-6">
+          {/* Toast */}
+          {toast && (
+            <div className="fixed top-4 right-4 z-[100]" role="alert" aria-live="polite" aria-atomic="true">
+              <div className={`max-w-sm w-80 text-white rounded-lg shadow-xl border backdrop-blur-md ${toast.type === 'success' ? 'bg-green-600/90 border-green-300' : 'bg-red-600/90 border-red-300'}`}>
+                <div className="px-4 py-3 flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M10.29 3.86l-7.6 13.15A1.5 1.5 0 003.9 19.5h16.2a1.5 1.5 0 001.31-2.49L13.81 3.86a1.5 1.5 0 00-2.62 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">{toast.message}</p>
+                  </div>
+                  <button type="button" onClick={() => setToast(null)} className="text-white/90 hover:text-white" aria-label="Fechar aviso">×</button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="max-w-4xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* Informações Pessoais */}
+            <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
+              <h2 className="text-lg font-semibold mb-4">Informações Pessoais</h2>
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Nome</label>
+                  <input
+                    type="text"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                    value={profile.nome}
+                    onChange={(e) => setProfile({ ...profile, nome: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Email</label>
+                  <input
+                    type="email"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                    value={profile.email}
+                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Telefone</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                    value={profile.telefone}
+                    onChange={(e) => setProfile({ ...profile, telefone: formatPhoneBR(e.target.value) })}
+                  />
+                </div>
+                {saveMsg && (
+                  <div className="text-sm mt-2 text-gray-300">{saveMsg}</div>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className={`mt-2 px-4 py-2 rounded-md text-sm font-medium ${isSaving ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white`}
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar alterações'}
+                </button>
+              </form>
+            </section>
+
+            {/* Foto de Perfil */}
+            <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
+              <h2 className="text-lg font-semibold mb-4">Foto de Perfil</h2>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 rounded-full bg-gray-700 overflow-hidden flex items-center justify-center">
+                  {profile.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white text-lg font-bold">{(profile.nome || user?.email)?.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                    className="text-sm text-gray-300"
+                  />
+                </div>
+              </div>
+              {avatarMsg && (
+                <div className="text-sm mt-2 text-gray-300">{avatarMsg}</div>
+              )}
+              <button
+                onClick={handleUploadAvatar}
+                disabled={avatarUploading || !avatarFile}
+                className={`mt-2 px-4 py-2 rounded-md text-sm font-medium ${avatarUploading ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white`}
+              >
+                {avatarUploading ? 'Enviando...' : 'Enviar foto'}
+              </button>
+            </section>
+
+            {/* Alterar Senha */}
+            <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg xl:col-span-2">
+              <h2 className="text-lg font-semibold mb-4">Alterar Senha</h2>
+              <form onSubmit={handleChangePassword} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Senha Atual</label>
+                  <input
+                    type="password"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Nova Senha</label>
+                  <input
+                    type="password"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <div className="mt-2 space-y-1 text-xs">
+                    <p className={`${pwdRules.length ? 'text-green-400' : 'text-gray-400'}`}>• Mínimo de 8 caracteres</p>
+                    <p className={`${pwdRules.upper ? 'text-green-400' : 'text-gray-400'}`}>• Pelo menos 1 letra maiúscula</p>
+                    <p className={`${pwdRules.lower ? 'text-green-400' : 'text-gray-400'}`}>• Pelo menos 1 letra minúscula</p>
+                    <p className={`${pwdRules.digit ? 'text-green-400' : 'text-gray-400'}`}>• Pelo menos 1 número</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Confirmar Nova Senha</label>
+                  <input
+                    type="password"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                  <div className="mt-2 space-y-1 text-xs">
+                    <p className={`${pwdRules.match ? 'text-green-400' : 'text-gray-400'}`}>• Senhas iguais</p>
+                    <p className={`${pwdRules.different ? 'text-green-400' : 'text-gray-400'}`}>• Diferente da senha atual</p>
+                  </div>
+                </div>
+                {pwdMsg && (
+                  <div className="md:col-span-3 text-sm text-gray-300">{pwdMsg}</div>
+                )}
+                <div className="md:col-span-3 mt-2">
+                  <button
+                    type="submit"
+                    disabled={pwdSaving || !(pwdRules.length && pwdRules.upper && pwdRules.lower && pwdRules.digit && pwdRules.match && pwdRules.different)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium ${pwdSaving ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white`}
+                  >
+                    {pwdSaving ? 'Alterando...' : 'Alterar senha'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }

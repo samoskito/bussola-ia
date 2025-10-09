@@ -3,7 +3,7 @@
 /**
  * Função para buscar os chats do usuário no cliente
  */
-export async function fetchUserChats(): Promise<{ chats: any[] | null; error?: string }> {
+export async function fetchUserChats(): Promise<{ chats: any[] | null; expirado?: boolean; diasRestantes?: number; dataExpiracao?: string | null; error?: string }> {
   try {
     console.log('Iniciando fetchUserChats');
     
@@ -29,8 +29,13 @@ export async function fetchUserChats(): Promise<{ chats: any[] | null; error?: s
     const data = await response.json();
     console.log('Dados recebidos da API chats:', data);
     
-    // Garantir que sempre retorne um array, mesmo vazio
-    return { chats: Array.isArray(data.chats) ? data.chats : [] };
+    // Garantir que sempre retorne um array, mesmo vazio, e propagar metadados
+    return { 
+      chats: Array.isArray(data.chats) ? data.chats : [],
+      expirado: typeof data.expirado === 'boolean' ? data.expirado : undefined,
+      diasRestantes: typeof data.diasRestantes === 'number' ? data.diasRestantes : undefined,
+      dataExpiracao: typeof data.dataExpiracao === 'string' || data.dataExpiracao === null ? data.dataExpiracao : undefined
+    };
   } catch (error) {
     console.error('Fetch chats error:', error);
     return { 

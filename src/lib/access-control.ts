@@ -15,6 +15,14 @@ export interface Usuario {
   [key: string]: any;
 }
 
+// Log apenas em desenvolvimento
+const devLog = (...args: any[]) => {
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log(...args);
+  }
+};
+
 export interface ResultadoVerificacao {
   acesso: boolean;
   motivo?: string;
@@ -26,7 +34,7 @@ export interface ResultadoVerificacao {
  * Verifica se o usuário tem acesso a uma IA específica
  */
 export const verificarAcessoIA = (usuario: Usuario, tipoIA: TipoIA): ResultadoVerificacao => {
-  console.log('[ACCESS CONTROL] Verificando acesso:', {
+  devLog('[ACCESS CONTROL] Verificando acesso:', {
     usuario: usuario.email,
     tipoIA,
     plano: usuario.plano,
@@ -35,7 +43,7 @@ export const verificarAcessoIA = (usuario: Usuario, tipoIA: TipoIA): ResultadoVe
   
   // Se não tem plano definido, libera acesso (compatibilidade com usuários antigos)
   if (!usuario.plano) {
-    console.log('[ACCESS CONTROL] Sem plano definido, liberando acesso (compatibilidade)');
+    devLog('[ACCESS CONTROL] Sem plano definido, liberando acesso (compatibilidade)');
     return { acesso: true };
   }
 
@@ -61,14 +69,14 @@ export const verificarAcessoIA = (usuario: Usuario, tipoIA: TipoIA): ResultadoVe
     
     // Verificar se tem acesso à IA específica
     if (usuario.plano === 'Ambas' || usuario.plano === tipoIA) {
-      console.log('[ACCESS CONTROL] Acesso liberado! Plano:', usuario.plano, 'IA:', tipoIA);
+      devLog('[ACCESS CONTROL] Acesso liberado! Plano:', usuario.plano, 'IA:', tipoIA);
       return {
         acesso: true,
         diasRestantes
       };
     }
     
-    console.log('[ACCESS CONTROL] Acesso negado! Plano não inclui esta IA');
+    devLog('[ACCESS CONTROL] Acesso negado! Plano não inclui esta IA');
     return {
       acesso: false,
       motivo: `Seu plano atual é "${usuario.plano}". Para acessar "${tipoIA}", você precisa fazer upgrade.`,

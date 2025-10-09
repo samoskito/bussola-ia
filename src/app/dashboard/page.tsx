@@ -7,6 +7,7 @@ import Header from '@/components/layout/Header';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
+import ExpiryToast from '@/components/access/ExpiryToast';
 
 // Definição dos agentes disponíveis
 const agents = [
@@ -31,6 +32,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [chats, setChats] = useState([]);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
+  const [diasRestantesApi, setDiasRestantesApi] = useState<number | undefined>(undefined);
+  const [dataExpiracaoApi, setDataExpiracaoApi] = useState<string | null | undefined>(undefined);
   
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
@@ -44,7 +47,7 @@ export default function DashboardPage() {
     const loadChats = async () => {
       try {
         setIsLoadingChats(true);
-        const { chats: userChats, error } = await fetchUserChats();
+        const { chats: userChats, error, diasRestantes, dataExpiracao } = await fetchUserChats();
         
         if (error) {
           console.error('Erro ao carregar chats:', error);
@@ -54,6 +57,8 @@ export default function DashboardPage() {
         if (userChats && userChats.length > 0) {
           setChats(userChats);
         }
+        setDiasRestantesApi(diasRestantes);
+        setDataExpiracaoApi(dataExpiracao);
       } catch (err) {
         console.error('Erro ao carregar chats:', err);
       } finally {
@@ -84,6 +89,9 @@ export default function DashboardPage() {
     return null;
   }
   
+  const diasParaAviso = diasRestantesApi;
+  const dataExpParaAviso = dataExpiracaoApi;
+  
   return (
     <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
       {/* Sidebar - visível apenas em desktop */}
@@ -97,10 +105,43 @@ export default function DashboardPage() {
           userName={user.nome || user.email} 
           title="Selecione um Agente" 
           onMenuToggle={() => {}} 
+          daysRemaining={diasParaAviso}
         />
         
         <main className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-950 w-full p-6">
           <div className="max-w-6xl mx-auto">
+            {/* Resumo do Plano / Expiração */}
+            {typeof diasParaAviso === 'number' && (
+              <div className={`mb-6 rounded-lg border p-4 ${diasParaAviso <= 0 ? 'bg-red-500/10 border-red-500/40 text-red-300' : diasParaAviso <= 3 ? 'bg-red-500/10 border-red-500/40 text-red-300' : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300'}`}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M10.29 3.86l-7.6 13.15A1.5 1.5 0 003.9 19.5h16.2a1.5 1.5 0 001.31-2.49L13.81 3.86a1.5 1.5 0 00-2.62 0z" />
+                    </svg>
+                    <span className="text-sm">
+                      {diasParaAviso <= 0
+                        ? 'Seu plano está expirado.'
+                        : `Seu plano expira em ${diasParaAviso} dia${diasParaAviso === 1 ? '' : 's'}.`}
+                      {dataExpParaAviso ? ` Data de expiração: ${new Date(dataExpParaAviso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}.` : ''}
+                    </span>
+                  </div>
+                  {typeof diasParaAviso === 'number' && diasParaAviso <= 10 && (
+                    <div className="flex items-center gap-2">
+                      <a
+                        href="https://app.bussolaexecutiva.com.br/renovar-executivia"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-md bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs font-medium"
+                      >
+                        {diasParaAviso > 0 ? 'Renovar' : 'Renovar Acesso'}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Toast de Expiração (<= 3 dias) */}
+            <ExpiryToast daysRemaining={diasParaAviso} dataExpiracao={dataExpParaAviso || null} />
             {/* Seção do Vídeo Tutorial */}
             <div className="mb-10">
               <div className="text-center mb-4">

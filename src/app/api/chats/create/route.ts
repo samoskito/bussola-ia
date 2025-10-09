@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     // Buscar dados do usuário
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, email, nome, telefone')
+      .select('id, email, nome, telefone, data_expiracao, plano')
       .eq('id', userId)
       .single();
       
@@ -53,6 +53,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao buscar dados do usuário' }, { status: 500 });
     }
     
+    // Verificar expiração do plano
+    if (userData.data_expiracao) {
+      const hoje = new Date();
+      hoje.setHours(0,0,0,0);
+      const exp = new Date(userData.data_expiracao);
+      exp.setHours(0,0,0,0);
+      if (hoje > exp) {
+        return NextResponse.json({ error: 'Seu plano expirou. Renove para continuar usando.' }, { status: 403 });
+      }
+    }
+
+    // Verificar plano permite Comunicação Executiva
+    if (userData.plano && !(userData.plano === 'Ambas' || userData.plano === 'Comunicação Executiva')) {
+      return NextResponse.json({ error: 'Seu plano não inclui acesso à Comunicação Executiva.' }, { status: 403 });
+    }
+
     // Criar um novo chat
     const { data: chatData, error: chatError } = await supabase
       .from('chats')
@@ -60,6 +76,7 @@ export async function POST(request: Request) {
         { 
           user_id: userId,
           title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+          agent_type: 'comunicacao'
         }
       ])
       .select('id, title, created_at')

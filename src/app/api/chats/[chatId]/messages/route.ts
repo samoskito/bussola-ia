@@ -39,10 +39,10 @@ export async function GET(
     // Criar cliente do Supabase com a chave de serviço
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Verificar se o chat pertence ao usuário
+    // Verificar se o chat pertence ao usuário e obter tipo do agente
     const { data: chatData, error: chatError } = await supabase
       .from('chats')
-      .select('id, user_id')
+      .select('id, user_id, title, agent_type')
       .eq('id', chatId)
       .single();
     
@@ -56,6 +56,50 @@ export async function GET(
       return NextResponse.json({ error: 'Não autorizado a acessar este chat' }, { status: 403 });
     }
     
+    // Buscar dados do usuário para verificar expiração e plano
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, data_expiracao, plano')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userData) {
+      console.error('Erro ao buscar dados do usuário:', userError);
+      return NextResponse.json({ error: 'Erro ao buscar dados do usuário' }, { status: 500 });
+    }
+
+    // Verificar expiração
+    if (userData.data_expiracao) {
+      const hoje = new Date();
+      hoje.setHours(0,0,0,0);
+      const exp = new Date(userData.data_expiracao);
+      exp.setHours(0,0,0,0);
+      if (hoje > exp) {
+        return NextResponse.json({ error: 'Seu plano expirou. Renove para continuar usando.' }, { status: 403 });
+      }
+    }
+
+    // Verificar acesso conforme agent_type (fallback para título)
+    if (userData.plano) {
+      const type = (chatData as any).agent_type as string | null;
+      if (type === 'apresentacao' && !(userData.plano === 'Ambas' || userData.plano === 'Apresentação para Reunião de Resultados')) {
+        return NextResponse.json({ error: 'Seu plano não inclui acesso à Apresentação para Reunião de Resultados.' }, { status: 403 });
+      }
+      if (type === 'comunicacao' && !(userData.plano === 'Ambas' || userData.plano === 'Comunicação Executiva')) {
+        return NextResponse.json({ error: 'Seu plano não inclui acesso à Comunicação Executiva.' }, { status: 403 });
+      }
+      if (!type) {
+        const title = (chatData.title || '').toLowerCase();
+        const isApresentacao = title.includes('apresentação') || title.includes('reuniao') || title.includes('reunião');
+        if (isApresentacao && !(userData.plano === 'Ambas' || userData.plano === 'Apresentação para Reunião de Resultados')) {
+          return NextResponse.json({ error: 'Seu plano não inclui acesso à Apresentação para Reunião de Resultados.' }, { status: 403 });
+        }
+        if (!isApresentacao && !(userData.plano === 'Ambas' || userData.plano === 'Comunicação Executiva')) {
+          return NextResponse.json({ error: 'Seu plano não inclui acesso à Comunicação Executiva.' }, { status: 403 });
+        }
+      }
+    }
+
     // Buscar mensagens do chat na tabela scripts
     const { data: messages, error: messagesError } = await supabase
       .from('scripts')

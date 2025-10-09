@@ -41,10 +41,10 @@ export async function POST(request: Request) {
     // Criar cliente do Supabase com a chave de serviço
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Verificar se o chat pertence ao usuário
+    // Verificar se o chat pertence ao usuário e seu tipo
     const { data: chatData, error: chatError } = await supabase
       .from('chats')
-      .select('id, user_id')
+      .select('id, user_id, agent_type')
       .eq('id', chatId)
       .single();
     
@@ -57,17 +57,37 @@ export async function POST(request: Request) {
     if (chatData.user_id !== userId) {
       return NextResponse.json({ error: 'Não autorizado a acessar este chat' }, { status: 403 });
     }
+    // Garantir que este endpoint seja usado apenas para chats de Comunicação Executiva
+    if ((chatData as any).agent_type && (chatData as any).agent_type !== 'comunicacao') {
+      return NextResponse.json({ error: 'Este chat pertence a outro agente. Use o endpoint correto.' }, { status: 400 });
+    }
     
     // Buscar dados do usuário
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, email, nome, telefone')
+      .select('id, email, nome, telefone, data_expiracao, plano')
       .eq('id', userId)
       .single();
       
     if (userError || !userData) {
       console.error('Erro ao buscar dados do usuário:', userError);
       return NextResponse.json({ error: 'Erro ao buscar dados do usuário' }, { status: 500 });
+    }
+
+    // Verificar expiração do plano
+    if (userData.data_expiracao) {
+      const hoje = new Date();
+      hoje.setHours(0,0,0,0);
+      const exp = new Date(userData.data_expiracao);
+      exp.setHours(0,0,0,0);
+      if (hoje > exp) {
+        return NextResponse.json({ error: 'Seu plano expirou. Renove para continuar usando.' }, { status: 403 });
+      }
+    }
+
+    // Verificar plano permite Comunicação Executiva
+    if (userData.plano && !(userData.plano === 'Ambas' || userData.plano === 'Comunicação Executiva')) {
+      return NextResponse.json({ error: 'Seu plano não inclui acesso à Comunicação Executiva.' }, { status: 403 });
     }
     
     // Salvar a mensagem do usuário na tabela scripts

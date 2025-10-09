@@ -13,7 +13,7 @@ interface AccessDeniedProps {
 
 export default function AccessDenied({ motivo, expirado, nomeIA, dataExpiracao }: AccessDeniedProps) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-950 p-6">
+    <div className="fixed inset-0 z-50 w-screen h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-950 p-6">
       <div className="max-w-md w-full">
         {/* Card de Acesso Negado */}
         <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border-2 border-red-500/30 shadow-2xl">
@@ -84,10 +84,15 @@ export default function AccessDenied({ motivo, expirado, nomeIA, dataExpiracao }
           {/* Botões de Ação */}
           <div className="space-y-3">
             <Link
-              href="/dashboard"
+              href={expirado 
+                ? "https://app.bussolaexecutiva.com.br/renovar-executivia" 
+                : "https://app.bussolaexecutiva.com.br/upgrade-executivia"
+              }
+              target="_blank"
+              rel="noopener noreferrer"
               className="block w-full py-3 px-6 text-center font-semibold rounded-lg bg-[#FF6B00] hover:bg-[#FF6B00]/90 text-white transition-all duration-200 shadow-lg hover:shadow-xl"
             >
-              {expirado ? 'Renovar Plano' : 'Fazer Upgrade'}
+              {expirado ? 'Renovar Acesso' : 'Fazer Upgrade'}
             </Link>
             
             <Link

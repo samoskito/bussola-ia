@@ -15,6 +15,7 @@ import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 import { verificarAcessoIA } from '@/lib/access-control';
 import AccessDenied from '@/components/access/AccessDenied';
 import AccessWarning from '@/components/access/AccessWarning';
+import ExpiryToast from '@/components/access/ExpiryToast';
 
 const mockAgents = [
   { id: '1', name: 'Apresentação para Reunião de Resultados', isActive: true },
@@ -30,6 +31,8 @@ export default function ApresentacaoPage() {
   const router = useRouter();
   const [chats, setChats] = useState([]);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
+  const [diasRestantesApi, setDiasRestantesApi] = useState<number | undefined>(undefined);
+  const [dataExpiracaoApi, setDataExpiracaoApi] = useState<string | null | undefined>(undefined);
   
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
@@ -45,7 +48,7 @@ export default function ApresentacaoPage() {
         // Garantir que estamos no navegador antes de fazer a chamada
         if (typeof window !== 'undefined') {
           setIsLoadingChats(true);
-          const { chats: userChats, error } = await fetchUserChats();
+          const { chats: userChats, error, diasRestantes, dataExpiracao } = await fetchUserChats();
           
           if (error) {
             console.error('Erro ao carregar chats:', error);
@@ -55,6 +58,8 @@ export default function ApresentacaoPage() {
           if (userChats && userChats.length > 0) {
             setChats(userChats);
           }
+          setDiasRestantesApi(diasRestantes);
+          setDataExpiracaoApi(dataExpiracao);
         }
       } catch (err) {
         console.error('Erro ao carregar chats:', err);
@@ -84,6 +89,8 @@ export default function ApresentacaoPage() {
   
   // Verificar acesso à IA de Apresentação para Reunião de Resultados
   const resultadoAcesso = verificarAcessoIA(user, 'Apresentação para Reunião de Resultados');
+  const diasParaAviso = typeof diasRestantesApi === 'number' ? diasRestantesApi : resultadoAcesso.diasRestantes;
+  const dataExpParaAviso = (typeof dataExpiracaoApi !== 'undefined') ? dataExpiracaoApi : user.data_expiracao;
   
   // Se não tem acesso, mostrar tela de bloqueio
   if (!resultadoAcesso.acesso) {
@@ -110,13 +117,16 @@ export default function ApresentacaoPage() {
           userName={user.nome || user.email} 
           title="Apresentação para Reunião de Resultados" 
           onMenuToggle={() => {}} 
+          agentType="apresentacao"
+          daysRemaining={diasParaAviso}
         />
         
         {/* Aviso de Expiração Próxima */}
         <AccessWarning 
-          diasRestantes={resultadoAcesso.diasRestantes}
-          dataExpiracao={user.data_expiracao}
+          diasRestantes={diasParaAviso}
+          dataExpiracao={dataExpParaAviso}
         />
+        <ExpiryToast daysRemaining={diasParaAviso} dataExpiracao={dataExpParaAviso || null} />
         
         <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950 w-full">
           <div className="h-full w-full">

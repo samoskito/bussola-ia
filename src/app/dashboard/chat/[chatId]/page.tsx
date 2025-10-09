@@ -7,7 +7,10 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import MobileMenu from '@/components/layout/MobileMenu';
 import { ChatDetail } from '@/components/chat';
+import AccessDenied from '@/components/access/AccessDenied';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
+import AccessWarning from '@/components/access/AccessWarning';
+import ExpiryToast from '@/components/access/ExpiryToast';
 
 
 type ChatPageProps = {
@@ -28,6 +31,8 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [chats, setChats] = useState<Array<{ id: string; title: string }>>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [chatType, setChatType] = useState<'script' | 'apresentacao' | undefined>();
+  const [accessDenied, setAccessDenied] = useState<{ motivo: string; expirado?: boolean } | null>(null);
+  const [daysRemaining, setDaysRemaining] = useState<number | undefined>(undefined);
   
   // Função para controlar a abertura/fechamento do menu mobile
   const toggleMobileMenu = () => {
@@ -83,21 +88,36 @@ export default function ChatPage({ params }: ChatPageProps) {
         const response = await fetch(`/api/chats/${chatId}`);
         
         if (!response.ok) {
+          if (response.status === 403) {
+            const data = await response.json().catch(() => ({ error: 'Acesso negado' }));
+            const msg: string = data.error || 'Acesso negado';
+            const expirado = /expirou/i.test(msg);
+            setAccessDenied({ motivo: msg, expirado });
+            return;
+          }
           throw new Error('Erro ao carregar detalhes do chat');
         }
         
         const data = await response.json();
         if (data.chat) {
           setChatTitle(data.chat.title || 'Chat sem título');
-          
-          // Detectar tipo de chat pelo título
-          const title = data.chat.title.toLowerCase();
-          if (title.includes('apresentação') || title.includes('reuniao')) {
-            console.log('[ChatPage] Detectado tipo de chat pelo título: apresentacao');
+          if (typeof data.diasRestantes === 'number') {
+            setDaysRemaining(data.diasRestantes);
+          }
+
+          // Preferir agent_type do chat; fallback para título
+          const agentType = data.chat.agent_type as string | undefined;
+          if (agentType === 'apresentacao') {
             setChatType('apresentacao');
-          } else {
-            console.log('[ChatPage] Detectado tipo de chat pelo título: script (padrão)');
+          } else if (agentType === 'comunicacao') {
             setChatType('script');
+          } else {
+            const title = (data.chat.title || '').toLowerCase();
+            if (title.includes('apresentação') || title.includes('reuniao') || title.includes('reunião')) {
+              setChatType('apresentacao');
+            } else {
+              setChatType('script');
+            }
           }
         }
       } catch (err) {
@@ -125,6 +145,19 @@ export default function ChatPage({ params }: ChatPageProps) {
     return null; // Será redirecionado pelo middleware
   }
 
+  // Bloqueio de acesso (plano expirado ou sem permissão)
+  if (accessDenied) {
+    return (
+      <AccessDenied
+        motivo={accessDenied.motivo}
+        expirado={accessDenied.expirado}
+        nomeIA={chatType === 'apresentacao' ? 'Apresentação para Reunião de Resultados' : 'Comunicação Executiva'}
+        dataExpiracao={user?.data_expiracao || null}
+      />
+    );
+  }
+  
+  // Render padrão do chat quando acesso permitido
   return (
     <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
       {/* Sidebar - visível apenas em desktop */}
@@ -144,9 +177,19 @@ export default function ChatPage({ params }: ChatPageProps) {
           userName={user?.nome || 'Usuário'} 
           title={chatTitle} 
           onMenuToggle={toggleMobileMenu}
+          agentType={chatType === 'apresentacao' ? 'apresentacao' : 'comunicacao'}
+          daysRemaining={daysRemaining}
         />
+        <ExpiryToast daysRemaining={daysRemaining} dataExpiracao={user?.data_expiracao || null} />
         
         <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950 w-full">
+          {/* Aviso de Expiração Próxima (agora dentro do main) */}
+          <div className="px-3 md:px-6 pt-3">
+            <AccessWarning 
+              diasRestantes={daysRemaining}
+              dataExpiracao={user?.data_expiracao}
+            />
+          </div>
           <div className="h-full w-full">
             {error ? (
               <div className="flex h-full items-center justify-center p-4">

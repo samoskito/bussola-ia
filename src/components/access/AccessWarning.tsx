@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { getCorPlano, getMensagemAviso } from '@/lib/access-control';
+import { getMensagemAviso } from '@/lib/access-control';
 
 interface AccessWarningProps {
   diasRestantes?: number;
@@ -14,12 +14,10 @@ export default function AccessWarning({ diasRestantes, dataExpiracao }: AccessWa
   
   // Não mostrar nada se não houver aviso
   if (!mensagem) return null;
-
-  const corBadge = getCorPlano(diasRestantes);
   const urgente = diasRestantes && diasRestantes <= 3;
 
   return (
-    <div className={`mx-4 my-4 rounded-lg border-2 p-4 ${
+    <div className={`max-w-3xl mx-auto my-4 rounded-lg border-2 p-4 ${
       urgente 
         ? 'bg-red-500/10 border-red-500/50' 
         : 'bg-yellow-500/10 border-yellow-500/50'

@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Verificar se o chat pertence ao usuário
     const { data: chatData, error: chatError } = await supabase
       .from('chats')
-      .select('id, title')
+      .select('id, title, agent_type')
       .eq('id', chatId)
       .eq('user_id', userId)
       .single();
@@ -59,10 +59,18 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Garantir que este endpoint seja usado apenas para chats de Apresentação
+    if ((chatData as any).agent_type && (chatData as any).agent_type !== 'apresentacao') {
+      return NextResponse.json(
+        { success: false, error: 'Este chat pertence a outro agente. Use o endpoint correto.' },
+        { status: 400 }
+      );
+    }
+
     // Buscar dados do usuário
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, email, nome, telefone')
+      .select('id, email, nome, telefone, data_expiracao, plano')
       .eq('id', userId)
       .single();
       
@@ -71,6 +79,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao buscar dados do usuário' }, { status: 500 });
     }
     
+    // Verificar expiração do plano
+    if (userData.data_expiracao) {
+      const hoje = new Date();
+      hoje.setHours(0,0,0,0);
+      const exp = new Date(userData.data_expiracao);
+      exp.setHours(0,0,0,0);
+      if (hoje > exp) {
+        return NextResponse.json(
+          { success: false, error: 'Seu plano expirou. Renove para continuar usando.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Verificar plano permite Apresentação para Reunião de Resultados
+    if (userData.plano && !(userData.plano === 'Ambas' || userData.plano === 'Apresentação para Reunião de Resultados')) {
+      return NextResponse.json(
+        { success: false, error: 'Seu plano não inclui acesso à Apresentação para Reunião de Resultados.' },
+        { status: 403 }
+      );
+    }
+
     // Salvar a mensagem do usuário na tabela scripts
     const { data: messageData, error: messageError } = await supabase
       .from('scripts')

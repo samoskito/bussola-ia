@@ -61,7 +61,10 @@ export async function clientCheckSession(): Promise<{ user: any | null; error?: 
  */
 export async function clientLogin(email: string, password: string): Promise<{ user: any | null; error?: string }> {
   try {
-    console.log('[CLIENT] Iniciando processo de login para:', email);
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[CLIENT] Iniciando processo de login para:', email);
+    }
     
     const response = await fetch('/api/auth/login', {
       method: 'POST',
@@ -73,7 +76,10 @@ export async function clientLogin(email: string, password: string): Promise<{ us
       credentials: 'include'
     });
     
-    console.log('[CLIENT] Resposta do servidor:', response.status, response.statusText);
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[CLIENT] Resposta do servidor:', response.status, response.statusText);
+    }
     
     if (!response.ok) {
       let errorMessage = 'Erro ao fazer login';
@@ -90,7 +96,10 @@ export async function clientLogin(email: string, password: string): Promise<{ us
     }
     
     const data = await response.json();
-    console.log('[CLIENT] Login bem-sucedido, dados do usuário recebidos');
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[CLIENT] Login bem-sucedido, dados do usuário recebidos');
+    }
     return { user: data.user || null };
   } catch (error) {
     console.error('[CLIENT] Erro no processo de login:', error);

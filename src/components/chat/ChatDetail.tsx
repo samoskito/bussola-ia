@@ -38,15 +38,24 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
       const typeParam = urlParams.get('type');
       
       if (typeParam === 'apresentacao') {
-        console.log(`[ChatDetail] Detectado tipo de chat: apresentacao (da URL)`); 
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log(`[ChatDetail] Detectado tipo de chat: apresentacao (da URL)`);
+        }
         setChatTypeState('apresentacao');
       } else {
         // Padrão é script
-        console.log(`[ChatDetail] Detectado tipo de chat: script (padrão)`); 
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log(`[ChatDetail] Detectado tipo de chat: script (padrão)`);
+        }
         setChatTypeState('script');
       }
     } else {
-      console.log(`[ChatDetail] Usando tipo de chat definido por props: ${chatTypeState}`);
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log(`[ChatDetail] Usando tipo de chat definido por props: ${chatTypeState}`);
+      }
     }
   }, [chatTypeState]);
   
@@ -60,13 +69,18 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
         if (response.ok) {
           const data = await response.json();
           
-          // Verificar se o título do chat contém informação sobre o tipo
-          if (data.chat && data.chat.title) {
-            const title = data.chat.title.toLowerCase();
-            
-            if (title.includes('apresentação') || title.includes('reuniao')) {
-              console.log(`[ChatDetail] Detectado tipo de chat: apresentacao (do título)`); 
+          // Preferir agent_type do chat; fallback para título
+          if (data.chat) {
+            const agentType = data.chat.agent_type as string | undefined;
+            if (agentType === 'apresentacao') {
               setChatTypeState('apresentacao');
+            } else if (agentType === 'comunicacao') {
+              setChatTypeState('script');
+            } else if (data.chat.title) {
+              const title = data.chat.title.toLowerCase();
+              if (title.includes('apresentação') || title.includes('reuniao') || title.includes('reunião')) {
+                setChatTypeState('apresentacao');
+              }
             }
           }
         }
@@ -188,7 +202,10 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
     
     // Iniciar novo intervalo de polling (verificar a cada 2 segundos)
     pollingIntervalRef.current = setInterval(() => {
-      console.log('Verificando novas respostas...');
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log('Verificando novas respostas...');
+      }
       fetchChatMessages();
     }, 2000);
   };
@@ -239,7 +256,10 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
         ? '/api/chats/message-apresentacao'
         : '/api/chats/message';
       
-      console.log(`Enviando mensagem para endpoint: ${endpoint} (tipo: ${chatTypeState})`);
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log(`Enviando mensagem para endpoint: ${endpoint} (tipo: ${chatTypeState})`);
+      }
       
       // Enviar mensagem para a API
       const response = await fetch(endpoint, {

@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 import ExpiryToast from '@/components/access/ExpiryToast';
+import MobileMenu from '@/components/layout/MobileMenu';
 
 // Definição dos agentes disponíveis
 const agents = [
@@ -34,6 +35,9 @@ export default function DashboardPage() {
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [diasRestantesApi, setDiasRestantesApi] = useState<number | undefined>(undefined);
   const [dataExpiracaoApi, setDataExpiracaoApi] = useState<string | null | undefined>(undefined);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
   
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
@@ -99,12 +103,19 @@ export default function DashboardPage() {
         <Sidebar initialChats={chats} />
       </div>
       
+      {/* Mobile Menu Overlay */}
+      <MobileMenu 
+        isOpen={isMobileMenuOpen} 
+        onClose={closeMobileMenu} 
+        chats={chats as any}
+      />
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden w-full">
         <Header 
           userName={user.nome || user.email} 
           title="Selecione um Agente" 
-          onMenuToggle={() => {}} 
+          onMenuToggle={toggleMobileMenu} 
           daysRemaining={diasParaAviso}
         />
         

@@ -17,6 +17,7 @@ import { verificarAcessoIA } from '@/lib/access-control';
 import AccessDenied from '@/components/access/AccessDenied';
 import AccessWarning from '@/components/access/AccessWarning';
 import ExpiryToast from '@/components/access/ExpiryToast';
+import MobileMenu from '@/components/layout/MobileMenu';
 
 const mockAgents = [
   { id: '1', name: 'Comunicação Executiva', isActive: true },
@@ -34,6 +35,9 @@ export default function ScriptPage() {
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [diasRestantesApi, setDiasRestantesApi] = useState<number | undefined>(undefined);
   const [dataExpiracaoApi, setDataExpiracaoApi] = useState<string | null | undefined>(undefined);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
   
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
@@ -112,24 +116,33 @@ export default function ScriptPage() {
         <Sidebar initialChats={chats} />
       </div>
       
+      {/* Mobile Menu Overlay */}
+      <MobileMenu 
+        isOpen={isMobileMenuOpen} 
+        onClose={closeMobileMenu} 
+        chats={chats as any}
+      />
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden w-full">
         <Header 
           userName={user.nome || user.email} 
           title="Novo Chat" 
-          onMenuToggle={() => {}} 
+          onMenuToggle={toggleMobileMenu} 
           agentType="comunicacao"
           daysRemaining={diasParaAviso}
         />
         
-        {/* Aviso de Expiração Próxima */}
-        <AccessWarning 
-          diasRestantes={diasParaAviso}
-          dataExpiracao={dataExpParaAviso}
-        />
         <ExpiryToast daysRemaining={diasParaAviso} dataExpiracao={dataExpParaAviso || null} />
         
         <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950 w-full">
+          {/* Aviso dentro do conteúdo */}
+          <div className="px-3 md:px-6 pt-3">
+            <AccessWarning 
+              diasRestantes={diasParaAviso}
+              dataExpiracao={dataExpParaAviso}
+            />
+          </div>
           <div className="h-full w-full">
             <ChatInterface userName={user.nome || user.email} agents={mockAgents} />
           </div>

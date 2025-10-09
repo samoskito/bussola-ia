@@ -66,7 +66,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 lg:hidden">
+    <div className="fixed inset-0 z-[60] lg:hidden">
       {/* Overlay com efeito de fade */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm transition-opacity duration-300"
@@ -113,25 +113,14 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
           </Link>
 
           <Link 
-            href="/dashboard"
-            className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive('/dashboard') ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
-            onClick={onClose}
-          >
-            <svg className="w-5 h-5 mr-3 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            Selecionar Agente
-          </Link>
-
-          <Link 
             href="/script"
             className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive('/script') ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
             onClick={onClose}
           >
-            <svg className="w-5 h-5 mr-3 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-3 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Novo Chat
+            Gerar Script
           </Link>
           
           <Link 
@@ -143,6 +132,18 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span>Apresentação para Reunião de Resultados</span>
+          </Link>
+
+          {/* Meu Perfil no final */}
+          <Link 
+            href="/dashboard/profile"
+            className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive('/dashboard/profile') ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
+            onClick={onClose}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-3 text-current" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
+            </svg>
+            Meu Perfil
           </Link>
         </nav>
 

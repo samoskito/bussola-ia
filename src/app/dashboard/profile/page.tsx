@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
+import MobileMenu from '@/components/layout/MobileMenu';
 import { useAuth } from '@/contexts/AuthContext';
 
 type Profile = {
@@ -26,6 +27,9 @@ export default function ProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarMsg, setAvatarMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   // Helpers
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -246,8 +250,15 @@ export default function ProfilePage() {
         <Sidebar />
       </div>
 
+      {/* Mobile Menu Overlay */}
+      <MobileMenu 
+        isOpen={isMobileMenuOpen} 
+        onClose={closeMobileMenu} 
+        chats={[]} 
+      />
+
       <div className="flex flex-col flex-1 overflow-hidden w-full">
-        <Header userName={user?.nome || user?.email} title="Meu Perfil" onMenuToggle={() => {}} />
+        <Header userName={user?.nome || user?.email} title="Meu Perfil" onMenuToggle={toggleMobileMenu} />
 
         <main className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-950 w-full p-6">
           {/* Toast */}

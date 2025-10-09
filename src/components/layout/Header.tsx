@@ -71,7 +71,7 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
           </svg>
         </button>
 
-        <div className="flex items-center gap-2 bg-[#FF6B00]/10 px-3 py-2 rounded-lg shadow-inner">
+        <div className="flex items-center gap-1.5 md:gap-2 bg-[#FF6B00]/10 px-2 py-1 md:px-3 md:py-2 rounded-lg shadow-inner">
           <Image 
             src="/images/executivia-logo.png" 
             alt="ExecutivIA Logo" 
@@ -79,7 +79,7 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
             height={28}
             className="object-contain"
           />
-          <span className="font-medium text-sm md:text-base">ExecutivIA</span>
+          <span className="hidden sm:inline font-medium text-sm md:text-base">ExecutivIA</span>
         </div>
         
         {title && (
@@ -95,8 +95,8 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
         
         {/* Título visível apenas em mobile quando há título */}
         {title && (
-          <div className="md:hidden flex items-center ml-3 gap-2">
-            <h1 className="font-medium text-sm text-white truncate max-w-[120px]">{title}</h1>
+          <div className="md:hidden flex items-center ml-2 gap-2 flex-1 min-w-0">
+            <h1 className="font-medium text-sm text-white truncate max-w-[50vw]">{title}</h1>
             {agentType && (
               <span className={`text-[10px] px-2 py-0.5 rounded-full border ${agentType === 'apresentacao' ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' : 'bg-[#FF6B00]/20 border-[#FF6B00]/30 text-[#FF6B00]'}`}>
                 {agentType === 'apresentacao' ? 'Apresentação' : 'Comunicação'}
@@ -106,8 +106,9 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
         )}
       </div>
 
-      <div className="flex items-center space-x-3 md:space-x-4">
-        <Link href="/dashboard/profile" className="flex items-center gap-2 px-3 py-2 bg-[#FF6B00]/5 rounded-lg shadow-inner hover:bg-[#FF6B00]/10 transition-colors">
+      <div className="flex items-center space-x-2 md:space-x-4">
+        {/* Perfil (desktop) */}
+        <Link href="/dashboard/profile" className="hidden md:flex items-center gap-2 px-3 py-2 bg-[#FF6B00]/5 rounded-lg shadow-inner hover:bg-[#FF6B00]/10 transition-colors">
           <div className="hidden md:block w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 overflow-hidden">
             { (userProfile?.avatar || authUser?.avatar) ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -122,6 +123,16 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
             <p className="text-sm font-medium text-white">{userName}</p>
             <p className="text-xs text-gray-400 hidden md:block">{userProfile?.email || authUser?.email || 'Usuário'}</p>
           </div>
+        </Link>
+
+        {/* Perfil (mobile compacto) */}
+        <Link href="/dashboard/profile" className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-full bg-[#FF6B00]/10 hover:bg-[#FF6B00]/20 transition-colors overflow-hidden">
+          { (userProfile?.avatar || authUser?.avatar) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={(userProfile?.avatar || authUser?.avatar) as string} alt="Avatar" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white text-xs font-bold">{userName.substring(0, 1).toUpperCase()}</span>
+          )}
         </Link>
         
         {typeof daysRemaining === 'number' && daysRemaining <= 7 && (

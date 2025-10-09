@@ -1,10 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import Image from 'next/image';
+import MobileMenu from '@/components/layout/MobileMenu';
 
 // Definição dos agentes disponíveis
 const agents = [
@@ -26,6 +27,9 @@ const agents = [
 
 export default function AgentSelectionPage() {
   const router = useRouter();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   const handleAgentSelection = (path: string) => {
     router.push(path);
@@ -36,9 +40,16 @@ export default function AgentSelectionPage() {
       {/* Sidebar */}
       <Sidebar />
       
+      {/* Mobile Menu Overlay */}
+      <MobileMenu 
+        isOpen={isMobileMenuOpen} 
+        onClose={closeMobileMenu} 
+        chats={[]} 
+      />
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header userName="Usuário" />
+        <Header userName="Usuário" onMenuToggle={toggleMobileMenu} />
         
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-6xl mx-auto">

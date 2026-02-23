@@ -13,10 +13,29 @@ import {
 
 export const runtime = 'nodejs';
 
+function maskEmail(email: string) {
+  const [local = '', domain = ''] = email.split('@');
+  if (!domain) return '***';
+  const start = local.slice(0, 2);
+  return `${start}${'*'.repeat(Math.max(local.length - 2, 0))}@${domain}`;
+}
+
 function getAppUrl(request: Request) {
   const envUrl = process.env.NEXT_PUBLIC_APP_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
   return new URL(request.url).origin;
+}
+
+function parseFromAddress(from: string) {
+  const trimmed = String(from || '').trim();
+  const match = trimmed.match(/^(.*)<(.+@.+)>$/);
+  if (match) {
+    return {
+      name: match[1].trim().replace(/^"|"$/g, ''),
+      email: match[2].trim(),
+    };
+  }
+  return { name: process.env.BREVO_SENDER_NAME || 'Bussola IA', email: trimmed };
 }
 
 function getSmtpConfig() {
@@ -32,6 +51,69 @@ function getSmtpConfig() {
   }
 
   return { host, port, user, pass, from, secure };
+}
+
+function getBrevoApiConfig() {
+  const apiKey = process.env.BREVO_API_KEY;
+  const apiUrl = process.env.BREVO_API_URL || 'https://api.brevo.com/v3/smtp/email';
+  if (!apiKey) return null;
+  return { apiKey, apiUrl };
+}
+
+async function sendWithBrevoApi(params: {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}) {
+  const brevo = getBrevoApiConfig();
+  if (!brevo) {
+    throw new Error('BREVO_API_KEY nao configurada para fallback HTTP.');
+  }
+
+  const sender = parseFromAddress(params.from);
+  const payload = {
+    sender: {
+      email: sender.email,
+      name: sender.name,
+    },
+    to: [{ email: params.to }],
+    subject: params.subject,
+    htmlContent: params.html,
+    textContent: params.text,
+    tags: ['password-reset'],
+  };
+
+  const response = await fetch(brevo.apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': brevo.apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await response.text();
+  let parsed: any = null;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Brevo API falhou (${response.status}): ${
+        parsed?.message || parsed?.code || raw || 'sem detalhes'
+      }`
+    );
+  }
+
+  return {
+    messageId: parsed?.messageId || null,
+    responseBody: parsed || raw || null,
+  };
 }
 
 async function getPasswordResetTemplate(supabase: ReturnType<typeof createServerSupabaseClient>) {
@@ -81,6 +163,9 @@ export async function POST(request: Request) {
     }
 
     if (!user) {
+      console.log('[FORGOT_PASSWORD] Usuario nao encontrado para e-mail informado. Retornando resposta generica.', {
+        email: maskEmail(normalizedEmail),
+      });
       return NextResponse.json({
         success: true,
         message: 'Se o e-mail estiver cadastrado, voce recebera um link para redefinir sua senha.',
@@ -115,39 +200,88 @@ export async function POST(request: Request) {
       );
     }
 
-    const smtp = getSmtpConfig();
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: {
-        user: smtp.user,
-        pass: smtp.pass,
-      },
-    });
-
     const appUrl = getAppUrl(request);
     const resetUrl = `${appUrl}/auth/update-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(normalizedEmail)}`;
+    const supportEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'suporte@bussolaexecutiva.com.br';
 
     const customTemplate = await getPasswordResetTemplate(supabase);
     const templateVars = {
       reset_url: resetUrl,
       email: normalizedEmail,
-      support_email: smtp.from,
+      support_email: supportEmail,
       app_name: 'Bussola IA',
     };
 
     const finalHtml = applyTemplateVariables(customTemplate.html, templateVars);
     const finalText = htmlToText(finalHtml);
     const finalSubject = applyTemplateVariables(customTemplate.subject, templateVars);
+    const normalizedSubject = finalSubject || PASSWORD_RESET_DEFAULT_SUBJECT;
+    const normalizedText = finalText || `Use este link para redefinir sua senha:\n${resetUrl}`;
 
-    await transporter.sendMail({
-      from: smtp.from,
-      to: normalizedEmail,
-      subject: finalSubject || PASSWORD_RESET_DEFAULT_SUBJECT,
-      text: finalText || `Use este link para redefinir sua senha:\n${resetUrl}`,
-      html: finalHtml,
-    });
+    let sent = false;
+    try {
+      const smtp = getSmtpConfig();
+      const transporter = nodemailer.createTransport({
+        host: smtp.host,
+        port: smtp.port,
+        secure: smtp.secure,
+        auth: {
+          user: smtp.user,
+          pass: smtp.pass,
+        },
+      });
+      const info = await transporter.sendMail({
+        from: smtp.from,
+        to: normalizedEmail,
+        subject: normalizedSubject,
+        text: normalizedText,
+        html: finalHtml,
+      });
+      sent = true;
+      console.log('[FORGOT_PASSWORD] E-mail enviado via SMTP.', {
+        email: maskEmail(normalizedEmail),
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+      });
+    } catch (smtpError) {
+      console.error('[FORGOT_PASSWORD] Falha no SMTP, tentando fallback Brevo API.', {
+        email: maskEmail(normalizedEmail),
+        error: smtpError instanceof Error ? smtpError.message : smtpError,
+      });
+    }
+
+    if (!sent) {
+      try {
+        const fallbackFrom = process.env.SMTP_FROM || process.env.SMTP_USER || '';
+        const info = await sendWithBrevoApi({
+          from: fallbackFrom,
+          to: normalizedEmail,
+          subject: normalizedSubject,
+          text: normalizedText,
+          html: finalHtml,
+        });
+        sent = true;
+        console.log('[FORGOT_PASSWORD] E-mail enviado via Brevo API (fallback).', {
+          email: maskEmail(normalizedEmail),
+          messageId: info.messageId,
+          responseBody: info.responseBody,
+        });
+      } catch (fallbackError) {
+        console.error('[FORGOT_PASSWORD] Falha no fallback Brevo API.', {
+          email: maskEmail(normalizedEmail),
+          error: fallbackError instanceof Error ? fallbackError.message : fallbackError,
+        });
+      }
+    }
+
+    if (!sent) {
+      return NextResponse.json(
+        { error: 'Falha no envio de e-mail. Verifique SMTP/Brevo e tente novamente.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

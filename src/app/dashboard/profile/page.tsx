@@ -161,6 +161,71 @@ export default function ProfilePage() {
     setTemplate((prev) => ({ ...prev, html: editorRef.current?.innerHTML || prev.html }));
   };
 
+  const getSelectedAnchor = (): HTMLAnchorElement | null => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+
+    let node: Node | null = selection.anchorNode;
+    if (!node) return null;
+    if (node.nodeType === Node.TEXT_NODE) {
+      node = node.parentElement;
+    }
+
+    while (node && node instanceof HTMLElement) {
+      if (node.tagName === 'A') return node as HTMLAnchorElement;
+      node = node.parentElement;
+    }
+
+    return null;
+  };
+
+  const insertActionButton = () => {
+    if (!editorRef.current) return;
+    const label = window.prompt('Texto do botão:', 'Redefinir senha');
+    if (!label) return;
+    const href = window.prompt('URL do botão (use {{reset_url}}):', '{{reset_url}}');
+    if (!href) return;
+    const bg = window.prompt('Cor de fundo (hex):', '#FF6B00') || '#FF6B00';
+    const fg = window.prompt('Cor do texto (hex):', '#FFFFFF') || '#FFFFFF';
+    const radius = window.prompt('Borda arredondada (px):', '6') || '6';
+
+    const buttonHtml = `<a href="${href}" style="background:${bg};color:${fg};padding:10px 14px;border-radius:${radius}px;text-decoration:none;display:inline-block;font-weight:600;">${label}</a>`;
+    editorRef.current.focus();
+    document.execCommand('insertHTML', false, buttonHtml);
+    setTemplate((prev) => ({ ...prev, html: editorRef.current?.innerHTML || prev.html }));
+  };
+
+  const editSelectedButton = () => {
+    const link = getSelectedAnchor();
+    if (!link) {
+      window.alert('Selecione um botao/link dentro do editor antes de editar.');
+      return;
+    }
+
+    const label = window.prompt('Texto do botão:', link.textContent || 'Botao');
+    if (!label) return;
+    const href = window.prompt('URL do botão:', link.getAttribute('href') || '{{reset_url}}');
+    if (!href) return;
+    const bg = window.prompt('Cor de fundo (hex):', link.style.backgroundColor || '#FF6B00') || '#FF6B00';
+    const fg = window.prompt('Cor do texto (hex):', link.style.color || '#FFFFFF') || '#FFFFFF';
+    const radius = window.prompt(
+      'Borda arredondada (px):',
+      (link.style.borderRadius || '6px').replace('px', '')
+    ) || '6';
+
+    link.textContent = label;
+    link.setAttribute('href', href);
+    link.style.background = bg;
+    link.style.color = fg;
+    link.style.padding = link.style.padding || '10px 14px';
+    link.style.borderRadius = `${radius}px`;
+    link.style.textDecoration = 'none';
+    link.style.display = 'inline-block';
+    link.style.fontWeight = '600';
+
+    setTemplate((prev) => ({ ...prev, html: editorRef.current?.innerHTML || prev.html }));
+  };
+
   const insertPlaceholder = (placeholder: string) => {
     applyEditorCommand('insertText', placeholder);
   };
@@ -580,6 +645,20 @@ export default function ProfilePage() {
                       >
                         Link
                       </button>
+                      <button
+                        type="button"
+                        onClick={insertActionButton}
+                        className="px-2 py-1 text-xs rounded bg-[#FF6B00] hover:bg-[#E05E00] text-white"
+                      >
+                        Inserir botao
+                      </button>
+                      <button
+                        type="button"
+                        onClick={editSelectedButton}
+                        className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white"
+                      >
+                        Editar botao
+                      </button>
                       <button type="button" onClick={() => insertPlaceholder('{{reset_url}}')} className="px-2 py-1 text-xs rounded bg-[#FF6B00] hover:bg-[#E05E00] text-white">{'{{reset_url}}'}</button>
                       <button type="button" onClick={() => insertPlaceholder('{{email}}')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">{'{{email}}'}</button>
                       <button type="button" onClick={() => insertPlaceholder('{{support_email}}')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">{'{{support_email}}'}</button>
@@ -590,9 +669,12 @@ export default function ProfilePage() {
                       contentEditable
                       suppressContentEditableWarning
                       onInput={(e) => setTemplate((prev) => ({ ...prev, html: (e.currentTarget as HTMLDivElement).innerHTML }))}
-                      className="min-h-[260px] p-4 bg-gray-900 text-sm text-white outline-none"
+                      className="min-h-[260px] p-4 bg-white text-sm text-gray-900 outline-none"
                     />
                   </div>
+                  <p className="text-xs text-gray-400">
+                    Dica: para editar um botao existente, clique nele no editor e use "Editar botao".
+                  </p>
 
                   {template.isDefault && (
                     <p className="text-xs text-amber-300">Voce esta usando o template padrao. Ao salvar, ele passa a ser customizado.</p>

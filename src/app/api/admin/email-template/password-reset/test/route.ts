@@ -68,6 +68,45 @@ function getBrevoApiConfig() {
   return { apiKey, apiUrl };
 }
 
+async function getBrevoLatestEvent(messageId: string) {
+  const brevo = getBrevoApiConfig();
+  if (!brevo || !messageId) return null;
+
+  const eventsUrl = 'https://api.brevo.com/v3/smtp/statistics/events';
+  const qs = new URLSearchParams({
+    messageId,
+    limit: '1',
+    sort: 'desc',
+  });
+
+  try {
+    const response = await fetch(`${eventsUrl}?${qs.toString()}`, {
+      method: 'GET',
+      headers: {
+        'api-key': brevo.apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json().catch(() => null);
+    const event = data?.events?.[0];
+    if (!event) return null;
+
+    return {
+      event: event.event || null,
+      date: event.date || null,
+      reason: event.reason || null,
+      from: event.from || null,
+      messageId: event.messageId || messageId,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function sendWithBrevoApi(params: {
   from: string;
   to: string;
@@ -238,10 +277,13 @@ export async function POST(request: Request) {
           responseBody: info.responseBody,
         });
 
+        const latestEvent = info.messageId ? await getBrevoLatestEvent(info.messageId) : null;
+
         return NextResponse.json({
           success: true,
           channel: 'brevo_api',
           messageId: info.messageId,
+          latestEvent,
         });
       } catch (apiError) {
         console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Falha na Brevo API, tentando SMTP.', {
@@ -279,10 +321,13 @@ export async function POST(request: Request) {
         response: info.response,
       });
 
+      const latestEvent = info.messageId ? await getBrevoLatestEvent(info.messageId) : null;
+
       return NextResponse.json({
         success: true,
         channel: 'smtp',
         messageId: info.messageId,
+        latestEvent,
       });
     } catch (smtpError) {
       console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Falha no SMTP.', {

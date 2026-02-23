@@ -54,6 +54,7 @@ export default function ProfilePage() {
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateTesting, setTemplateTesting] = useState(false);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
+  const [templateLastDelivery, setTemplateLastDelivery] = useState<string | null>(null);
   const [templateTestEmail, setTemplateTestEmail] = useState('');
   const editorRef = useRef<HTMLDivElement | null>(null);
   const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
@@ -282,6 +283,7 @@ export default function ProfilePage() {
 
     setTemplateTesting(true);
     setTemplateMsg(null);
+    setTemplateLastDelivery(null);
     try {
       const html = editorRef.current?.innerHTML || template.html;
       const res = await fetch('/api/admin/email-template/password-reset/test', {
@@ -298,7 +300,16 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(data.error || 'Falha no envio de teste');
 
       const channelLabel = data.channel === 'brevo_api' ? 'Brevo API' : 'SMTP';
-      setTemplateMsg(`Teste enviado com sucesso via ${channelLabel}.`);
+      const msgId = data.messageId ? ` Message ID: ${data.messageId}` : '';
+      setTemplateMsg(`Teste enviado com sucesso via ${channelLabel}.${msgId}`);
+
+      if (data.latestEvent?.event) {
+        const reason = data.latestEvent.reason ? ` | motivo: ${data.latestEvent.reason}` : '';
+        setTemplateLastDelivery(`Evento Brevo: ${data.latestEvent.event}${reason}`);
+      } else {
+        setTemplateLastDelivery('Evento Brevo ainda nao disponivel. Aguarde alguns segundos e teste novamente.');
+      }
+
       showToast('success', `E-mail de teste enviado via ${channelLabel}.`);
     } catch (err: any) {
       setTemplateMsg(err.message || 'Falha no envio de teste');
@@ -725,6 +736,9 @@ export default function ProfilePage() {
                   {templateMsg && (
                     <p className="text-sm text-gray-300">{templateMsg}</p>
                   )}
+                  {templateLastDelivery && (
+                    <p className="text-sm text-amber-300">{templateLastDelivery}</p>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                     <div className="md:col-span-2">
@@ -739,6 +753,7 @@ export default function ProfilePage() {
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         O teste usa o HTML atual do editor, mesmo antes de salvar.
+                        A tela de "Configuracao SMTP" da Brevo pode nao mostrar envios feitos via API HTTP.
                       </p>
                     </div>
                     <button

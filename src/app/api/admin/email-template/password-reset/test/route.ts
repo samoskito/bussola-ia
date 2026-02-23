@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { resolveAppUrl } from '@/lib/app-url';
 import {
   PASSWORD_RESET_DEFAULT_HTML,
   PASSWORD_RESET_DEFAULT_SUBJECT,
@@ -26,12 +27,6 @@ function maskEmail(email: string) {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function getAppUrl(request: Request) {
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  return new URL(request.url).origin;
 }
 
 function parseFromAddress(from: string) {
@@ -66,45 +61,6 @@ function getBrevoApiConfig() {
   const apiUrl = process.env.BREVO_API_URL || 'https://api.brevo.com/v3/smtp/email';
   if (!apiKey) return null;
   return { apiKey, apiUrl };
-}
-
-async function getBrevoLatestEvent(messageId: string) {
-  const brevo = getBrevoApiConfig();
-  if (!brevo || !messageId) return null;
-
-  const eventsUrl = 'https://api.brevo.com/v3/smtp/statistics/events';
-  const qs = new URLSearchParams({
-    messageId,
-    limit: '1',
-    sort: 'desc',
-  });
-
-  try {
-    const response = await fetch(`${eventsUrl}?${qs.toString()}`, {
-      method: 'GET',
-      headers: {
-        'api-key': brevo.apiKey,
-      },
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json().catch(() => null);
-    const event = data?.events?.[0];
-    if (!event) return null;
-
-    return {
-      event: event.event || null,
-      date: event.date || null,
-      reason: event.reason || null,
-      from: event.from || null,
-      messageId: event.messageId || messageId,
-    };
-  } catch {
-    return null;
-  }
 }
 
 async function sendWithBrevoApi(params: {
@@ -247,7 +203,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const appUrl = getAppUrl(request);
+    const appUrl = resolveAppUrl(request);
     const fakeToken = `TESTE-${Date.now()}`;
     const resetUrl = `${appUrl}/auth/update-password?token=${encodeURIComponent(fakeToken)}&email=${encodeURIComponent(toEmail)}`;
     const supportEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'suporte@bussolaexecutiva.com.br';
@@ -263,13 +219,65 @@ export async function POST(request: Request) {
     const finalText = htmlToText(finalHtml);
 
     const hasBrevoApi = Boolean(getBrevoApiConfig());
-    const tryApiFirst = channelMode === 'brevo_api' || (channelMode === 'auto' && hasBrevoApi);
-    const trySmtp = channelMode === 'smtp' || channelMode === 'auto';
 
-    if (tryApiFirst) {
-      if (!hasBrevoApi) {
-        return NextResponse.json({ error: 'BREVO_API_KEY nao configurada na Vercel.' }, { status: 400 });
+    if (channelMode === 'smtp' || channelMode === 'auto') {
+      try {
+        const smtp = getSmtpConfig();
+        const transporter = nodemailer.createTransport({
+          host: smtp.host,
+          port: smtp.port,
+          secure: smtp.secure,
+          auth: {
+            user: smtp.user,
+            pass: smtp.pass,
+          },
+        });
+
+        const info = await transporter.sendMail({
+          from: smtp.from,
+          to: toEmail,
+          subject: finalSubject,
+          text: finalText,
+          html: finalHtml,
+        });
+
+        console.log('[ADMIN][EMAIL_TEMPLATE][TEST] E-mail de teste enviado via SMTP.', {
+          to: maskEmail(toEmail),
+          messageId: info.messageId,
+          accepted: info.accepted,
+          rejected: info.rejected,
+          response: info.response,
+        });
+
+        return NextResponse.json({
+          success: true,
+          channel: 'smtp',
+          requestedChannel: channelMode,
+          messageId: info.messageId,
+        });
+      } catch (smtpError) {
+        console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Falha no SMTP.', {
+          to: maskEmail(toEmail),
+          error: smtpError instanceof Error ? smtpError.message : smtpError,
+        });
+
+        if (channelMode === 'smtp') {
+          return NextResponse.json(
+            { error: 'Falha ao enviar e-mail de teste via SMTP.' },
+            { status: 500 }
+          );
+        }
       }
+    }
+
+    if (channelMode === 'brevo_api' || channelMode === 'auto') {
+      if (!hasBrevoApi) {
+        return NextResponse.json(
+          { error: 'BREVO_API_KEY nao configurada na Vercel para fallback API.' },
+          { status: 400 }
+        );
+      }
+
       try {
         const apiFrom = process.env.SMTP_FROM || process.env.SMTP_USER || '';
         const info = await sendWithBrevoApi({
@@ -286,80 +294,26 @@ export async function POST(request: Request) {
           responseBody: info.responseBody,
         });
 
-        const latestEvent = info.messageId ? await getBrevoLatestEvent(info.messageId) : null;
-
         return NextResponse.json({
           success: true,
           channel: 'brevo_api',
           requestedChannel: channelMode,
           messageId: info.messageId,
-          latestEvent,
         });
       } catch (apiError) {
         console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Falha na Brevo API.', {
           to: maskEmail(toEmail),
           error: apiError instanceof Error ? apiError.message : apiError,
         });
-        if (channelMode === 'brevo_api') {
-          return NextResponse.json(
-            { error: apiError instanceof Error ? apiError.message : 'Falha na Brevo API' },
-            { status: 500 }
-          );
-        }
+
+        return NextResponse.json(
+          { error: apiError instanceof Error ? apiError.message : 'Falha na Brevo API' },
+          { status: 500 }
+        );
       }
     }
 
-    if (!trySmtp) {
-      return NextResponse.json({ error: 'Canal de envio invalido.' }, { status: 400 });
-    }
-
-    try {
-      const smtp = getSmtpConfig();
-      const transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.secure,
-        auth: {
-          user: smtp.user,
-          pass: smtp.pass,
-        },
-      });
-
-      const info = await transporter.sendMail({
-        from: smtp.from,
-        to: toEmail,
-        subject: finalSubject,
-        text: finalText,
-        html: finalHtml,
-      });
-
-      console.log('[ADMIN][EMAIL_TEMPLATE][TEST] E-mail de teste enviado via SMTP.', {
-        to: maskEmail(toEmail),
-        messageId: info.messageId,
-        accepted: info.accepted,
-        rejected: info.rejected,
-        response: info.response,
-      });
-
-      const latestEvent = info.messageId ? await getBrevoLatestEvent(info.messageId) : null;
-
-      return NextResponse.json({
-        success: true,
-        channel: 'smtp',
-        requestedChannel: channelMode,
-        messageId: info.messageId,
-        latestEvent,
-      });
-    } catch (smtpError) {
-      console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Falha no SMTP.', {
-        to: maskEmail(toEmail),
-        error: smtpError instanceof Error ? smtpError.message : smtpError,
-      });
-      return NextResponse.json(
-        { error: 'Falha ao enviar e-mail de teste via Brevo API e SMTP.' },
-        { status: 500 }
-      );
-    }
+    return NextResponse.json({ error: 'Canal de envio invalido.' }, { status: 400 });
   } catch (error) {
     console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Erro inesperado:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });

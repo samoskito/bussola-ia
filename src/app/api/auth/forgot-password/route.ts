@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { resolveAppUrl } from '@/lib/app-url';
 import {
   PASSWORD_RESET_DEFAULT_HTML,
   PASSWORD_RESET_DEFAULT_SUBJECT,
@@ -18,12 +19,6 @@ function maskEmail(email: string) {
   if (!domain) return '***';
   const start = local.slice(0, 2);
   return `${start}${'*'.repeat(Math.max(local.length - 2, 0))}@${domain}`;
-}
-
-function getAppUrl(request: Request) {
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  return new URL(request.url).origin;
 }
 
 function parseFromAddress(from: string) {
@@ -200,7 +195,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const appUrl = getAppUrl(request);
+    const appUrl = resolveAppUrl(request);
     const resetUrl = `${appUrl}/auth/update-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(normalizedEmail)}`;
     const supportEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'suporte@bussolaexecutiva.com.br';
 
@@ -221,7 +216,40 @@ export async function POST(request: Request) {
     let sent = false;
     const hasBrevoApi = Boolean(getBrevoApiConfig());
 
-    if (hasBrevoApi) {
+    try {
+      const smtp = getSmtpConfig();
+      const transporter = nodemailer.createTransport({
+        host: smtp.host,
+        port: smtp.port,
+        secure: smtp.secure,
+        auth: {
+          user: smtp.user,
+          pass: smtp.pass,
+        },
+      });
+      const info = await transporter.sendMail({
+        from: smtp.from,
+        to: normalizedEmail,
+        subject: normalizedSubject,
+        text: normalizedText,
+        html: finalHtml,
+      });
+      sent = true;
+      console.log('[FORGOT_PASSWORD] E-mail enviado via SMTP.', {
+        email: maskEmail(normalizedEmail),
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+      });
+    } catch (smtpError) {
+      console.error('[FORGOT_PASSWORD] Falha no SMTP, tentando fallback Brevo API.', {
+        email: maskEmail(normalizedEmail),
+        error: smtpError instanceof Error ? smtpError.message : smtpError,
+      });
+    }
+
+    if (!sent && hasBrevoApi) {
       try {
         const apiFrom = process.env.SMTP_FROM || process.env.SMTP_USER || '';
         const info = await sendWithBrevoApi({
@@ -232,50 +260,15 @@ export async function POST(request: Request) {
           html: finalHtml,
         });
         sent = true;
-        console.log('[FORGOT_PASSWORD] E-mail enviado via Brevo API.', {
+        console.log('[FORGOT_PASSWORD] E-mail enviado via Brevo API (fallback).', {
           email: maskEmail(normalizedEmail),
           messageId: info.messageId,
           responseBody: info.responseBody,
         });
       } catch (apiError) {
-        console.error('[FORGOT_PASSWORD] Falha na Brevo API, tentando SMTP fallback.', {
+        console.error('[FORGOT_PASSWORD] Falha no fallback Brevo API.', {
           email: maskEmail(normalizedEmail),
           error: apiError instanceof Error ? apiError.message : apiError,
-        });
-      }
-    }
-
-    if (!sent) {
-      try {
-        const smtp = getSmtpConfig();
-        const transporter = nodemailer.createTransport({
-          host: smtp.host,
-          port: smtp.port,
-          secure: smtp.secure,
-          auth: {
-            user: smtp.user,
-            pass: smtp.pass,
-          },
-        });
-        const info = await transporter.sendMail({
-          from: smtp.from,
-          to: normalizedEmail,
-          subject: normalizedSubject,
-          text: normalizedText,
-          html: finalHtml,
-        });
-        sent = true;
-        console.log('[FORGOT_PASSWORD] E-mail enviado via SMTP.', {
-          email: maskEmail(normalizedEmail),
-          messageId: info.messageId,
-          accepted: info.accepted,
-          rejected: info.rejected,
-          response: info.response,
-        });
-      } catch (smtpError) {
-        console.error('[FORGOT_PASSWORD] Falha no SMTP.', {
-          email: maskEmail(normalizedEmail),
-          error: smtpError instanceof Error ? smtpError.message : smtpError,
         });
       }
     }

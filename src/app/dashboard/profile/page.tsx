@@ -54,7 +54,6 @@ export default function ProfilePage() {
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateTesting, setTemplateTesting] = useState(false);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
-  const [templateLastDelivery, setTemplateLastDelivery] = useState<string | null>(null);
   const [templateTestEmail, setTemplateTestEmail] = useState('');
   const [templateTestChannel, setTemplateTestChannel] = useState<'auto' | 'brevo_api' | 'smtp'>('auto');
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -284,7 +283,6 @@ export default function ProfilePage() {
 
     setTemplateTesting(true);
     setTemplateMsg(null);
-    setTemplateLastDelivery(null);
     try {
       const html = editorRef.current?.innerHTML || template.html;
       const res = await fetch('/api/admin/email-template/password-reset/test', {
@@ -302,15 +300,7 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(data.error || 'Falha no envio de teste');
 
       const channelLabel = data.channel === 'brevo_api' ? 'Brevo API' : 'SMTP';
-      const msgId = data.messageId ? ` Message ID: ${data.messageId}` : '';
-      setTemplateMsg(`Teste enviado com sucesso via ${channelLabel}.${msgId}`);
-
-      if (data.latestEvent?.event) {
-        const reason = data.latestEvent.reason ? ` | motivo: ${data.latestEvent.reason}` : '';
-        setTemplateLastDelivery(`Evento Brevo: ${data.latestEvent.event}${reason}`);
-      } else {
-        setTemplateLastDelivery('Evento Brevo ainda nao disponivel. Aguarde alguns segundos e teste novamente.');
-      }
+      setTemplateMsg(`Teste enviado com sucesso via ${channelLabel}.`);
 
       showToast('success', `E-mail de teste enviado via ${channelLabel}.`);
     } catch (err: any) {
@@ -656,10 +646,6 @@ export default function ProfilePage() {
             {isAdmin && (
               <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg xl:col-span-2">
                 <h2 className="text-lg font-semibold mb-1">Template do e-mail de recuperacao de senha</h2>
-                <p className="text-sm text-gray-400 mb-4">
-                  Este conteudo sera enviado no fluxo "Esqueci minha senha" usando o SMTP configurado.
-                  Use o placeholder obrigatorio <code>{'{{reset_url}}'}</code>.
-                </p>
 
                 <form onSubmit={handleSaveTemplate} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -738,9 +724,6 @@ export default function ProfilePage() {
                   {templateMsg && (
                     <p className="text-sm text-gray-300">{templateMsg}</p>
                   )}
-                  {templateLastDelivery && (
-                    <p className="text-sm text-amber-300">{templateLastDelivery}</p>
-                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                     <div className="md:col-span-2">
@@ -753,10 +736,6 @@ export default function ProfilePage() {
                         placeholder="seu@email.com"
                         disabled={templateTesting}
                       />
-                      <p className="text-xs text-gray-500 mt-1">
-                        O teste usa o HTML atual do editor, mesmo antes de salvar.
-                        A tela de "Configuracao SMTP" da Brevo pode nao mostrar envios feitos via API HTTP.
-                      </p>
                     </div>
                     <div>
                       <label className="block text-sm text-gray-400 mb-1">Canal do teste</label>
@@ -766,7 +745,7 @@ export default function ProfilePage() {
                         disabled={templateTesting}
                         className="w-full h-[42px] bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md px-3 text-sm outline-none"
                       >
-                        <option value="auto">Automatico (API -> SMTP)</option>
+                        <option value="auto">Automatico (SMTP -> API)</option>
                         <option value="brevo_api">Somente Brevo API</option>
                         <option value="smtp">Somente SMTP</option>
                       </select>

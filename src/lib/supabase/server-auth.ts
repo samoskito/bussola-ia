@@ -14,7 +14,7 @@ interface AuthResponse {
  */
 export const serverSignUp = async (email: string, password: string): Promise<AuthResponse> => {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerSupabaseClient({ useServiceRole: false });
     
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),

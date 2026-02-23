@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
-  const cookieStore = cookies();
   try {
     console.log('[LOGIN] Iniciando processo de login');
     const { email, password } = await request.json();
@@ -19,7 +17,16 @@ export async function POST(request: Request) {
     }
 
     console.log('[LOGIN] Criando cliente Supabase');
-    const supabase = createServerSupabaseClient();
+    let supabase;
+    try {
+      supabase = createServerSupabaseClient();
+    } catch (clientError) {
+      console.error('[LOGIN] Erro de configuração do Supabase:', clientError);
+      return NextResponse.json(
+        { error: 'Configuração do servidor incompleta (SUPABASE_SERVICE_ROLE_KEY ausente).' },
+        { status: 500 }
+      );
+    }
     
     // Buscar usuário da tabela users
     console.log(`[LOGIN] Buscando usuário com email: ${email.trim().toLowerCase()}`);
@@ -27,10 +34,17 @@ export async function POST(request: Request) {
       .from('users')
       .select('*')
       .eq('email', email.trim().toLowerCase())
-      .single();
+      .maybeSingle();
     
     if (userError) {
-      console.log('[LOGIN] Erro ao buscar usuário:', userError.message);
+      console.log('[LOGIN] Erro ao buscar usuário:', userError);
+      // Ajuda de diagnóstico para políticas RLS mal configuradas
+      if (userError.code === '42P17') {
+        return NextResponse.json(
+          { error: 'Erro de política no banco (RLS recursiva na tabela users).' },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
         { error: 'Erro ao buscar usuário' },
         { status: 500 }

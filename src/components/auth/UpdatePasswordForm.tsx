@@ -1,34 +1,37 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 
 export default function UpdatePasswordForm() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [token, setToken] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [passwordError, setPasswordError] = useState('');
-  const supabase = createClientComponentClient();
   const router = useRouter();
 
-  // Verificar se o usuário tem uma sessão válida para redefinição de senha
+  // Verificar se o link contém token e email
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const tokenParam = params.get('token') || '';
+    const emailParam = params.get('email') || '';
+
+    setToken(tokenParam);
+    setEmail(emailParam);
+
+    if (!tokenParam || !emailParam) {
         setMessage({
           type: 'error',
-          text: 'Sessão inválida ou expirada. Por favor, solicite um novo link de redefinição de senha.'
+        text: 'Link inválido ou expirado. Solicite uma nova redefinição de senha.'
         });
-      }
-    };
-    
-    checkSession();
-  }, [supabase.auth]);
+    }
+  }, []);
 
   // Validar senha
   const validatePassword = (password: string): boolean => {
@@ -62,14 +65,21 @@ export default function UpdatePasswordForm() {
     setMessage(null);
 
     try {
-      // Atualizar senha via Supabase
-      const { error } = await supabase.auth.updateUser({
-        password: password
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          token,
+          password
+        })
       });
-      
-      if (error) {
-        console.error('Erro ao atualizar senha:', error);
-        throw error;
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Falha ao atualizar senha');
       }
       
       setMessage({
@@ -106,6 +116,10 @@ export default function UpdatePasswordForm() {
       <p className="text-gray-300 mb-6">
         Digite sua nova senha para atualizar sua conta.
       </p>
+
+      {!token || !email ? null : (
+        <p className="text-sm text-gray-400 mb-4">Conta: {email}</p>
+      )}
       
       {message && (
         <div 
@@ -161,7 +175,7 @@ export default function UpdatePasswordForm() {
         <div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !token || !email}
             className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Atualizando...' : 'Atualizar senha'}

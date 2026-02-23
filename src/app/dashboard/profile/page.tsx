@@ -1,10 +1,14 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import MobileMenu from '@/components/layout/MobileMenu';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  PASSWORD_RESET_DEFAULT_HTML,
+  PASSWORD_RESET_DEFAULT_SUBJECT,
+} from '@/lib/email/password-reset-template';
 
 type Profile = {
   nome: string;
@@ -13,8 +17,18 @@ type Profile = {
   avatar?: string | null;
 };
 
+type PasswordResetTemplate = {
+  subject: string;
+  html: string;
+  smtpFrom: string | null;
+  updatedAt: string | null;
+  updatedByEmail: string | null;
+  isDefault: boolean;
+};
+
 export default function ProfilePage() {
   const { user, loading, setUser } = useAuth();
+  const isAdmin = user?.nivel === 'admin';
   const [profile, setProfile] = useState<Profile>({ nome: '', email: '', telefone: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -28,6 +42,18 @@ export default function ProfilePage() {
   const [avatarMsg, setAvatarMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [template, setTemplate] = useState<PasswordResetTemplate>({
+    subject: '',
+    html: '',
+    smtpFrom: null,
+    updatedAt: null,
+    updatedByEmail: null,
+    isDefault: true,
+  });
+  const [templateLoading, setTemplateLoading] = useState(false);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateMsg, setTemplateMsg] = useState<string | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
@@ -79,6 +105,100 @@ export default function ProfilePage() {
     };
     if (user) loadProfile();
   }, [user]);
+
+  // Carregar template de e-mail de recuperacao (somente admin)
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    let cancelled = false;
+    const loadTemplate = async () => {
+      setTemplateLoading(true);
+      setTemplateMsg(null);
+      try {
+        const res = await fetch('/api/admin/email-template/password-reset', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Erro ao carregar template');
+        if (cancelled) return;
+        setTemplate({
+          subject: data.subject || '',
+          html: data.html || '',
+          smtpFrom: data.smtpFrom || null,
+          updatedAt: data.updatedAt || null,
+          updatedByEmail: data.updatedByEmail || null,
+          isDefault: Boolean(data.isDefault),
+        });
+      } catch (err: any) {
+        if (cancelled) return;
+        setTemplateMsg(err.message || 'Falha ao carregar template');
+        showToast('error', err.message || 'Falha ao carregar template de e-mail');
+      } finally {
+        if (!cancelled) setTemplateLoading(false);
+      }
+    };
+
+    loadTemplate();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
+  // Sincroniza o conteudo do editor rico quando o template for carregado.
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (document.activeElement === editorRef.current) return;
+    if (editorRef.current.innerHTML !== template.html) {
+      editorRef.current.innerHTML = template.html;
+    }
+  }, [template.html]);
+
+  const applyEditorCommand = (command: string, value?: string) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(command, false, value);
+    setTemplate((prev) => ({ ...prev, html: editorRef.current?.innerHTML || prev.html }));
+  };
+
+  const insertPlaceholder = (placeholder: string) => {
+    applyEditorCommand('insertText', placeholder);
+  };
+
+  const handleSaveTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTemplateSaving(true);
+    setTemplateMsg(null);
+    try {
+      const html = editorRef.current?.innerHTML || template.html;
+      const res = await fetch('/api/admin/email-template/password-reset', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          subject: template.subject.trim(),
+          html,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar template');
+
+      setTemplate((prev) => ({
+        ...prev,
+        html,
+        isDefault: false,
+        updatedAt: new Date().toISOString(),
+        updatedByEmail: user?.email || null,
+      }));
+      setTemplateMsg('Template salvo com sucesso.');
+      showToast('success', 'Template de e-mail atualizado com sucesso.');
+    } catch (err: any) {
+      setTemplateMsg(err.message || 'Falha ao salvar template');
+      showToast('error', err.message || 'Falha ao salvar template');
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
 
   // Salvar perfil (nome/email/telefone)
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -411,6 +531,103 @@ export default function ProfilePage() {
                 </div>
               </form>
             </section>
+
+            {isAdmin && (
+              <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg xl:col-span-2">
+                <h2 className="text-lg font-semibold mb-1">Template do e-mail de recuperacao de senha</h2>
+                <p className="text-sm text-gray-400 mb-4">
+                  Este conteudo sera enviado no fluxo "Esqueci minha senha" usando o SMTP configurado.
+                  Use o placeholder obrigatorio <code>{'{{reset_url}}'}</code>.
+                </p>
+
+                <form onSubmit={handleSaveTemplate} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Assunto do e-mail</label>
+                      <input
+                        type="text"
+                        value={template.subject}
+                        onChange={(e) => setTemplate((prev) => ({ ...prev, subject: e.target.value }))}
+                        className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                        placeholder="Ex.: Redefinicao de senha - Bussola IA"
+                        disabled={templateLoading}
+                      />
+                    </div>
+                    <div className="text-sm text-gray-300 self-end md:text-right">
+                      <p>Remetente SMTP: <span className="text-white">{template.smtpFrom || '-'}</span></p>
+                      {template.updatedAt && (
+                        <p className="text-gray-400 mt-1">
+                          Ultima atualizacao: {new Date(template.updatedAt).toLocaleString('pt-BR')}
+                          {template.updatedByEmail ? ` por ${template.updatedByEmail}` : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-700 rounded-lg overflow-hidden">
+                    <div className="flex flex-wrap gap-2 p-3 bg-gray-800 border-b border-gray-700">
+                      <button type="button" onClick={() => applyEditorCommand('bold')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">Negrito</button>
+                      <button type="button" onClick={() => applyEditorCommand('italic')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">Italico</button>
+                      <button type="button" onClick={() => applyEditorCommand('underline')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">Sublinhado</button>
+                      <button type="button" onClick={() => applyEditorCommand('insertUnorderedList')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">Lista</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = window.prompt('URL do link:');
+                          if (url) applyEditorCommand('createLink', url);
+                        }}
+                        className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white"
+                      >
+                        Link
+                      </button>
+                      <button type="button" onClick={() => insertPlaceholder('{{reset_url}}')} className="px-2 py-1 text-xs rounded bg-[#FF6B00] hover:bg-[#E05E00] text-white">{'{{reset_url}}'}</button>
+                      <button type="button" onClick={() => insertPlaceholder('{{email}}')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">{'{{email}}'}</button>
+                      <button type="button" onClick={() => insertPlaceholder('{{support_email}}')} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-white">{'{{support_email}}'}</button>
+                    </div>
+
+                    <div
+                      ref={editorRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={(e) => setTemplate((prev) => ({ ...prev, html: (e.currentTarget as HTMLDivElement).innerHTML }))}
+                      className="min-h-[260px] p-4 bg-gray-900 text-sm text-white outline-none"
+                    />
+                  </div>
+
+                  {template.isDefault && (
+                    <p className="text-xs text-amber-300">Voce esta usando o template padrao. Ao salvar, ele passa a ser customizado.</p>
+                  )}
+                  {templateMsg && (
+                    <p className="text-sm text-gray-300">{templateMsg}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="submit"
+                      disabled={templateSaving || templateLoading}
+                      className={`px-4 py-2 rounded-md text-sm font-medium ${templateSaving ? 'bg-gray-600' : 'bg-[#FF6B00] hover:bg-[#E05E00]'} text-white`}
+                    >
+                      {templateSaving ? 'Salvando...' : 'Salvar template'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={templateLoading}
+                      onClick={() => {
+                        setTemplate((prev) => ({
+                          ...prev,
+                          html: PASSWORD_RESET_DEFAULT_HTML,
+                          subject: PASSWORD_RESET_DEFAULT_SUBJECT,
+                          isDefault: true,
+                        }));
+                      }}
+                      className="px-4 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white"
+                    >
+                      Restaurar padrao
+                    </button>
+                  </div>
+                </form>
+              </section>
+            )}
           </div>
         </main>
       </div>

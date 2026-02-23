@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import {
+  PASSWORD_RESET_DEFAULT_HTML,
+  PASSWORD_RESET_DEFAULT_SUBJECT,
+  PASSWORD_RESET_TEMPLATE_KEY,
+  applyTemplateVariables,
+  htmlToText,
+  normalizeTemplateHtml,
+} from '@/lib/email/password-reset-template';
 
 export const runtime = 'nodejs';
 
@@ -20,10 +28,33 @@ function getSmtpConfig() {
   const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
   if (!host || !user || !pass || !from) {
-    throw new Error('SMTP não configurado. Defina SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM.');
+    throw new Error('SMTP nao configurado. Defina SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM.');
   }
 
   return { host, port, user, pass, from, secure };
+}
+
+async function getPasswordResetTemplate(supabase: ReturnType<typeof createServerSupabaseClient>) {
+  const { data, error } = await supabase
+    .from('email_templates')
+    .select('subject, html_content')
+    .eq('template_key', PASSWORD_RESET_TEMPLATE_KEY)
+    .maybeSingle();
+
+  if (error) {
+    if ((error as any).code !== '42P01') {
+      console.error('[FORGOT_PASSWORD] Erro ao carregar template customizado:', error);
+    }
+    return {
+      subject: PASSWORD_RESET_DEFAULT_SUBJECT,
+      html: PASSWORD_RESET_DEFAULT_HTML,
+    };
+  }
+
+  return {
+    subject: data?.subject || PASSWORD_RESET_DEFAULT_SUBJECT,
+    html: normalizeTemplateHtml(data?.html_content || PASSWORD_RESET_DEFAULT_HTML),
+  };
 }
 
 export async function POST(request: Request) {
@@ -32,12 +63,12 @@ export async function POST(request: Request) {
     const normalizedEmail = String(email || '').trim().toLowerCase();
 
     if (!normalizedEmail) {
-      return NextResponse.json({ error: 'Email é obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'Email e obrigatorio' }, { status: 400 });
     }
 
     const supabase = createServerSupabaseClient();
 
-    // Não vazar existência de usuário: resposta final sempre será genérica.
+    // Nao vazar existencia de usuario: resposta final sempre sera generica.
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('id, email')
@@ -45,14 +76,14 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (userError) {
-      console.error('[FORGOT_PASSWORD] Erro ao buscar usuário:', userError);
-      return NextResponse.json({ error: 'Erro ao processar solicitação' }, { status: 500 });
+      console.error('[FORGOT_PASSWORD] Erro ao buscar usuario:', userError);
+      return NextResponse.json({ error: 'Erro ao processar solicitacao' }, { status: 500 });
     }
 
     if (!user) {
       return NextResponse.json({
         success: true,
-        message: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.'
+        message: 'Se o e-mail estiver cadastrado, voce recebera um link para redefinir sua senha.',
       });
     }
 
@@ -61,7 +92,7 @@ export async function POST(request: Request) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hora
 
-    // Invalida tokens anteriores ainda não usados para este email.
+    // Invalida tokens anteriores ainda nao usados para este email.
     await supabase
       .from('password_reset_tokens')
       .update({ used_at: now.toISOString() })
@@ -73,13 +104,13 @@ export async function POST(request: Request) {
       .insert({
         email: normalizedEmail,
         token_hash: tokenHash,
-        expires_at: expiresAt.toISOString()
+        expires_at: expiresAt.toISOString(),
       });
 
     if (tokenInsertError) {
       console.error('[FORGOT_PASSWORD] Erro ao salvar token:', tokenInsertError);
       return NextResponse.json(
-        { error: 'Erro ao salvar token de redefinição. Verifique a tabela password_reset_tokens.' },
+        { error: 'Erro ao salvar token de redefinicao. Verifique a tabela password_reset_tokens.' },
         { status: 500 }
       );
     }
@@ -91,42 +122,39 @@ export async function POST(request: Request) {
       secure: smtp.secure,
       auth: {
         user: smtp.user,
-        pass: smtp.pass
-      }
+        pass: smtp.pass,
+      },
     });
 
     const appUrl = getAppUrl(request);
     const resetUrl = `${appUrl}/auth/update-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(normalizedEmail)}`;
 
+    const customTemplate = await getPasswordResetTemplate(supabase);
+    const templateVars = {
+      reset_url: resetUrl,
+      email: normalizedEmail,
+      support_email: smtp.from,
+      app_name: 'Bussola IA',
+    };
+
+    const finalHtml = applyTemplateVariables(customTemplate.html, templateVars);
+    const finalText = htmlToText(finalHtml);
+    const finalSubject = applyTemplateVariables(customTemplate.subject, templateVars);
+
     await transporter.sendMail({
       from: smtp.from,
       to: normalizedEmail,
-      subject: 'Redefinição de senha - Bússola IA',
-      text: `Recebemos uma solicitação para redefinir sua senha.\n\nUse este link (válido por 1 hora):\n${resetUrl}\n\nSe você não solicitou, ignore este e-mail.`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-          <h2>Redefinição de senha</h2>
-          <p>Recebemos uma solicitação para redefinir sua senha.</p>
-          <p>
-            <a href="${resetUrl}" style="background:#FF6B00;color:#fff;padding:10px 14px;border-radius:6px;text-decoration:none;">
-              Redefinir senha
-            </a>
-          </p>
-          <p>Ou copie e cole este link no navegador:</p>
-          <p>${resetUrl}</p>
-          <p>Este link expira em 1 hora.</p>
-          <p>Se você não solicitou, ignore este e-mail.</p>
-        </div>
-      `
+      subject: finalSubject || PASSWORD_RESET_DEFAULT_SUBJECT,
+      text: finalText || `Use este link para redefinir sua senha:\n${resetUrl}`,
+      html: finalHtml,
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.'
+      message: 'Se o e-mail estiver cadastrado, voce recebera um link para redefinir sua senha.',
     });
   } catch (error) {
     console.error('[FORGOT_PASSWORD] Erro inesperado:', error);
-    return NextResponse.json({ error: 'Erro ao processar solicitação' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao processar solicitacao' }, { status: 500 });
   }
 }
-

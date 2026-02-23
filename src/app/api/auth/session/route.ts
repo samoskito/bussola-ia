@@ -35,7 +35,7 @@ export async function GET() {
     // Get user data from the database
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, email, nome, telefone, avatar, created_at, updated_at, data_expiracao, plano')
+      .select('id, email, nome, telefone, avatar, nivel, created_at, updated_at, data_expiracao, plano')
       .eq('id', decoded.userId)
       .single();
     
@@ -54,6 +54,7 @@ export async function GET() {
     console.log('[SESSION] Dados do usuário:', {
       id: user.id,
       email: user.email,
+      nivel: user.nivel,
       plano: user.plano,
       data_expiracao: user.data_expiracao
     });

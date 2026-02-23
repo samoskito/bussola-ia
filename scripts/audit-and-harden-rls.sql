@@ -222,6 +222,29 @@ BEGIN
   END IF;
 END $$;
 
+-- ------------------------------------------------------------
+-- 6b) email_templates must be server-only
+-- ------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'email_templates'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS deny_all_email_templates ON public.email_templates';
+    EXECUTE '
+      CREATE POLICY deny_all_email_templates
+      ON public.email_templates
+      FOR ALL
+      USING (false)
+      WITH CHECK (false)
+    ';
+  END IF;
+END $$;
+
 COMMIT;
 
 -- ------------------------------------------------------------
@@ -250,4 +273,3 @@ LEFT JOIN pg_policies p
 WHERE t.schemaname = 'public'
 GROUP BY t.tablename
 ORDER BY t.tablename;
-

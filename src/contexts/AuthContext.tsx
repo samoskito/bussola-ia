@@ -11,6 +11,7 @@ type AppUser = {
   nome?: string | null;
   telefone?: string | null;
   avatar?: string | null;
+  nivel?: 'admin' | 'user' | null;
   created_at: string;
   updated_at?: string | null;
   data_expiracao?: string | null;

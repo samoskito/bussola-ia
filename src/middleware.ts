@@ -15,7 +15,14 @@ export async function middleware(request: NextRequest) {
     ];
     
     // Permitir acesso a arquivos estáticos e imagens
-    if (path.startsWith('/images/') || path.startsWith('/api/')) {
+    if (
+      path.startsWith('/images/') ||
+      path.startsWith('/assets/') ||
+      path.startsWith('/temp/') ||
+      path.startsWith('/login-images/') ||
+      path.startsWith('/static-images/') ||
+      path.startsWith('/api/')
+    ) {
       return NextResponse.next();
     }
     

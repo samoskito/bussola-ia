@@ -52,7 +52,9 @@ export default function ProfilePage() {
   });
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateTesting, setTemplateTesting] = useState(false);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
+  const [templateTestEmail, setTemplateTestEmail] = useState('');
   const editorRef = useRef<HTMLDivElement | null>(null);
   const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
@@ -144,6 +146,12 @@ export default function ProfilePage() {
       cancelled = true;
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!templateTestEmail && user?.email) {
+      setTemplateTestEmail(user.email);
+    }
+  }, [user?.email, templateTestEmail]);
 
   // Sincroniza o conteudo do editor rico quando o template for carregado.
   useEffect(() => {
@@ -262,6 +270,41 @@ export default function ProfilePage() {
       showToast('error', err.message || 'Falha ao salvar template');
     } finally {
       setTemplateSaving(false);
+    }
+  };
+
+  const handleSendTemplateTest = async () => {
+    const toEmail = templateTestEmail.trim().toLowerCase();
+    if (!toEmail) {
+      showToast('error', 'Informe o e-mail para teste.');
+      return;
+    }
+
+    setTemplateTesting(true);
+    setTemplateMsg(null);
+    try {
+      const html = editorRef.current?.innerHTML || template.html;
+      const res = await fetch('/api/admin/email-template/password-reset/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          toEmail,
+          subject: template.subject.trim(),
+          html,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Falha no envio de teste');
+
+      const channelLabel = data.channel === 'brevo_api' ? 'Brevo API' : 'SMTP';
+      setTemplateMsg(`Teste enviado com sucesso via ${channelLabel}.`);
+      showToast('success', `E-mail de teste enviado via ${channelLabel}.`);
+    } catch (err: any) {
+      setTemplateMsg(err.message || 'Falha no envio de teste');
+      showToast('error', err.message || 'Falha no envio de teste');
+    } finally {
+      setTemplateTesting(false);
     }
   };
 
@@ -682,6 +725,31 @@ export default function ProfilePage() {
                   {templateMsg && (
                     <p className="text-sm text-gray-300">{templateMsg}</p>
                   )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm text-gray-400 mb-1">E-mail para teste</label>
+                      <input
+                        type="email"
+                        value={templateTestEmail}
+                        onChange={(e) => setTemplateTestEmail(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md py-2 px-3 text-sm outline-none"
+                        placeholder="seu@email.com"
+                        disabled={templateTesting}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        O teste usa o HTML atual do editor, mesmo antes de salvar.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSendTemplateTest}
+                      disabled={templateTesting || templateLoading}
+                      className={`h-[42px] px-4 py-2 rounded-md text-sm font-medium ${templateTesting ? 'bg-gray-600' : 'bg-indigo-600 hover:bg-indigo-500'} text-white`}
+                    >
+                      {templateTesting ? 'Enviando teste...' : 'Enviar teste'}
+                    </button>
+                  </div>
 
                   <div className="flex flex-wrap gap-3">
                     <button

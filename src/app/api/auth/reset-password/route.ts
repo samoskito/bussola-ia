@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         senha: hashedPassword,
         updated_at: nowIso
       })
-      .eq('email', email)
+      .ilike('email', email)
       .select('id')
       .maybeSingle();
 
@@ -97,4 +97,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Erro ao processar solicitação' }, { status: 500 });
   }
 }
-

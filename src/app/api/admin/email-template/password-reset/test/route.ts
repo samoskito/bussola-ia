@@ -227,6 +227,10 @@ export async function POST(request: Request) {
     const toEmail = String(body?.toEmail || '').trim().toLowerCase();
     const overrideSubject = String(body?.subject || '').trim();
     const overrideHtml = String(body?.html || '').trim();
+    const requestedChannel = String(body?.channel || 'auto').toLowerCase();
+    const channelMode = ['auto', 'brevo_api', 'smtp'].includes(requestedChannel)
+      ? (requestedChannel as 'auto' | 'brevo_api' | 'smtp')
+      : 'auto';
 
     if (!toEmail || !isValidEmail(toEmail)) {
       return NextResponse.json({ error: 'Informe um e-mail valido para teste.' }, { status: 400 });
@@ -259,8 +263,13 @@ export async function POST(request: Request) {
     const finalText = htmlToText(finalHtml);
 
     const hasBrevoApi = Boolean(getBrevoApiConfig());
+    const tryApiFirst = channelMode === 'brevo_api' || (channelMode === 'auto' && hasBrevoApi);
+    const trySmtp = channelMode === 'smtp' || channelMode === 'auto';
 
-    if (hasBrevoApi) {
+    if (tryApiFirst) {
+      if (!hasBrevoApi) {
+        return NextResponse.json({ error: 'BREVO_API_KEY nao configurada na Vercel.' }, { status: 400 });
+      }
       try {
         const apiFrom = process.env.SMTP_FROM || process.env.SMTP_USER || '';
         const info = await sendWithBrevoApi({
@@ -282,15 +291,26 @@ export async function POST(request: Request) {
         return NextResponse.json({
           success: true,
           channel: 'brevo_api',
+          requestedChannel: channelMode,
           messageId: info.messageId,
           latestEvent,
         });
       } catch (apiError) {
-        console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Falha na Brevo API, tentando SMTP.', {
+        console.error('[ADMIN][EMAIL_TEMPLATE][TEST] Falha na Brevo API.', {
           to: maskEmail(toEmail),
           error: apiError instanceof Error ? apiError.message : apiError,
         });
+        if (channelMode === 'brevo_api') {
+          return NextResponse.json(
+            { error: apiError instanceof Error ? apiError.message : 'Falha na Brevo API' },
+            { status: 500 }
+          );
+        }
       }
+    }
+
+    if (!trySmtp) {
+      return NextResponse.json({ error: 'Canal de envio invalido.' }, { status: 400 });
     }
 
     try {
@@ -326,6 +346,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         channel: 'smtp',
+        requestedChannel: channelMode,
         messageId: info.messageId,
         latestEvent,
       });

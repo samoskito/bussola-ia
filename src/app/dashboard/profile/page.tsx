@@ -56,6 +56,7 @@ export default function ProfilePage() {
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [templateLastDelivery, setTemplateLastDelivery] = useState<string | null>(null);
   const [templateTestEmail, setTemplateTestEmail] = useState('');
+  const [templateTestChannel, setTemplateTestChannel] = useState<'auto' | 'brevo_api' | 'smtp'>('auto');
   const editorRef = useRef<HTMLDivElement | null>(null);
   const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
@@ -294,6 +295,7 @@ export default function ProfilePage() {
           toEmail,
           subject: template.subject.trim(),
           html,
+          channel: templateTestChannel,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -740,7 +742,7 @@ export default function ProfilePage() {
                     <p className="text-sm text-amber-300">{templateLastDelivery}</p>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                     <div className="md:col-span-2">
                       <label className="block text-sm text-gray-400 mb-1">E-mail para teste</label>
                       <input
@@ -755,6 +757,19 @@ export default function ProfilePage() {
                         O teste usa o HTML atual do editor, mesmo antes de salvar.
                         A tela de "Configuracao SMTP" da Brevo pode nao mostrar envios feitos via API HTTP.
                       </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Canal do teste</label>
+                      <select
+                        value={templateTestChannel}
+                        onChange={(e) => setTemplateTestChannel(e.target.value as 'auto' | 'brevo_api' | 'smtp')}
+                        disabled={templateTesting}
+                        className="w-full h-[42px] bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md px-3 text-sm outline-none"
+                      >
+                        <option value="auto">Automatico (API -> SMTP)</option>
+                        <option value="brevo_api">Somente Brevo API</option>
+                        <option value="smtp">Somente SMTP</option>
+                      </select>
                     </div>
                     <button
                       type="button"

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    senha VARCHAR(255) DEFAULT 'mudar123',
+    senha VARCHAR(255) DEFAULT '$2b$10$UnXZjNMEFJKPqt2TpuYkWeKyBcb94fUBc0/Xgz55V8LDSi1FZjI82',
     telefone VARCHAR(20),
     avatar TEXT,
     rua VARCHAR(255),

@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
-const { useState, useEffect } = React;
+const { useState } = React;
 import { useRouter } from 'next/navigation';
+import type { AgentType } from '@/lib/agents';
 
 interface Agent {
   id: string;
@@ -13,6 +14,8 @@ interface Agent {
 interface ChatInterfaceProps {
   userName: string;
   agents?: Agent[];
+  agentType?: AgentType;
+  agentName?: string;
 }
 
 interface Message {
@@ -23,7 +26,11 @@ interface Message {
   isTyping?: boolean; // Indica se a mensagem é uma animação de digitação
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterfaceProps) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  userName,
+  agentType = 'comunicacao',
+  agentName = 'Comunicação Executiva',
+}: ChatInterfaceProps) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,12 +65,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
     
     try {
       // Enviar mensagem para API
-      const response = await fetch('/api/chats/create', {
+      const response = await fetch('/api/chats/create-agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userMessage.content }),
+        body: JSON.stringify({ message: userMessage.content, agentType }),
       });
       
       if (!response.ok) {
@@ -78,7 +85,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
         setCurrentChatId(data.chat.id);
         
         // Redirecionar para a página do chat específico com parâmetro indicando novo chat
-        router.push(`/dashboard/chat/${data.chat.id}?new=true`);
+        router.push(`/dashboard/chat/${data.chat.id}?new=true&type=${agentType}`);
       }
       
       // Adicionar mensagem de confirmação
@@ -133,7 +140,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userName }: ChatInterface
                 </div>
               </div>
               <h3 className="text-2xl font-medium mb-4">Inicie uma nova conversa</h3>
-              <p className="text-lg">Envie uma mensagem para começar a conversar com a Comunicação Executiva</p>
+              <p className="text-lg">Envie uma mensagem para começar a conversar com {agentName}</p>
             </div>
           </div>
         )}

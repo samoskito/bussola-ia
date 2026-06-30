@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
+import { getAgentByType } from '@/lib/agents';
 import { userHasAgentAccess } from '@/lib/agent-access';
 import { getAgentWebhookUrl } from '@/lib/server/agent-webhooks';
 
@@ -38,19 +39,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Token invalido' }, { status: 401 });
     }
 
-    if (!decoded?.userId) {
+    if (!decoded || !decoded.userId) {
       return NextResponse.json({ error: 'Token invalido' }, { status: 401 });
     }
 
-    const { message } = await request.json();
+    const userId = decoded.userId;
+    const { message, agentType } = await request.json();
 
-    if (!message) {
-      return NextResponse.json({ error: 'Mensagem nao fornecida' }, { status: 400 });
+    if (!message || !agentType) {
+      return NextResponse.json({ error: 'Mensagem e agente sao obrigatorios' }, { status: 400 });
     }
 
-    const userId = decoded.userId;
+    const agent = getAgentByType(agentType);
+
+    if (!agent) {
+      return NextResponse.json({ error: 'Agente invalido' }, { status: 400 });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const accessResult = await userHasAgentAccess(supabase, userId, 'apresentacao');
+    const accessResult = await userHasAgentAccess(supabase, userId, agent.type);
 
     if (!accessResult.access || !accessResult.user) {
       return NextResponse.json(
@@ -65,7 +72,7 @@ export async function POST(request: Request) {
         {
           user_id: userId,
           title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
-          agent_type: 'apresentacao',
+          agent_type: agent.type,
         },
       ])
       .select('id, title, created_at')
@@ -94,18 +101,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao salvar mensagem' }, { status: 500 });
     }
 
+    console.log('Mensagem inicial salva com sucesso na tabela scripts, ID:', scriptData.id);
+
+    const webhookUrl = getAgentWebhookUrl(agent.type);
+    const chatId = chatData.id;
+    const scriptId = scriptData.id;
     const { id, email, nome, telefone } = accessResult.user;
+
     const webhookPayload = {
-      chatId: chatData.id,
+      chatId,
       message,
-      scriptId: scriptData.id,
-      user: { id, email, nome, telefone },
+      scriptId,
+      user: { id, email, nome, telefone }
     };
 
     try {
-      const webhookResponse = await fetch(getAgentWebhookUrl('apresentacao'), {
+      const webhookResponse = await fetch(webhookUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(webhookPayload),
       });
 

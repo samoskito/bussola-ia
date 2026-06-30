@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
+import type { AgentType } from '@/lib/agents';
+
+const hasDateExpired = (dateValue?: string | null) => {
+  if (!dateValue) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiration = new Date(dateValue);
+  expiration.setHours(0, 0, 0, 0);
+
+  return today > expiration;
+};
 
 export async function GET(request: Request) {
   try {
@@ -23,7 +36,21 @@ export async function GET(request: Request) {
     }
     
     // Verificar o token JWT para obter o ID do usuário
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string; email: string };
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      console.error('JWT_SECRET nao configurado');
+      return NextResponse.json({ error: 'Configuracao do servidor invalida' }, { status: 500 });
+    }
+
+    let decoded: { userId: string; email: string };
+
+    try {
+      decoded = jwt.verify(token, jwtSecret) as { userId: string; email: string };
+    } catch (jwtError) {
+      console.error('Token invalido:', jwtError);
+      return NextResponse.json({ error: 'Token invalido' }, { status: 401 });
+    }
     
     if (!decoded || !decoded.userId) {
       return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
@@ -70,19 +97,31 @@ export async function GET(request: Request) {
       console.error('Erro ao buscar chats:', error);
       return NextResponse.json({ error: 'Erro ao buscar chats' }, { status: 500 });
     }
-    // Se o usuário não tem acesso a ambas as IAs, filtrar a lista
+    // Se o usuário não tem acesso global, filtrar a lista pelos agentes liberados
     let filtered = chats || [];
-    if (userData.plano && userData.plano !== 'Ambas') {
-      const allowCom = userData.plano === 'Comunicação Executiva';
-      const allowApr = userData.plano === 'Apresentação para Reunião de Resultados';
+    const hasGlobalAgentAccess = userData.plano === 'Todas' || userData.plano === 'Ambas';
+
+    if (!hasGlobalAgentAccess) {
+      const { data: allowedRows, error: allowedError } = await supabase
+        .from('user_agent_access')
+        .select('agent_type, expires_at')
+        .eq('user_id', userId)
+        .eq('enabled', true);
+
+      if (allowedError) {
+        console.error('Erro ao buscar acessos de agentes:', allowedError);
+        return NextResponse.json({ error: 'Erro ao buscar acessos de agentes' }, { status: 500 });
+      }
+
+      const allowedAgentTypes = new Set(
+        (allowedRows || [])
+          .filter((row: any) => !hasDateExpired(row.expires_at))
+          .map((row: any) => row.agent_type as AgentType)
+      );
+
       filtered = filtered.filter((c: any) => {
-        // prefer agent_type when present
-        if (c.agent_type === 'apresentacao') return allowApr;
-        if (c.agent_type === 'comunicacao') return allowCom;
-        // fallback to title inference if agent_type is null
-        const title = (c.title || '').toLowerCase();
-        const isApr = title.includes('apresentação') || title.includes('reuniao') || title.includes('reunião');
-        return isApr ? allowApr : allowCom;
+        const chatAgentType = (c.agent_type || 'comunicacao') as AgentType;
+        return allowedAgentTypes.has(chatAgentType);
       });
     }
 

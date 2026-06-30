@@ -11,6 +11,8 @@ import AccessDenied from '@/components/access/AccessDenied';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 import AccessWarning from '@/components/access/AccessWarning';
 import ExpiryToast from '@/components/access/ExpiryToast';
+import type { AgentType } from '@/lib/agents';
+import { getAgentByType, getAgentLabel } from '@/lib/agents';
 
 
 type ChatPageProps = {
@@ -28,9 +30,9 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [chats, setChats] = useState<Array<{ id: string; title: string }>>([]);
+  const [chats, setChats] = useState<Array<{ id: string; title: string; agent_type?: AgentType | null }>>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
-  const [chatType, setChatType] = useState<'script' | 'apresentacao' | undefined>();
+  const [agentType, setAgentType] = useState<AgentType | null>(null);
   const [accessDenied, setAccessDenied] = useState<{ motivo: string; expirado?: boolean } | null>(null);
   const [daysRemaining, setDaysRemaining] = useState<number | undefined>(undefined);
   
@@ -74,9 +76,11 @@ export default function ChatPage({ params }: ChatPageProps) {
     const urlParams = new URLSearchParams(window.location.search);
     const typeParam = urlParams.get('type');
     
-    if (typeParam === 'apresentacao') {
-      console.log('[ChatPage] Detectado tipo de chat da URL: apresentacao');
-      setChatType('apresentacao');
+    const agent = typeParam ? getAgentByType(typeParam) : null;
+
+    if (agent) {
+      console.log(`[ChatPage] Detectado agente do chat da URL: ${agent.type}`);
+      setAgentType(agent.type);
     }
   }, []);
 
@@ -105,20 +109,8 @@ export default function ChatPage({ params }: ChatPageProps) {
             setDaysRemaining(data.diasRestantes);
           }
 
-          // Preferir agent_type do chat; fallback para título
-          const agentType = data.chat.agent_type as string | undefined;
-          if (agentType === 'apresentacao') {
-            setChatType('apresentacao');
-          } else if (agentType === 'comunicacao') {
-            setChatType('script');
-          } else {
-            const title = (data.chat.title || '').toLowerCase();
-            if (title.includes('apresentação') || title.includes('reuniao') || title.includes('reunião')) {
-              setChatType('apresentacao');
-            } else {
-              setChatType('script');
-            }
-          }
+          const chatAgent = getAgentByType((data.chat.agent_type as string | null) || 'comunicacao');
+          setAgentType(chatAgent?.type || 'comunicacao');
         }
       } catch (err) {
         console.error('Erro ao buscar detalhes do chat:', err);
@@ -151,7 +143,7 @@ export default function ChatPage({ params }: ChatPageProps) {
       <AccessDenied
         motivo={accessDenied.motivo}
         expirado={accessDenied.expirado}
-        nomeIA={chatType === 'apresentacao' ? 'Apresentação para Reunião de Resultados' : 'Comunicação Executiva'}
+        nomeIA={getAgentLabel(agentType || 'comunicacao')}
         dataExpiracao={user?.data_expiracao || null}
       />
     );
@@ -177,7 +169,7 @@ export default function ChatPage({ params }: ChatPageProps) {
           userName={user?.nome || 'Usuário'} 
           title={chatTitle} 
           onMenuToggle={toggleMobileMenu}
-          agentType={chatType === 'apresentacao' ? 'apresentacao' : 'comunicacao'}
+          agentType={agentType || 'comunicacao'}
           daysRemaining={daysRemaining}
         />
         <ExpiryToast daysRemaining={daysRemaining} dataExpiracao={user?.data_expiracao || null} />
@@ -202,7 +194,8 @@ export default function ChatPage({ params }: ChatPageProps) {
               <ChatDetail 
                 chatId={chatId} 
                 userName={user?.nome || 'Usuário'}
-                chatType={chatType}
+                agentType={agentType || 'comunicacao'}
+                agentName={getAgentLabel(agentType || 'comunicacao')}
               />
             )}
           </div>

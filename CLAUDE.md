@@ -1,246 +1,336 @@
-# CLAUDE.md - Guia do Projeto Bussola IA (ExecutivIA)
+# CLAUDE.md - Guia vivo do projeto Bussola IA / ExecutivIA
 
-## Visão Geral
+Este arquivo e a memoria persistente do projeto. Em um chat novo, comece por aqui antes de propor arquitetura, corrigir bugs ou implementar novas funcionalidades.
 
-**Nome:** Bussola IA / ExecutivIA
-**Descrição:** SaaS para geração de scripts profissionais para reuniões de negócios usando IA
-**Versão:** v1.0.7
-**Idioma da UI:** Português (Brasil)
-**URL de Produção:** https://bussola-ia.vercel.app
+## Estado Atual
 
-## Stack Tecnológico
+- Projeto: Bussola IA / ExecutivIA.
+- Produto: SaaS em portugues do Brasil para conversas com agentes de IA externos via n8n.
+- Producao conhecida: `https://bussola-ia.vercel.app`.
+- Remoto Git: `origin https://github.com/samoskito/bussola-ia.git`.
+- Branch de trabalho atual desta evolucao: `feature/four-ai-agents-access`.
+- Stack: Next.js 15.3.8 App Router, React 19.1.0, TypeScript 5.4.5, Tailwind CSS, Supabase PostgreSQL/Storage, JWT proprio em cookie httpOnly.
+- IA: nao ha chamada direta a LLM no codigo. O app envia mensagens para webhooks n8n e espera que o n8n atualize `scripts.output`.
 
-| Categoria | Tecnologia |
-|-----------|-----------|
-| Framework | Next.js 15.3.8 (App Router) |
-| Frontend | React 19.1.0, TypeScript 5.4.5 |
-| Estilização | Tailwind CSS 3.4.1 (tema escuro, cor primária: `#FF6B00`) |
-| Banco de Dados | Supabase (PostgreSQL) |
-| Autenticação | JWT (jsonwebtoken) + bcryptjs |
-| Email | Nodemailer + Brevo API (fallback) |
-| Deploy | Vercel (primário), Netlify (secundário) |
-| Analytics | Vercel Analytics |
-| IA/Processamento | n8n Webhooks (externo) |
-
-## Estrutura de Diretórios
-
-```
-src/
-├── app/
-│   ├── api/                          # API Routes (18 endpoints)
-│   │   ├── admin/email-template/     # Gerenciamento de templates de email (admin)
-│   │   ├── auth/                     # Login, logout, registro, forgot/reset password, session
-│   │   ├── chats/                    # CRUD de chats + envio de mensagens
-│   │   │   ├── create/               # Criar chat Comunicação Executiva
-│   │   │   ├── create-apresentacao/  # Criar chat Apresentação
-│   │   │   ├── message/              # Enviar mensagem (comunicação)
-│   │   │   ├── message-apresentacao/ # Enviar mensagem (apresentação)
-│   │   │   └── [chatId]/messages/    # Buscar mensagens de um chat
-│   │   ├── user/                     # Profile, avatar, password
-│   │   └── webhook/                  # Recebe respostas da IA via n8n
-│   │
-│   ├── auth/                         # Páginas de autenticação
-│   │   ├── login/                    # Tela de login
-│   │   ├── register/                 # Tela de registro
-│   │   ├── forgot-password/          # Recuperação de senha
-│   │   ├── reset-password/           # Reset de senha com token
-│   │   └── update-password/          # Atualização de senha
-│   │
-│   ├── dashboard/                    # Área logada principal
-│   │   ├── page.tsx                  # Seleção de agente
-│   │   ├── apresentacao/             # Interface do agente Apresentação
-│   │   ├── chat/[chatId]/            # Visualização de chat individual
-│   │   ├── profile/                  # Perfil do usuário (+ admin: templates de email)
-│   │   ├── help/                     # Ajuda
-│   │   └── select-agent/             # Seleção de agente IA
-│   │
-│   └── script/                       # Páginas do agente Comunicação Executiva
-│       └── chat/[chatId]/
-│
-├── components/
-│   ├── access/                       # AccessDenied, AccessWarning, ExpiryToast
-│   ├── auth/                         # LoginForm, LogoutButton, ProtectedRoute, ResetPasswordForm
-│   ├── chat/                         # ChatInterface, ApresentacaoInterface, ChatDetail, EnhancedChatInterface
-│   ├── layout/                       # Header, Sidebar, MobileMenu
-│   ├── scripts/                      # ScriptGenerator, ScriptGeneratorChat, ScriptViewer
-│   └── common/                       # AccessRestricted
-│
-├── contexts/
-│   └── AuthContext.tsx               # Estado global de autenticação
-│
-├── hooks/
-│   └── useAuth.ts                    # Hook de autenticação
-│
-├── lib/
-│   ├── access-control.ts            # Lógica de controle de acesso por plano/expiração
-│   ├── auth-utils.ts                # Utilitários de autenticação
-│   ├── database.types.ts            # Tipos TypeScript das tabelas
-│   ├── db-functions.ts              # Funções de banco (CRUD chats/scripts)
-│   ├── storage-functions.ts         # Upload de arquivos (avatars)
-│   ├── webhook.ts                   # Integração com n8n webhooks
-│   ├── app-url.ts                   # Helper de URL da aplicação
-│   ├── email/                       # Templates de email
-│   └── supabase/                    # Clientes Supabase (server.ts, client.ts, server-auth.ts)
-│
-├── middleware.ts                     # Proteção de rotas (verifica auth_token cookie)
-│
-├── types/                            # Definições TypeScript
-├── styles/                           # Cores customizadas Tailwind
-├── utils/supabase/                   # Utilitários Supabase (client, server, middleware)
-└── scripts/                          # Scripts utilitários (hash, upload imagens)
-
-supabase/
-├── setup-database.sql                # Schema principal
-├── create-password-reset-tokens.sql  # Tabela de tokens de reset
-├── audit-and-harden-rls.sql          # Políticas de segurança RLS
-└── migrations/                       # Migrações de banco
-```
-
-## Funcionalidades Principais
-
-### 1. Dois Agentes de IA
-- **Comunicação Executiva** — Gera scripts de comunicação executiva
-- **Apresentação para Reunião de Resultados** — Gera apresentações para reuniões de resultados
-
-Cada agente possui:
-- Endpoint de criação de chat separado
-- Endpoint de envio de mensagens separado
-- Interface de chat dedicada (ChatInterface vs ApresentacaoInterface)
-- Webhook n8n diferente
-
-### 2. Sistema de Planos e Acesso
-- **Planos:** `'Comunicação Executiva'` | `'Apresentação para Reunião de Resultados'` | `'Ambas'` | `null`
-- **Expiração:** Campo `data_expiracao` na tabela users
-- **Lógica:** Se `plano` é null → acesso total (retrocompatibilidade)
-- **Avisos:** 7 dias antes (warning), 3 dias antes (crítico), 0 dias (bloqueio)
-- **Verificação:** Feita em cada request aos endpoints de chat
-- **Arquivo:** `src/lib/access-control.ts`
-
-### 3. Autenticação
-- Login com email/senha → bcrypt.compare → JWT (30 dias) → cookie httpOnly `auth_token`
-- Middleware (`src/middleware.ts`) protege todas as rotas exceto `/auth/*`, `/api/*`, assets
-- Níveis: `admin` (gerencia templates de email) e `user`
-- Reset de senha via token seguro (crypto.randomBytes) com expiração de 1 hora
-
-### 4. Fluxo de Chat com IA (via n8n)
-```
-1. Cliente envia mensagem → POST /api/chats/create ou /message
-2. API cria registro em chats + scripts (output=null)
-3. API envia payload ao webhook n8n (assíncrono)
-4. n8n processa com IA
-5. n8n chama POST /api/webhook com a resposta
-6. API atualiza scripts.output + tabela outputs
-7. Frontend faz polling para buscar a resposta
-```
-
-**Webhooks n8n:**
-- Comunicação: `https://webhookbussola.palmup.com.br/webhook/ia/bussolascript`
-- Apresentação: `https://webhookbussola.palmup.com.br/webhook/ia/bussolascriptresultado`
-
-### 5. Gerenciamento de Perfil
-- Editar nome, email, telefone
-- Upload de avatar (Supabase Storage, buckets: `avatars` / `app-resources`)
-- Alterar senha (requer senha atual)
-
-### 6. Sistema de Email
-- Envio via SMTP (Brevo) com fallback para API HTTP
-- Templates customizáveis pelo admin (tabela `email_templates`)
-- Variáveis de template: `{{reset_url}}`, `{{email}}`, `{{support_email}}`, `{{app_name}}`
-
-## Schema do Banco de Dados
-
-### Tabela `users`
-- `id` (UUID), `email`, `nome`, `senha` (bcrypt hash)
-- `telefone`, `avatar`, campos de endereço (rua, numero, bairro, cep, cidade, estado, pais)
-- `nivel` ('admin' | 'user'), `plano`, `data_expiracao`
-- `created_at`, `updated_at`
-
-### Tabela `chats`
-- `id` (UUID), `user_id` (FK), `title`, `agent_type` ('comunicacao' | 'apresentacao')
-- `created_at`, `updated_at`
-
-### Tabela `scripts`
-- `id`, `user_id` (FK), `chatid` (FK), `input`, `output` (nullable)
-- `created_at`, `updated_at`
-
-### Tabela `outputs`
-- `webhook_id`, `user_id`, `chat_id`, `input`, `output`
-- `status` ('pendente' | 'processando' | 'concluido' | 'erro')
-
-### Tabela `password_reset_tokens`
-- `email`, `token_hash`, `expires_at`, `used_at`
-
-### Tabela `email_templates`
-- `template_key`, `subject`, `html_content`
-
-## Variáveis de Ambiente Necessárias
-
-```env
-# App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-# Autenticação
-JWT_SECRET=
-
-# Email (SMTP)
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
-SMTP_SECURE=false
-
-# Email (Brevo API - fallback)
-BREVO_API_KEY=
-BREVO_API_URL=https://api.brevo.com/v3/smtp/email
-BREVO_SENDER_NAME=Bussola IA
-
-# Storage
-NEXT_PUBLIC_AVATAR_BUCKET=avatars
-
-# Ambiente
-NODE_ENV=development
-```
-
-## Comandos de Desenvolvimento
+Antes de novas implementacoes, rode:
 
 ```bash
-npm run dev        # Servidor de desenvolvimento (localhost:3000)
-npm run build      # Build de produção
-npm start          # Servidor de produção
-npm run lint       # ESLint
+git fetch origin --prune
+git status --short --branch
+git rev-list --left-right --count HEAD...origin/main
 ```
 
-## Convenções do Projeto
+## Comandos
 
-- **Idioma do código:** Variáveis e funções em português (ex: `verificarAcessoIA`, `getMensagemAviso`, `data_expiracao`)
-- **Path alias:** `@/*` → `./src/*`
-- **Tema:** Dark mode com cor primária laranja (#FF6B00)
-- **Estado global:** React Context (AuthContext) — não usa Redux/Zustand
-- **Estilização:** Tailwind CSS + classes customizadas em `globals.css` (.btn-primary, .btn-secondary, .input-field)
-- **Notificações:** react-hot-toast
-- **Ícones:** react-icons
-- **Database client:** Supabase JS client direto (sem ORM)
-- **Commits:** Versionamento no formato `bussola-ia-v1.0.X`
+```bash
+npm run dev
+npm run build
+npm start
+npm run lint
+npx tsc --noEmit --pretty false
+```
 
-## Arquitetura de Segurança
+Atencao: `next.config.js` ignora erros de TypeScript e ESLint durante build. Use `npx tsc --noEmit --pretty false` para checar tipos. Em 2026-06-29 existe um erro conhecido fora do fluxo de agentes em `src/app/dashboard/profile/page.tsx:748` (`TS1382`).
 
-- JWT em cookies httpOnly (proteção contra XSS)
-- Senhas com bcrypt (10 salt rounds)
-- Service role key apenas no servidor
-- RLS (Row Level Security) no Supabase
-- Tokens de reset com hash + expiração
-- Middleware de proteção de rotas
+## Estrutura Principal
 
-## Pontos de Atenção
+```text
+src/
+  app/
+    api/
+      auth/                         login, logout, session, forgot/reset password
+      chats/                        rotas de chat, agentes e historico
+        create-agent/               criacao generica por agentType
+        message-agent/              envio generico por agent_type do chat
+        create/                     legado compat: comunicacao
+        message/                    legado compat: comunicacao
+        create-apresentacao/        legado compat: apresentacao
+        message-apresentacao/       legado compat: apresentacao
+      user/                         perfil, avatar, senha
+      webhook/                      callback n8n por scriptId; fallback legado por webhook_id
+    dashboard/
+      agent/[agentType]/            entrada generica de qualquer agente
+      chat/[chatId]/                conversa individual
+      page.tsx                      selecao dos agentes
+      select-agent/                 selecao alternativa dos agentes
+      profile/                      perfil/admin email template
+    script/                         entrada legada para comunicacao
+  components/
+    access/                         avisos/bloqueios de plano e expiracao
+    chat/                           ChatInterface, ChatDetail, fluxo legado Enhanced
+    layout/                         Header, Sidebar, MobileMenu
+  contexts/AuthContext.tsx
+  lib/
+    agents.ts                       catalogo publico dos agentes
+    agent-access.ts                 permissao server-side por agente
+    access-control.ts               helper de UI legado/plano
+    server/
+      agent-webhooks.ts             webhooks n8n server-only
+      webhook.ts                    processamento server-side de callbacks n8n
+    supabase/
 
-- Não há rate limiting nos endpoints (login, forgot-password, webhook)
-- Não há verificação de assinatura nos webhooks recebidos
-- Não há integração com gateway de pagamento (planos gerenciados manualmente)
-- O processamento de IA é totalmente externo (n8n) — o código não contém chamadas diretas a LLMs
-- Polling para respostas de chat (não usa WebSocket)
+supabase/
+  migrations/
+    20251009_add_agent_type_to_chats.sql
+    20260629000001_four_agents_access.sql
+```
+
+## Autenticacao
+
+O app usa autenticacao propria, nao Supabase Auth como sessao principal:
+
+1. `POST /api/auth/login` busca usuario em `users`.
+2. `users.senha` precisa estar em bcrypt.
+3. Login valido gera JWT `{ userId, email }`.
+4. JWT fica no cookie httpOnly `auth_token`.
+5. `AuthContext` chama `GET /api/auth/session`.
+6. APIs server-side leem o cookie, validam JWT e usam Supabase service role.
+
+Arquivos centrais:
+
+- `src/app/api/auth/login/route.ts`
+- `src/app/api/auth/session/route.ts`
+- `src/app/api/auth/logout/route.ts`
+- `src/contexts/AuthContext.tsx`
+- `src/middleware.ts`
+
+Algumas rotas antigas fora de chat ainda tem fallback `JWT_SECRET || 'your-secret-key'`. Nas rotas novas/de chat alteradas, `JWT_SECRET` ausente falha fechado com erro 500 e token invalido retorna 401.
+
+## Agentes de IA
+
+O catalogo publico fica em `src/lib/agents.ts`. Ele contem metadados seguros para client components: tipo, nome, descricao e logo. Webhook URL nao fica neste arquivo.
+
+Agentes atuais:
+
+| agent_type | Nome visivel | Logo |
+| --- | --- | --- |
+| `comunicacao` | Comunicacao Executiva | `/images/comunicacao-executiva-logo.png` |
+| `apresentacao` | Apresentacao para Reuniao de Resultados | `/images/apresentacao-resultados-logo.png` |
+| `conversas_dificeis` | Conversas Dificeis | `/images/conversas-dificeis-logo.jpeg` |
+| `postagem` | Postagem no Linkedin | `/images/postagem-linkedin-logo.jpeg` |
+
+Webhooks n8n ficam somente em `src/lib/server/agent-webhooks.ts`:
+
+- `comunicacao`: `https://webhookbussola.palmup.com.br/webhook/ia/bussolascript`
+- `apresentacao`: `https://webhookbussola.palmup.com.br/webhook/ia/bussolascriptresultado`
+- `conversas_dificeis`: `https://webhookk.bussolaexecutiva.com.br/webhook/b4063e72-f560-4f98-aa4b-d34657ba2494`
+- `postagem`: `https://webhookk.bussolaexecutiva.com.br/webhook/69e204cf-2b74-45f0-b522-633e60085920`
+
+Nao importe `src/lib/server/agent-webhooks.ts` em components client-side.
+
+## Contrato n8n
+
+Este contrato nao deve ser alterado sem combinar com quem mantem as automacoes n8n. Todos os agentes enviam exatamente este payload:
+
+```json
+{
+  "chatId": "uuid-do-chat",
+  "message": "texto do usuario",
+  "scriptId": 123,
+  "user": {
+    "id": "uuid-do-usuario",
+    "email": "email",
+    "nome": "nome",
+    "telefone": "telefone"
+  }
+}
+```
+
+Nao adicionar `agentType`, `agent_type`, nome do agente ou campos extras no payload do n8n. A unica diferenca entre agentes e a URL de destino.
+
+## Fluxo de Chat Ativo
+
+Entrada principal:
+
+- `/dashboard`: lista os quatro agentes usando `AGENTS`.
+- `/dashboard/agent/[agentType]`: inicia conversa com qualquer agente.
+- `/dashboard/chat/[chatId]`: conversa individual.
+
+Rotas genericas novas:
+
+- `POST /api/chats/create-agent`
+  - Recebe `{ message, agentType }`.
+  - Valida agente com `getAgentByType`.
+  - Valida acesso com `userHasAgentAccess`.
+  - Cria `chats` com `agent_type`.
+  - Cria `scripts` com `input` e `output = null`.
+  - Envia payload n8n para `getAgentWebhookUrl(agent.type)`.
+
+- `POST /api/chats/message-agent`
+  - Recebe `{ chatId, message }`.
+  - Busca o chat e usa `chat.agent_type`.
+  - Se `agent_type` for `null`, faz fallback para `comunicacao`.
+  - Valida acesso com `userHasAgentAccess`.
+  - Cria novo `scripts`.
+  - Envia payload n8n para o webhook do agente do chat.
+
+Rotas legadas mantidas por compatibilidade:
+
+- `POST /api/chats/create` e `POST /api/chats/message`: comunicacao.
+- `POST /api/chats/create-apresentacao` e `POST /api/chats/message-apresentacao`: apresentacao.
+
+Essas rotas legadas tambem usam `userHasAgentAccess` e `src/lib/server/agent-webhooks.ts`.
+
+Leitura:
+
+- `GET /api/chats`: lista chats do usuario. Se `plano` for `Todas` ou `Ambas`, lista tudo; caso contrario filtra por linhas ativas em `user_agent_access`.
+- `GET /api/chats/[chatId]`: detalhes do chat com validacao de dono, expiracao e permissao do agente.
+- `GET /api/chats/[chatId]/messages`: retorna registros de `scripts` com validacao de dono, expiracao e permissao do agente.
+
+O frontend faz polling em `GET /api/chats/[chatId]/messages` e espera resposta em `scripts.output`. O callback `POST /api/webhook` aceita `scriptId`/`script_id` mais `output`/`response`/`resposta`/`message` e atualiza `scripts.output`.
+
+## Controle de Acesso e Assinatura
+
+O controle atual e interno/manual pelo banco, nao Hotmart direto.
+
+Campos relevantes em `users`:
+
+- `plano`: resumo comercial/manual.
+- `data_expiracao`: data de fim do acesso.
+
+Tabela nova:
+
+```text
+user_agent_access
+  id uuid
+  user_id mesmo tipo de users.id
+  agent_type text
+  enabled boolean
+  expires_at date
+  created_at timestamptz
+  updated_at timestamptz
+  unique(user_id, agent_type)
+```
+
+Regras:
+
+- `users.plano = 'Todas'`: acesso global a todos os agentes atuais.
+- `users.plano = 'Ambas'`: tratado como global legado.
+- `users.plano = 'Personalizado'` ou nome de IA: permissao efetiva vem de `user_agent_access`.
+- `users.plano = null`: nao deve liberar acesso automaticamente. A migracao atual normaliza usuarios existentes para `Todas`.
+- `data_expiracao` expirada bloqueia acesso.
+- `user_agent_access.expires_at` tambem pode limitar acesso por agente.
+
+Helper server-side:
+
+- `src/lib/agent-access.ts`
+- Funcao principal: `userHasAgentAccess(supabase, userId, agentType)`.
+
+Helper client/UI legado:
+
+- `src/lib/access-control.ts`
+- Usado por paginas antigas (`/script`, `/dashboard/apresentacao`).
+- Nao deve tratar `plano = null` como acesso liberado.
+
+## Migracao Quatro Agentes
+
+Arquivo:
+
+- `supabase/migrations/20260629000001_four_agents_access.sql`
+
+Ela faz:
+
+- Atualiza constraint de `chats.agent_type` para quatro agentes.
+- Cria `user_agent_access` adaptando o tipo de `user_id` ao tipo real de `public.users.id` (`uuid`, `int4` ou `int8`).
+- Cria indices de acesso.
+- Habilita RLS com policy para service role.
+- Atualiza constraint de `users.plano`.
+- Executa `UPDATE public.users SET plano = 'Todas';`
+- Cria/atualiza linhas `user_agent_access` para todos os usuarios e os quatro agentes.
+
+Essa migracao atende ao requisito de liberar todos os usuarios atuais para todas as IAs antes do controle individual futuro.
+
+## Banco de Dados Principal
+
+### `users`
+
+Campos relevantes:
+
+- `id`
+- `email`
+- `nome`
+- `senha`
+- `telefone`
+- `avatar`
+- `nivel`
+- `plano`
+- `data_expiracao`
+
+### `chats`
+
+- `id`
+- `user_id`
+- `title`
+- `agent_type`: `comunicacao`, `apresentacao`, `conversas_dificeis`, `postagem`
+- timestamps
+
+### `scripts`
+
+- `id`
+- `user_id`
+- `chatid`
+- `input`
+- `output`
+- timestamps
+
+### `user_agent_access`
+
+Permissao por usuario/agente. Use para liberar uma, duas, tres ou todas as IAs quando o plano nao for global.
+
+## Codigo Legado/Experimental
+
+`src/components/chat/EnhancedChatInterface.tsx` representa um fluxo antigo por `mensagens` e `arquivos`.
+
+`src/app/api/webhook/route.ts` e `src/lib/server/webhook.ts` atendem o fluxo ativo por `scriptId` e mantem fallback legado por `webhook_id/outputs`.
+
+Esse nao e o fluxo principal das quatro IAs. O fluxo principal usa `chats` + `scripts` + `scriptId`.
+
+Antes de reaproveitar o componente legado, confirme se as tabelas `mensagens` e `arquivos` existem no Supabase ativo.
+
+## UI e Navegacao
+
+- `src/app/dashboard/page.tsx`: cards dos quatro agentes com logo.
+- `src/app/dashboard/select-agent/page.tsx`: selecao alternativa usando `AGENTS`.
+- `src/app/dashboard/agent/[agentType]/page.tsx`: tela generica para iniciar chat.
+- `src/app/dashboard/chat/[chatId]/page.tsx`: conversa individual.
+- `src/components/chat/ChatInterface.tsx`: cria chat via `/api/chats/create-agent`.
+- `src/components/chat/ChatDetail.tsx`: envia mensagens via `/api/chats/message-agent`.
+- `src/components/layout/Sidebar.tsx`: menu desktop com quatro agentes e historico com badge.
+- `src/components/layout/MobileMenu.tsx`: menu mobile com quatro agentes e historico com badge.
+- `src/components/layout/Header.tsx`: mostra badge do agente atual.
+
+Tema: escuro, Tailwind, cor primaria `#FF6B00`.
+
+## Futuro: Hotmart Direto
+
+Nao implementado ainda. Plano recomendado:
+
+1. Criar endpoint seguro para webhooks Hotmart.
+2. Validar assinatura/token do evento.
+3. Persistir IDs de eventos para idempotencia.
+4. Criar tabela de mapeamento produto/oferta Hotmart -> agentes liberados.
+5. Atualizar `users.plano`, `users.data_expiracao` e `user_agent_access`.
+6. Manter override manual/admin para suporte.
+7. Registrar logs de mudanca de assinatura.
+
+## Pontos de Atencao
+
+- Nao mudar o payload n8n sem atualizar as automacoes.
+- Webhook URLs devem ficar server-only.
+- `SUPABASE_SERVICE_ROLE_KEY` nunca deve ir para codigo client.
+- `next.config.js` ignora typecheck/lint em build.
+- Ainda ha rotas antigas fora de chat com fallback `JWT_SECRET || 'your-secret-key'`.
+- `/api/webhook` nao valida assinatura. Antes de expor mais automacoes, adicionar autenticacao/assinatura.
+- O retorno n8n ativo deve enviar `scriptId` e uma resposta em `output`, `response`, `resposta` ou `message`.
+- Existem schemas SQL divergentes (`supabase/fix-schema.sql`, `scripts/setup-database.sql`). Nao execute SQL destrutivo sem revisar o banco real.
+
+## Ordem Recomendada Para Novas Funcionalidades
+
+1. Sincronizar com GitHub.
+2. Ler este arquivo.
+3. Identificar se a mudanca toca fluxo principal (`scripts/scriptId`) ou o componente legado de `mensagens/arquivos`.
+4. Validar schema real antes de migracoes.
+5. Preservar contrato n8n.
+6. Usar `AGENTS` para metadados publicos e `agent-webhooks.ts` para URL server-only.
+7. Usar `userHasAgentAccess` para permissoes server-side.
+8. Atualizar este arquivo quando arquitetura, schema, fluxo ou proximos passos mudarem.

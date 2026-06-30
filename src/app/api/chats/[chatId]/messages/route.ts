@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as jwt from 'jsonwebtoken';
+import type { AgentType } from '@/lib/agents';
+import { userHasAgentAccess } from '@/lib/agent-access';
 
 export async function GET(
   request: Request,
@@ -26,7 +28,21 @@ export async function GET(
     }
     
     // Verificar o token JWT para obter o ID do usuário
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string; email: string };
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      console.error('JWT_SECRET nao configurado');
+      return NextResponse.json({ error: 'Configuracao do servidor invalida' }, { status: 500 });
+    }
+
+    let decoded: { userId: string; email: string };
+
+    try {
+      decoded = jwt.verify(token, jwtSecret) as { userId: string; email: string };
+    } catch (jwtError) {
+      console.error('Token invalido:', jwtError);
+      return NextResponse.json({ error: 'Token invalido' }, { status: 401 });
+    }
     
     if (!decoded || !decoded.userId) {
       return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
@@ -79,25 +95,14 @@ export async function GET(
       }
     }
 
-    // Verificar acesso conforme agent_type (fallback para título)
-    if (userData.plano) {
-      const type = (chatData as any).agent_type as string | null;
-      if (type === 'apresentacao' && !(userData.plano === 'Ambas' || userData.plano === 'Apresentação para Reunião de Resultados')) {
-        return NextResponse.json({ error: 'Seu plano não inclui acesso à Apresentação para Reunião de Resultados.' }, { status: 403 });
-      }
-      if (type === 'comunicacao' && !(userData.plano === 'Ambas' || userData.plano === 'Comunicação Executiva')) {
-        return NextResponse.json({ error: 'Seu plano não inclui acesso à Comunicação Executiva.' }, { status: 403 });
-      }
-      if (!type) {
-        const title = (chatData.title || '').toLowerCase();
-        const isApresentacao = title.includes('apresentação') || title.includes('reuniao') || title.includes('reunião');
-        if (isApresentacao && !(userData.plano === 'Ambas' || userData.plano === 'Apresentação para Reunião de Resultados')) {
-          return NextResponse.json({ error: 'Seu plano não inclui acesso à Apresentação para Reunião de Resultados.' }, { status: 403 });
-        }
-        if (!isApresentacao && !(userData.plano === 'Ambas' || userData.plano === 'Comunicação Executiva')) {
-          return NextResponse.json({ error: 'Seu plano não inclui acesso à Comunicação Executiva.' }, { status: 403 });
-        }
-      }
+    const accessAgentType = ((chatData as any).agent_type || 'comunicacao') as AgentType;
+    const accessResult = await userHasAgentAccess(supabase, userId, accessAgentType);
+
+    if (!accessResult.access) {
+      return NextResponse.json(
+        { error: accessResult.error || 'Acesso negado' },
+        { status: accessResult.status || 403 }
+      );
     }
 
     // Buscar mensagens do chat na tabela scripts

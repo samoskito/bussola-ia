@@ -2,95 +2,83 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
+import { userHasAgentAccess } from '@/lib/agent-access';
+import { getAgentWebhookUrl } from '@/lib/server/agent-webhooks';
 
 export async function POST(request: Request) {
   try {
-    // Obter as variáveis de ambiente do Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
+
     if (!supabaseUrl || !supabaseKey) {
-      console.error('Variáveis de ambiente do Supabase não encontradas');
-      return NextResponse.json({ error: 'Configuração do servidor inválida' }, { status: 500 });
+      console.error('Variaveis de ambiente do Supabase nao encontradas');
+      return NextResponse.json({ error: 'Configuracao do servidor invalida' }, { status: 500 });
     }
-    
-    // Obter o token de autenticação do cookie
+
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
-    
+
     if (!token) {
-      return NextResponse.json({ error: 'Usuário não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Usuario nao autenticado' }, { status: 401 });
     }
-    
-    // Verificar o token JWT para obter o ID do usuário
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string; email: string };
-    
-    if (!decoded || !decoded.userId) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
+
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      console.error('JWT_SECRET nao configurado');
+      return NextResponse.json({ error: 'Configuracao do servidor invalida' }, { status: 500 });
     }
-    
-    const userId = decoded.userId;
-    
-    // Obter dados da mensagem do corpo da requisição
+
+    let decoded: { userId: string; email: string };
+
+    try {
+      decoded = jwt.verify(token, jwtSecret) as { userId: string; email: string };
+    } catch (jwtError) {
+      console.error('Token invalido:', jwtError);
+      return NextResponse.json({ error: 'Token invalido' }, { status: 401 });
+    }
+
+    if (!decoded?.userId) {
+      return NextResponse.json({ error: 'Token invalido' }, { status: 401 });
+    }
+
     const { chatId, message } = await request.json();
-    
+
     if (!chatId || !message) {
-      return NextResponse.json({ error: 'ID do chat e mensagem são obrigatórios' }, { status: 400 });
+      return NextResponse.json({ error: 'ID do chat e mensagem sao obrigatorios' }, { status: 400 });
     }
-    
-    // Criar cliente do Supabase com a chave de serviço
+
+    const userId = decoded.userId;
     const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Verificar se o chat pertence ao usuário e seu tipo
+
     const { data: chatData, error: chatError } = await supabase
       .from('chats')
       .select('id, user_id, agent_type')
       .eq('id', chatId)
       .single();
-    
+
     if (chatError || !chatData) {
       console.error('Erro ao verificar chat:', chatError);
-      return NextResponse.json({ error: 'Chat não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: 'Chat nao encontrado' }, { status: 404 });
     }
-    
-    // Verificar se o chat pertence ao usuário autenticado
+
     if (chatData.user_id !== userId) {
-      return NextResponse.json({ error: 'Não autorizado a acessar este chat' }, { status: 403 });
+      return NextResponse.json({ error: 'Nao autorizado a acessar este chat' }, { status: 403 });
     }
-    // Garantir que este endpoint seja usado apenas para chats de Comunicação Executiva
-    if ((chatData as any).agent_type && (chatData as any).agent_type !== 'comunicacao') {
+
+    if ((chatData as { agent_type?: string | null }).agent_type && (chatData as { agent_type?: string | null }).agent_type !== 'comunicacao') {
       return NextResponse.json({ error: 'Este chat pertence a outro agente. Use o endpoint correto.' }, { status: 400 });
     }
-    
-    // Buscar dados do usuário
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id, email, nome, telefone, data_expiracao, plano')
-      .eq('id', userId)
-      .single();
-      
-    if (userError || !userData) {
-      console.error('Erro ao buscar dados do usuário:', userError);
-      return NextResponse.json({ error: 'Erro ao buscar dados do usuário' }, { status: 500 });
+
+    const accessResult = await userHasAgentAccess(supabase, userId, 'comunicacao');
+
+    if (!accessResult.access || !accessResult.user) {
+      return NextResponse.json(
+        { error: accessResult.error || 'Acesso negado' },
+        { status: accessResult.status || 403 }
+      );
     }
 
-    // Verificar expiração do plano
-    if (userData.data_expiracao) {
-      const hoje = new Date();
-      hoje.setHours(0,0,0,0);
-      const exp = new Date(userData.data_expiracao);
-      exp.setHours(0,0,0,0);
-      if (hoje > exp) {
-        return NextResponse.json({ error: 'Seu plano expirou. Renove para continuar usando.' }, { status: 403 });
-      }
-    }
-
-    // Verificar plano permite Comunicação Executiva
-    if (userData.plano && !(userData.plano === 'Ambas' || userData.plano === 'Comunicação Executiva')) {
-      return NextResponse.json({ error: 'Seu plano não inclui acesso à Comunicação Executiva.' }, { status: 403 });
-    }
-    
-    // Salvar a mensagem do usuário na tabela scripts
     const { data: scriptData, error: scriptError } = await supabase
       .from('scripts')
       .insert([
@@ -98,59 +86,48 @@ export async function POST(request: Request) {
           user_id: userId,
           chatid: chatId,
           input: message,
-          output: null // A resposta será atualizada quando o webhook responder
-        }
+          output: null,
+        },
       ])
-      .select();
+      .select('id')
+      .single();
 
-    if (scriptError) {
+    if (scriptError || !scriptData?.id) {
       console.error('Erro ao salvar mensagem na tabela scripts:', scriptError);
       return NextResponse.json({ error: 'Erro ao salvar mensagem' }, { status: 500 });
     }
 
-    // Enviar dados para o webhook do agente Comunicação Executiva
-    const webhookUrl = 'https://webhookbussola.palmup.com.br/webhook/ia/bussolascript';
-    
+    const { id, email, nome, telefone } = accessResult.user;
     const webhookPayload = {
-      chatId: chatId,
-      message: message,
-      scriptId: scriptData[0].id, // Enviar o ID do script para o webhook
-      user: {
-        id: userData.id,
-        email: userData.email,
-        nome: userData.nome,
-        telefone: userData.telefone
-      }
+      chatId,
+      message,
+      scriptId: scriptData.id,
+      user: { id, email, nome, telefone },
     };
-    
+
     try {
-      const webhookResponse = await fetch(webhookUrl, {
+      const webhookResponse = await fetch(getAgentWebhookUrl('comunicacao'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(webhookPayload),
       });
-      
+
       if (!webhookResponse.ok) {
         console.error('Erro ao enviar dados para webhook:', await webhookResponse.text());
         return NextResponse.json({ error: 'Erro ao processar mensagem' }, { status: 500 });
       }
-      
-      // Resposta bem-sucedida do webhook
-      return NextResponse.json({ 
-        success: true, 
+
+      return NextResponse.json({
+        success: true,
         message: 'Mensagem enviada com sucesso',
-        scriptId: scriptData[0].id
+        scriptId: scriptData.id,
       });
-      
     } catch (webhookError) {
       console.error('Erro ao chamar webhook:', webhookError);
       return NextResponse.json({ error: 'Erro ao processar mensagem' }, { status: 500 });
     }
-    
   } catch (error) {
-    console.error('Erro ao processar requisição:', error);
+    console.error('Erro ao processar requisicao:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

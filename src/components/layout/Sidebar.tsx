@@ -8,12 +8,28 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getMensagemAviso } from '@/lib/access-control';
 import { useRouter } from 'next/navigation';
 import LogoutButton from '@/components/auth/LogoutButton';
+import type { AgentType } from '@/lib/agents';
+import { AGENTS, getAgentLabel } from '@/lib/agents';
 
 type Chat = {
   id: string;
   title: string;
   created_at?: string;
-  agent_type?: 'comunicacao' | 'apresentacao' | null;
+  agent_type?: AgentType | null;
+};
+
+const getAgentBadgeClass = (agentType?: AgentType | null) => {
+  switch (agentType || 'comunicacao') {
+    case 'apresentacao':
+      return 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300';
+    case 'conversas_dificeis':
+      return 'bg-rose-500/20 border-rose-500/30 text-rose-300';
+    case 'postagem':
+      return 'bg-sky-500/20 border-sky-500/30 text-sky-300';
+    case 'comunicacao':
+    default:
+      return 'bg-[#FF6B00]/20 border-[#FF6B00]/30 text-[#FF6B00]';
+  }
 };
 
 interface SidebarProps {
@@ -191,7 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
                 return (
                   <li key={chat.id}>
                     <Link 
-                      href={`/script/chat/${chat.id}`}
+                      href={`/dashboard/chat/${chat.id}`}
                       className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white rounded-md transition-colors duration-200 group border border-transparent hover:border-gray-700"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 group-hover:text-[#FF6B00]" viewBox="0 0 20 20" fill="currentColor">
@@ -201,10 +217,8 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
                         <div className="truncate font-medium">{chat.title || `Chat ${chat.id.slice(0, 8)}`}</div>
                         <div className="text-xs text-gray-500 truncate flex items-center gap-2">
                           <span>{formattedDate}</span>
-                          <span className={`${chat.agent_type === 'apresentacao' 
-                            ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-300' 
-                            : 'bg-[#FF6B00]/20 border border-[#FF6B00]/30 text-[#FF6B00]'} px-2 py-0.5 rounded-full` }>
-                            {chat.agent_type === 'apresentacao' ? 'Apresentação' : 'Comunicação'}
+                          <span className={`${getAgentBadgeClass(chat.agent_type)} border px-2 py-0.5 rounded-full` }>
+                            {getAgentLabel(chat.agent_type || 'comunicacao')}
                           </span>
                         </div>
                       </div>
@@ -234,21 +248,27 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
               <span className="ml-3">Dashboard</span>
             </Link>
           </li>
-          <li>
-            <Link 
-              href="/script"
-              className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white rounded-md transition-colors duration-200 group"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-              </svg>
-              <span className="ml-3">Gerar Scripts</span>
-            </Link>
-          </li>
+          {AGENTS.map((agent) => (
+            <li key={agent.type}>
+              <Link
+                href={`/dashboard/agent/${agent.type}`}
+                className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white rounded-md transition-colors duration-200 group"
+              >
+                <Image
+                  src={agent.icon}
+                  alt={agent.name}
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 rounded object-contain bg-gray-950 border border-gray-700 group-hover:border-[#FF6B00]/60"
+                />
+                <span className="ml-3 line-clamp-2 leading-snug">{agent.name}</span>
+              </Link>
+            </li>
+          ))}
           <li>
             <Link 
               href="/dashboard/apresentacao"
-              className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white rounded-md transition-colors duration-200 group"
+              className="hidden"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

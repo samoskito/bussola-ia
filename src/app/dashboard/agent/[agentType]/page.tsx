@@ -10,7 +10,7 @@ import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 import AccessWarning from '@/components/access/AccessWarning';
 import ExpiryToast from '@/components/access/ExpiryToast';
 import MobileMenu from '@/components/layout/MobileMenu';
-import { getAgentByType } from '@/lib/agents';
+import { getAgentByType, isAgentAvailableForUser } from '@/lib/agents';
 
 type AgentStartPageProps = {
   params: {
@@ -90,6 +90,37 @@ export default function AgentStartPage({ params }: AgentStartPageProps) {
             <div className="max-w-md text-center bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-6 py-5">
               <h1 className="text-lg font-semibold mb-2">Agente não encontrado</h1>
               <p className="text-sm">Volte ao dashboard e escolha um agente disponível.</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAgentAvailableForUser(agent.type, user.nivel)) {
+    return (
+      <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
+        <div className="hidden lg:flex lg:w-64 xl:w-72 2xl:w-80 border-r border-gray-800 shadow-xl">
+          <Sidebar initialChats={chats} />
+        </div>
+        <MobileMenu isOpen={isMobileMenuOpen} onClose={closeMobileMenu} chats={chats as any} />
+        <div className="flex-1 flex flex-col overflow-hidden w-full">
+          <Header
+            userName={user.nome || user.email}
+            title={agent.name}
+            onMenuToggle={toggleMobileMenu}
+            agentType={agent.type}
+            daysRemaining={diasRestantesApi}
+          />
+          <main className="flex-1 bg-gradient-to-b from-gray-900 to-gray-950 w-full flex items-center justify-center p-6">
+            <div className="max-w-md text-center bg-yellow-500/10 border border-yellow-500/30 text-yellow-200 rounded-lg px-6 py-5">
+              <div className="inline-flex rounded-full border border-yellow-500/40 bg-yellow-500/10 px-3 py-1 text-xs font-semibold mb-4">
+                {agent.availabilityLabel}
+              </div>
+              <h1 className="text-lg font-semibold mb-2">{agent.name}</h1>
+              <p className="text-sm text-yellow-100/90">
+                Esta IA esta em ajustes finais e sera liberada em breve para usuarios. Administradores ja podem testar.
+              </p>
             </div>
           </main>
         </div>

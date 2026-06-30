@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jwt from 'jsonwebtoken';
 import type { AgentType } from '@/lib/agents';
+import { isAgentAvailableForUser } from '@/lib/agents';
 
 const hasDateExpired = (dateValue?: string | null) => {
   if (!dateValue) return false;
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
     // Buscar dados do usuário para verificar expiração
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, data_expiracao, plano')
+      .select('id, data_expiracao, plano, nivel')
       .eq('id', userId)
       .single();
 
@@ -99,6 +100,11 @@ export async function GET(request: Request) {
     }
     // Se o usuário não tem acesso global, filtrar a lista pelos agentes liberados
     let filtered = chats || [];
+    filtered = filtered.filter((c: any) => {
+      const chatAgentType = (c.agent_type || 'comunicacao') as AgentType;
+      return isAgentAvailableForUser(chatAgentType, userData.nivel);
+    });
+
     const hasGlobalAgentAccess = userData.plano === 'Todas' || userData.plano === 'Ambas';
 
     if (!hasGlobalAgentAccess) {

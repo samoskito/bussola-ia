@@ -5,7 +5,8 @@ import Link from 'next/link';
 import LogoutButton from '../auth/LogoutButton';
 import Image from 'next/image';
 import type { AgentType } from '@/lib/agents';
-import { AGENTS, getAgentLabel } from '@/lib/agents';
+import { AGENTS, getAgentLabel, isAgentAvailableForUser } from '@/lib/agents';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -28,6 +29,8 @@ const getAgentBadgeClass = (agentType?: AgentType | null) => {
 };
 
 const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
+  const { user } = useAuth();
+
   // Log para verificar os chats recebidos pelo MobileMenu
   useEffect(() => {
     if (isOpen) {
@@ -127,14 +130,9 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
 
           {AGENTS.map((agent) => {
             const href = `/dashboard/agent/${agent.type}`;
-
-            return (
-              <Link
-                key={agent.type}
-                href={href}
-                className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive(href) ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
-                onClick={onClose}
-              >
+            const isLocked = !isAgentAvailableForUser(agent.type, user?.nivel);
+            const content = (
+              <>
                 <Image
                   src={agent.icon}
                   alt={agent.name}
@@ -142,8 +140,33 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
                   height={24}
                   className="h-6 w-6 mr-3 rounded object-contain bg-gray-950 border border-gray-700"
                 />
-                <span className="leading-snug">{agent.name}</span>
-              </Link>
+                <span className="leading-snug flex-1">{agent.name}</span>
+                {isLocked && (
+                  <span className="ml-2 rounded-full border border-yellow-500/40 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-semibold text-yellow-300">
+                    {agent.availabilityLabel}
+                  </span>
+                )}
+              </>
+            );
+
+            return (
+              isLocked ? (
+                <div
+                  key={agent.type}
+                  className="flex items-center px-4 py-3 rounded-lg text-base font-medium text-gray-500 cursor-not-allowed"
+                >
+                  {content}
+                </div>
+              ) : (
+                <Link
+                  key={agent.type}
+                  href={href}
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive(href) ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
+                  onClick={onClose}
+                >
+                  {content}
+                </Link>
+              )
             );
           })}
           

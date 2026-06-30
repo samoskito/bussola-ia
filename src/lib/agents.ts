@@ -4,24 +4,32 @@ export const AGENTS = [
     name: 'Comunicação Executiva',
     description: 'Gere scripts personalizados para suas necessidades',
     icon: '/images/comunicacao-executiva-logo.png',
+    adminOnly: false,
+    availabilityLabel: null,
   },
   {
     type: 'apresentacao',
     name: 'Apresentação para Reunião de Resultados',
     description: 'Crie apresentações de resultados profissionais',
     icon: '/images/apresentacao-resultados-logo.png',
+    adminOnly: false,
+    availabilityLabel: null,
   },
   {
     type: 'conversas_dificeis',
     name: 'Conversas Dificeis',
     description: 'Prepare conversas sensiveis com clareza, empatia e direção',
     icon: '/images/conversas-dificeis-logo.jpeg',
+    adminOnly: true,
+    availabilityLabel: 'EM BREVE',
   },
   {
     type: 'postagem',
     name: 'Postagem no Linkedin',
     description: 'Crie posts profissionais para LinkedIn com apoio da IA',
     icon: '/images/postagem-linkedin-logo.jpeg',
+    adminOnly: true,
+    availabilityLabel: 'EM BREVE',
   },
 ] as const;
 
@@ -33,4 +41,12 @@ export function getAgentByType(type: string) {
 
 export function getAgentLabel(type: string) {
   return getAgentByType(type)?.name || type;
+}
+
+export function isAgentAdminOnly(type: string) {
+  return Boolean(getAgentByType(type)?.adminOnly);
+}
+
+export function isAgentAvailableForUser(type: string, userNivel?: string | null) {
+  return !isAgentAdminOnly(type) || userNivel === 'admin';
 }

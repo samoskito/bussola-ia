@@ -1,4 +1,5 @@
 import type { AgentType } from '@/lib/agents';
+import { isAgentAvailableForUser } from '@/lib/agents';
 
 type SupabaseLikeClient = {
   from: (table: string) => any;
@@ -11,6 +12,7 @@ export interface AgentAccessUser {
   telefone: string | null;
   data_expiracao: string | null;
   plano: string | null;
+  nivel: string | null;
 }
 
 export interface AgentAccessResult {
@@ -39,7 +41,7 @@ export async function userHasAgentAccess(
 ): Promise<AgentAccessResult> {
   const { data: user, error: userError } = await supabase
     .from('users')
-    .select('id, email, nome, telefone, data_expiracao, plano')
+    .select('id, email, nome, telefone, data_expiracao, plano, nivel')
     .eq('id', userId)
     .single();
 
@@ -53,6 +55,15 @@ export async function userHasAgentAccess(
   }
 
   const accessUser = user as AgentAccessUser;
+
+  if (!isAgentAvailableForUser(agentType, accessUser.nivel)) {
+    return {
+      access: false,
+      error: 'Este agente estara disponivel em breve.',
+      status: 403,
+      user: accessUser,
+    };
+  }
 
   if (hasDateExpired(accessUser.data_expiracao)) {
     return {

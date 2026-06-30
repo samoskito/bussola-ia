@@ -9,7 +9,7 @@ import { getMensagemAviso } from '@/lib/access-control';
 import { useRouter } from 'next/navigation';
 import LogoutButton from '@/components/auth/LogoutButton';
 import type { AgentType } from '@/lib/agents';
-import { AGENTS, getAgentLabel } from '@/lib/agents';
+import { AGENTS, getAgentLabel, isAgentAvailableForUser } from '@/lib/agents';
 
 type Chat = {
   id: string;
@@ -248,12 +248,10 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
               <span className="ml-3">Dashboard</span>
             </Link>
           </li>
-          {AGENTS.map((agent) => (
-            <li key={agent.type}>
-              <Link
-                href={`/dashboard/agent/${agent.type}`}
-                className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white rounded-md transition-colors duration-200 group"
-              >
+          {AGENTS.map((agent) => {
+            const isLocked = !isAgentAvailableForUser(agent.type, user?.nivel);
+            const content = (
+              <>
                 <Image
                   src={agent.icon}
                   alt={agent.name}
@@ -261,10 +259,32 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
                   height={24}
                   className="h-6 w-6 rounded object-contain bg-gray-950 border border-gray-700 group-hover:border-[#FF6B00]/60"
                 />
-                <span className="ml-3 line-clamp-2 leading-snug">{agent.name}</span>
-              </Link>
-            </li>
-          ))}
+                <span className="ml-3 line-clamp-2 leading-snug flex-1">{agent.name}</span>
+                {isLocked && (
+                  <span className="ml-2 rounded-full border border-yellow-500/40 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-semibold text-yellow-300">
+                    {agent.availabilityLabel}
+                  </span>
+                )}
+              </>
+            );
+
+            return (
+              <li key={agent.type}>
+                {isLocked ? (
+                  <div className="flex items-center px-3 py-2 text-sm text-gray-500 rounded-md cursor-not-allowed group">
+                    {content}
+                  </div>
+                ) : (
+                  <Link
+                    href={`/dashboard/agent/${agent.type}`}
+                    className="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white rounded-md transition-colors duration-200 group"
+                  >
+                    {content}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
           <li>
             <Link 
               href="/dashboard/apresentacao"

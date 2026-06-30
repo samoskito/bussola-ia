@@ -9,24 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserChats } from '@/lib/supabase/client-utils-chat';
 import ExpiryToast from '@/components/access/ExpiryToast';
 import MobileMenu from '@/components/layout/MobileMenu';
-
-// Definição dos agentes disponíveis
-const agents = [
-  {
-    id: 'comunicacao-executiva',
-    name: 'Comunicação Executiva',
-    description: 'Gere scripts personalizados para suas necessidades',
-    icon: '/images/comunicacao-executiva-logo.png',
-    path: '/script'
-  },
-  {
-    id: 'apresentacao-resultados',
-    name: 'Apresentação para Reunião de Resultados',
-    description: 'Crie apresentações de resultados profissionais',
-    icon: '/images/apresentacao-resultados-logo.png',
-    path: '/dashboard/apresentacao'
-  }
-];
+import { AGENTS } from '@/lib/agents';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -75,8 +58,8 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  const handleAgentSelection = (path: string) => {
-    router.push(path);
+  const handleAgentSelection = (agentType: string) => {
+    router.push(`/dashboard/agent/${agentType}`);
   };
   
   // Mostrar loading enquanto verifica autenticação
@@ -176,10 +159,10 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold mb-8 text-center">Selecione um Agente</h1>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {agents.map((agent) => (
+              {AGENTS.map((agent) => (
                 <div 
-                  key={agent.id}
-                  onClick={() => handleAgentSelection(agent.path)}
+                  key={agent.type}
+                  onClick={() => handleAgentSelection(agent.type)}
                   className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-8 flex flex-col items-center cursor-pointer hover:from-gray-700 hover:to-gray-800 transition-all duration-300 border-2 border-gray-700 hover:border-[#FF6B00] shadow-xl hover:shadow-2xl hover:scale-[1.02] group"
                 >
                   {/* Container da imagem sem círculo */}

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import type { AgentType } from '@/lib/agents';
+import { getAgentByType, getAgentLabel } from '@/lib/agents';
 
 interface Message {
   id: string;
@@ -25,30 +26,45 @@ interface ChatDetailProps {
   chatId: string;
   userName: string;
   chatType?: 'script' | 'apresentacao';
+  agentType?: AgentType | null;
+  agentName?: string;
 }
 
-const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) => {
+const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType, agentType, agentName }) => {
   // Determinar o tipo de chat a partir da URL se não for fornecido como prop
   const [chatTypeState, setChatTypeState] = useState<'script' | 'apresentacao' | undefined>(chatType);
+  const [agentTypeState, setAgentTypeState] = useState<AgentType>(
+    agentType || (chatType === 'apresentacao' ? 'apresentacao' : 'comunicacao')
+  );
+
+  useEffect(() => {
+    if (agentType) {
+      setAgentTypeState(agentType);
+      setChatTypeState(agentType === 'apresentacao' ? 'apresentacao' : 'script');
+    }
+  }, [agentType]);
   
   useEffect(() => {
     if (!chatTypeState) {
       // Verificar se há parâmetro de tipo na URL
       const urlParams = new URLSearchParams(window.location.search);
       const typeParam = urlParams.get('type');
+      const urlAgent = typeParam ? getAgentByType(typeParam) : null;
       
-      if (typeParam === 'apresentacao') {
+      if (urlAgent) {
         if (process.env.NODE_ENV !== 'production') {
           // eslint-disable-next-line no-console
-          console.log(`[ChatDetail] Detectado tipo de chat: apresentacao (da URL)`);
+          console.log(`[ChatDetail] Detectado agente do chat: ${urlAgent.type} (da URL)`);
         }
-        setChatTypeState('apresentacao');
+        setAgentTypeState(urlAgent.type);
+        setChatTypeState(urlAgent.type === 'apresentacao' ? 'apresentacao' : 'script');
       } else {
         // Padrão é script
         if (process.env.NODE_ENV !== 'production') {
           // eslint-disable-next-line no-console
           console.log(`[ChatDetail] Detectado tipo de chat: script (padrão)`);
         }
+        setAgentTypeState('comunicacao');
         setChatTypeState('script');
       }
     } else {
@@ -69,19 +85,11 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
         if (response.ok) {
           const data = await response.json();
           
-          // Preferir agent_type do chat; fallback para título
           if (data.chat) {
-            const agentType = data.chat.agent_type as string | undefined;
-            if (agentType === 'apresentacao') {
-              setChatTypeState('apresentacao');
-            } else if (agentType === 'comunicacao') {
-              setChatTypeState('script');
-            } else if (data.chat.title) {
-              const title = data.chat.title.toLowerCase();
-              if (title.includes('apresentação') || title.includes('reuniao') || title.includes('reunião')) {
-                setChatTypeState('apresentacao');
-              }
-            }
+            const chatAgent = getAgentByType((data.chat.agent_type as string | null) || 'comunicacao');
+            const resolvedAgentType = chatAgent?.type || 'comunicacao';
+            setAgentTypeState(resolvedAgentType);
+            setChatTypeState(resolvedAgentType === 'apresentacao' ? 'apresentacao' : 'script');
           }
         }
       } catch (error) {
@@ -99,7 +107,6 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
   const [hasPendingMessages, setHasPendingMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const router = useRouter();
   
   // Função para rolar para o final das mensagens
   const scrollToBottom = () => {
@@ -251,18 +258,13 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
     setIsLoading(true);
     
     try {
-      // Determinar o endpoint correto com base no tipo de chat
-      const endpoint = chatTypeState === 'apresentacao' 
-        ? '/api/chats/message-apresentacao'
-        : '/api/chats/message';
-      
       if (process.env.NODE_ENV !== 'production') {
         // eslint-disable-next-line no-console
-        console.log(`Enviando mensagem para endpoint: ${endpoint} (tipo: ${chatTypeState})`);
+        console.log(`Enviando mensagem para endpoint: /api/chats/message-agent (agente: ${agentTypeState})`);
       }
       
       // Enviar mensagem para a API
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/chats/message-agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -371,6 +373,8 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
     }
   };
 
+  const resolvedAgentName = agentName || getAgentLabel(agentTypeState);
+
   return (
     <div className="flex flex-col h-full min-h-[calc(100vh-80px)] w-full">
       {/* Messages Area */}
@@ -384,7 +388,7 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType }) =
                 </svg>
               </div>
               <h3 className="text-2xl font-medium mb-3">Inicie uma nova conversa</h3>
-              <p className="text-gray-400">Envie uma mensagem para começar a conversar com {chatType === 'apresentacao' ? 'a Apresentação para Reunião de Resultados' : 'a Comunicação Executiva'}</p>
+              <p className="text-gray-400">Envie uma mensagem para começar a conversar com {resolvedAgentName}</p>
             </div>
           </div>
         )}

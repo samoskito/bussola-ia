@@ -8,14 +8,30 @@ import { FiSettings, FiLogOut, FiBell } from 'react-icons/fi';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import LogoutButton from '../auth/LogoutButton';
 import { useAuth } from '@/contexts/AuthContext';
+import type { AgentType } from '@/lib/agents';
+import { getAgentLabel } from '@/lib/agents';
 
 interface HeaderProps {
   userName?: string;
   title?: string;
   onMenuToggle?: () => void;
-  agentType?: 'comunicacao' | 'apresentacao';
+  agentType?: AgentType;
   daysRemaining?: number;
 }
+
+const getAgentBadgeClass = (agentType: AgentType) => {
+  switch (agentType) {
+    case 'apresentacao':
+      return 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300';
+    case 'conversas_dificeis':
+      return 'bg-rose-500/20 border-rose-500/30 text-rose-300';
+    case 'postagem':
+      return 'bg-sky-500/20 border-sky-500/30 text-sky-300';
+    case 'comunicacao':
+    default:
+      return 'bg-[#FF6B00]/20 border-[#FF6B00]/30 text-[#FF6B00]';
+  }
+};
 
 const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuToggle, agentType, daysRemaining }) => {
   const supabase = createClientComponentClient();
@@ -86,8 +102,8 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
           <div className="hidden md:flex items-center ml-4 pl-4 border-l border-gray-700 gap-2">
             <h1 className="font-medium text-lg text-white">{title}</h1>
             {agentType && (
-              <span className={`text-xs px-2 py-0.5 rounded-full border ${agentType === 'apresentacao' ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' : 'bg-[#FF6B00]/20 border-[#FF6B00]/30 text-[#FF6B00]'}`}>
-                {agentType === 'apresentacao' ? 'Apresentação' : 'Comunicação'}
+              <span className={`inline-block text-xs px-2 py-0.5 rounded-full border max-w-[12rem] truncate ${getAgentBadgeClass(agentType)}`}>
+                {getAgentLabel(agentType)}
               </span>
             )}
           </div>
@@ -98,8 +114,8 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
           <div className="md:hidden flex items-center ml-2 gap-2 flex-1 min-w-0">
             <h1 className="font-medium text-sm text-white truncate max-w-[50vw]">{title}</h1>
             {agentType && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full border ${agentType === 'apresentacao' ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' : 'bg-[#FF6B00]/20 border-[#FF6B00]/30 text-[#FF6B00]'}`}>
-                {agentType === 'apresentacao' ? 'Apresentação' : 'Comunicação'}
+              <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full border max-w-[8rem] truncate ${getAgentBadgeClass(agentType)}`}>
+                {getAgentLabel(agentType)}
               </span>
             )}
           </div>

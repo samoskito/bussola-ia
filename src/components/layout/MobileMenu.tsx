@@ -2,19 +2,32 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import LogoutButton from '../auth/LogoutButton';
 import Image from 'next/image';
+import type { AgentType } from '@/lib/agents';
+import { AGENTS, getAgentLabel } from '@/lib/agents';
 
 interface MobileMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  chats: Array<{ id: string; title: string; agent_type?: 'comunicacao' | 'apresentacao' | null }>;
+  chats: Array<{ id: string; title: string; agent_type?: AgentType | null }>;
 }
 
+const getAgentBadgeClass = (agentType?: AgentType | null) => {
+  switch (agentType || 'comunicacao') {
+    case 'apresentacao':
+      return 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300';
+    case 'conversas_dificeis':
+      return 'bg-rose-500/20 border-rose-500/30 text-rose-300';
+    case 'postagem':
+      return 'bg-sky-500/20 border-sky-500/30 text-sky-300';
+    case 'comunicacao':
+    default:
+      return 'bg-[#FF6B00]/20 border-[#FF6B00]/30 text-[#FF6B00]';
+  }
+};
+
 const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
-  const router = useRouter();
-  
   // Log para verificar os chats recebidos pelo MobileMenu
   useEffect(() => {
     if (isOpen) {
@@ -112,20 +125,31 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
             Dashboard
           </Link>
 
-          <Link 
-            href="/script"
-            className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive('/script') ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
-            onClick={onClose}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-3 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Gerar Script
-          </Link>
+          {AGENTS.map((agent) => {
+            const href = `/dashboard/agent/${agent.type}`;
+
+            return (
+              <Link
+                key={agent.type}
+                href={href}
+                className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive(href) ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
+                onClick={onClose}
+              >
+                <Image
+                  src={agent.icon}
+                  alt={agent.name}
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 mr-3 rounded object-contain bg-gray-950 border border-gray-700"
+                />
+                <span className="leading-snug">{agent.name}</span>
+              </Link>
+            );
+          })}
           
           <Link 
             href="/dashboard/apresentacao"
-            className={`flex items-center px-4 py-3 rounded-lg text-base font-medium ${isActive('/dashboard/apresentacao') ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
+            className="hidden"
             onClick={onClose}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-3 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,18 +190,16 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
               chats.map((chat) => (
                 <Link
                   key={chat.id}
-                  href={`/script/chat/${chat.id}`}
-                  className={`flex items-center px-4 py-2.5 text-sm rounded-lg ${isActive(`/script/chat/${chat.id}`) ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
+                  href={`/dashboard/chat/${chat.id}`}
+                  className={`flex items-center px-4 py-2.5 text-sm rounded-lg ${isActive(`/dashboard/chat/${chat.id}`) ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800 hover:text-white'} transition-all duration-200`}
                   onClick={onClose}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-current mr-2.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
                   </svg>
                   <span className="truncate flex-1">{chat.title || 'Chat sem título'}</span>
-                  <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${chat.agent_type === 'apresentacao' 
-                    ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' 
-                    : 'bg-[#FF6B00]/20 border-[#FF6B00]/30 text-[#FF6B00]'}`}>
-                    {chat.agent_type === 'apresentacao' ? 'Apresentação' : 'Comunicação'}
+                  <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${getAgentBadgeClass(chat.agent_type)}`}>
+                    {getAgentLabel(chat.agent_type || 'comunicacao')}
                   </span>
                 </Link>
               ))

@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { sendToWebhook, checkOutputStatus } from '@/lib/webhook';
 import { supabase, uploadImage, STORAGE_BUCKETS } from '@/lib/supabase';
 
 interface Agent {
@@ -37,6 +36,80 @@ interface Message {
   }[];
 }
 
+interface UploadedFile {
+  id: string;
+  nome: string;
+  tipo: string;
+  url: string;
+}
+
+interface SendToWebhookResult {
+  success: boolean;
+  scriptId: string;
+  message?: string;
+}
+
+const checkOutputStatus = async (scriptId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('scripts')
+      .select('id, output')
+      .eq('id', scriptId)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      success: true,
+      status: data.output ? 'concluido' : 'pendente',
+      output: data.output,
+      id: data.id,
+    };
+  } catch (error) {
+    console.error('Erro ao verificar status do output:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Erro desconhecido',
+      status: 'erro',
+    };
+  }
+};
+
+const sendToWebhook = async (
+  _userId: string,
+  chatId: string,
+  input: string,
+  _files?: UploadedFile[]
+) => {
+  try {
+    const response = await fetch('/api/chats/message-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatId, message: input }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao processar mensagem');
+    }
+
+    return {
+      success: true,
+      scriptId: data.scriptId || '',
+    } satisfies SendToWebhookResult;
+  } catch (error) {
+    console.error('Erro ao enviar mensagem para API:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Erro desconhecido',
+      scriptId: '',
+    } satisfies SendToWebhookResult;
+  }
+};
+
 interface EnhancedChatInterfaceProps {
   user: User;
   currentChat?: Chat;
@@ -53,7 +126,7 @@ const EnhancedChatInterface: React.FC<EnhancedChatInterfaceProps> = ({
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [chatId, setChatId] = useState<string>(currentChat?.id || '');
-  const [webhookId, setWebhookId] = useState<string>('');
+  const [pendingScriptId, setPendingScriptId] = useState<string>('');
   const [outputPolling, setOutputPolling] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,17 +148,29 @@ const EnhancedChatInterface: React.FC<EnhancedChatInterfaceProps> = ({
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (outputPolling && webhookId) {
+    if (outputPolling && pendingScriptId) {
       interval = setInterval(async () => {
-        const result = await checkOutputStatus(webhookId);
+        const result = await checkOutputStatus(pendingScriptId);
         
         if (result.success && (result.status === 'concluido' || result.status === 'erro')) {
           setOutputPolling(false);
           setLoading(false);
           
           if (result.status === 'concluido' && result.output) {
-            // A mensagem já foi adicionada pelo processWebhookResponse
-            loadMessages();
+            // O fluxo atual retorna pelo scriptId e preenche scripts.output.
+            setMessages((currentMessages) => {
+              const withoutTyping = currentMessages.filter((msg) => msg.id !== 'typing');
+
+              return [
+                ...withoutTyping,
+                {
+                  id: `assistant-${pendingScriptId}`,
+                  tipo: 'assistente',
+                  conteudo: result.output,
+                  created_at: new Date().toISOString(),
+                },
+              ];
+            });
           }
         }
       }, 2000);
@@ -94,7 +179,7 @@ const EnhancedChatInterface: React.FC<EnhancedChatInterfaceProps> = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [outputPolling, webhookId]);
+  }, [outputPolling, pendingScriptId]);
 
   const loadMessages = async () => {
     try {
@@ -250,7 +335,7 @@ const EnhancedChatInterface: React.FC<EnhancedChatInterfaceProps> = ({
       );
       
       if (result.success) {
-        setWebhookId(result.webhook_id);
+        setPendingScriptId(result.scriptId);
         setOutputPolling(true);
         
         // Adicionar mensagem de "digitando..."

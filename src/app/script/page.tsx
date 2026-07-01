@@ -94,8 +94,9 @@ export default function ScriptPage() {
   
   // Verificar acesso à IA de Comunicação Executiva
   const resultadoAcesso = verificarAcessoIA(user, 'Comunicação Executiva');
-  const diasParaAviso = typeof diasRestantesApi === 'number' ? diasRestantesApi : resultadoAcesso.diasRestantes;
-  const dataExpParaAviso = (typeof dataExpiracaoApi !== 'undefined') ? dataExpiracaoApi : user.data_expiracao;
+  const isAdmin = user.nivel === 'admin';
+  const diasParaAviso = !isAdmin && typeof diasRestantesApi === 'number' ? diasRestantesApi : isAdmin ? undefined : resultadoAcesso.diasRestantes;
+  const dataExpParaAviso = isAdmin ? null : (typeof dataExpiracaoApi !== 'undefined') ? dataExpiracaoApi : user.data_expiracao;
   
   // Se não tem acesso, mostrar tela de bloqueio
   if (!resultadoAcesso.acesso) {
@@ -104,7 +105,7 @@ export default function ScriptPage() {
         motivo={resultadoAcesso.motivo || 'Você não tem acesso a esta IA'}
         expirado={resultadoAcesso.expirado}
         nomeIA="Comunicação Executiva"
-        dataExpiracao={user.data_expiracao}
+        dataExpiracao={isAdmin ? null : user.data_expiracao}
       />
     );
   }

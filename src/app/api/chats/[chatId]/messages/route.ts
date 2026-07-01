@@ -75,7 +75,7 @@ export async function GET(
     // Buscar dados do usuário para verificar expiração e plano
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, data_expiracao, plano')
+      .select('id, data_expiracao, plano, nivel')
       .eq('id', userId)
       .single();
 
@@ -85,7 +85,9 @@ export async function GET(
     }
 
     // Verificar expiração
-    if (userData.data_expiracao) {
+    const isAdmin = userData.nivel === 'admin';
+
+    if (!isAdmin && userData.data_expiracao) {
       const hoje = new Date();
       hoje.setHours(0,0,0,0);
       const exp = new Date(userData.data_expiracao);

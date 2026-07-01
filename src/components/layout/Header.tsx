@@ -37,6 +37,7 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
   const supabase = createClientComponentClient();
   const [userProfile, setUserProfile] = useState<any>(null);
   const { user: authUser } = useAuth();
+  const showExpirationBadge = authUser?.nivel !== 'admin' && typeof daysRemaining === 'number' && daysRemaining <= 7;
   
   // Buscar dados do usuário do Supabase
   useEffect(() => {
@@ -151,7 +152,7 @@ const Header: React.FC<HeaderProps> = ({ userName = 'Usuário', title, onMenuTog
           )}
         </Link>
         
-        {typeof daysRemaining === 'number' && daysRemaining <= 7 && (
+        {showExpirationBadge && (
           <div className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-full border ${daysRemaining <= 0 ? 'bg-red-500/10 border-red-500/40 text-red-300' : daysRemaining <= 3 ? 'bg-red-500/10 border-red-500/40 text-red-300' : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M10.29 3.86l-7.6 13.15A1.5 1.5 0 003.9 19.5h16.2a1.5 1.5 0 001.31-2.49L13.81 3.86a1.5 1.5 0 00-2.62 0z" />

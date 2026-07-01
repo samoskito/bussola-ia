@@ -18,6 +18,7 @@ export interface Usuario {
   email: string;
   data_expiracao?: string | null;
   plano?: Plano | null;
+  nivel?: 'admin' | 'user' | string | null;
   [key: string]: any;
 }
 
@@ -47,6 +48,10 @@ export const verificarAcessoIA = (usuario: Usuario, tipoIA: TipoIA): ResultadoVe
     plano: usuario.plano,
     data_expiracao: usuario.data_expiracao,
   });
+
+  if (usuario.nivel === 'admin') {
+    return { acesso: true };
+  }
 
   // A migracao normaliza usuarios atuais para "Todas"; sem plano nao deve bypassar permissao.
   if (!usuario.plano) {
@@ -101,6 +106,10 @@ export const verificarAcessoIA = (usuario: Usuario, tipoIA: TipoIA): ResultadoVe
 };
 
 export const verificarAcessoGeral = (usuario: Usuario): ResultadoVerificacao => {
+  if (usuario.nivel === 'admin') {
+    return { acesso: true };
+  }
+
   if (!usuario.plano) {
     return planoSemAcesso;
   }

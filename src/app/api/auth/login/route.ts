@@ -139,11 +139,14 @@ export async function POST(request: Request) {
       
       // Remover senha do objeto usuário
       const { senha, ...userWithoutPassword } = user;
+      const responseUser = userWithoutPassword.nivel === 'admin'
+        ? { ...userWithoutPassword, data_expiracao: null }
+        : userWithoutPassword;
       
       console.log('[LOGIN] Preparando resposta com dados do usuário');
       
       // Configurar cookie e retornar usuário
-      const response = NextResponse.json({ user: userWithoutPassword });
+      const response = NextResponse.json({ user: responseUser });
       response.cookies.set('auth_token', token, cookieOptions);
       
       console.log('[LOGIN] Login bem-sucedido para:', email);

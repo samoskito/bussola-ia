@@ -72,6 +72,8 @@ export default function AgentStartPage({ params }: AgentStartPageProps) {
     return null;
   }
 
+  const isAdmin = user.nivel === 'admin';
+
   if (!agent) {
     return (
       <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
@@ -84,7 +86,7 @@ export default function AgentStartPage({ params }: AgentStartPageProps) {
             userName={user.nome || user.email}
             title="Agente inválido"
             onMenuToggle={toggleMobileMenu}
-            daysRemaining={diasRestantesApi}
+            daysRemaining={isAdmin ? undefined : diasRestantesApi}
           />
           <main className="flex-1 bg-gradient-to-b from-gray-900 to-gray-950 w-full flex items-center justify-center p-6">
             <div className="max-w-md text-center bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-6 py-5">
@@ -110,7 +112,7 @@ export default function AgentStartPage({ params }: AgentStartPageProps) {
             title={agent.name}
             onMenuToggle={toggleMobileMenu}
             agentType={agent.type}
-            daysRemaining={diasRestantesApi}
+            daysRemaining={isAdmin ? undefined : diasRestantesApi}
           />
           <main className="flex-1 bg-gradient-to-b from-gray-900 to-gray-950 w-full flex items-center justify-center p-6">
             <div className="max-w-md text-center bg-yellow-500/10 border border-yellow-500/30 text-yellow-200 rounded-lg px-6 py-5">
@@ -128,8 +130,8 @@ export default function AgentStartPage({ params }: AgentStartPageProps) {
     );
   }
 
-  const diasParaAviso = typeof diasRestantesApi === 'number' ? diasRestantesApi : undefined;
-  const dataExpParaAviso = typeof dataExpiracaoApi !== 'undefined' ? dataExpiracaoApi : user.data_expiracao;
+  const diasParaAviso = !isAdmin && typeof diasRestantesApi === 'number' ? diasRestantesApi : undefined;
+  const dataExpParaAviso = isAdmin ? null : typeof dataExpiracaoApi !== 'undefined' ? dataExpiracaoApi : user.data_expiracao;
 
   return (
     <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">

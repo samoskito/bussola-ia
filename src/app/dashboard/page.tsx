@@ -79,8 +79,8 @@ export default function DashboardPage() {
     return null;
   }
   
-  const diasParaAviso = diasRestantesApi;
-  const dataExpParaAviso = dataExpiracaoApi;
+  const diasParaAviso = isAdmin ? undefined : diasRestantesApi;
+  const dataExpParaAviso = isAdmin ? null : dataExpiracaoApi;
   
   return (
     <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">

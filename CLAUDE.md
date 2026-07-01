@@ -8,9 +8,11 @@ Este arquivo e a memoria persistente do projeto. Em um chat novo, comece por aqu
 - Produto: SaaS em portugues do Brasil para conversas com agentes de IA externos via n8n.
 - Producao conhecida: `https://bussola-ia.vercel.app`.
 - Remoto Git: `origin https://github.com/samoskito/bussola-ia.git`.
-- Branch de trabalho atual desta evolucao: `feature/four-ai-agents-access`.
+- Branch principal atual: `main`.
+- Evolucoes recentes ja mergeadas/deployadas: `feature/four-ai-agents-access` e `feature/admin-only-coming-soon-agents`.
 - Stack: Next.js 15.3.8 App Router, React 19.1.0, TypeScript 5.4.5, Tailwind CSS, Supabase PostgreSQL/Storage, JWT proprio em cookie httpOnly.
 - IA: nao ha chamada direta a LLM no codigo. O app envia mensagens para webhooks n8n e espera que o n8n atualize `scripts.output`.
+- Estado de producao em 2026-06-30: quatro agentes cadastrados, mas `conversas_dificeis` e `postagem` estao em modo beta/admin-only com selo `EM BREVE` para usuarios comuns.
 
 Antes de novas implementacoes, rode:
 
@@ -102,12 +104,12 @@ O catalogo publico fica em `src/lib/agents.ts`. Ele contem metadados seguros par
 
 Agentes atuais:
 
-| agent_type | Nome visivel | Logo |
-| --- | --- | --- |
-| `comunicacao` | Comunicacao Executiva | `/images/comunicacao-executiva-logo.png` |
-| `apresentacao` | Apresentacao para Reuniao de Resultados | `/images/apresentacao-resultados-logo.png` |
-| `conversas_dificeis` | Conversas Dificeis | `/images/conversas-dificeis-logo.jpeg` |
-| `postagem` | Postagem no Linkedin | `/images/postagem-linkedin-logo.jpeg` |
+| agent_type | Nome visivel | Logo | Disponibilidade |
+| --- | --- | --- | --- |
+| `comunicacao` | Comunicacao Executiva | `/images/comunicacao-executiva-logo.png` | usuarios liberados pelo plano |
+| `apresentacao` | Apresentacao para Reuniao de Resultados | `/images/apresentacao-resultados-logo.png` | usuarios liberados pelo plano |
+| `conversas_dificeis` | Conversas Dificeis | `/images/conversas-dificeis-logo.jpeg` | `adminOnly: true`, selo `EM BREVE` para usuarios comuns |
+| `postagem` | Postagem no Linkedin | `/images/postagem-linkedin-logo.jpeg` | `adminOnly: true`, selo `EM BREVE` para usuarios comuns |
 
 Webhooks n8n ficam somente em `src/lib/server/agent-webhooks.ts`:
 
@@ -117,6 +119,15 @@ Webhooks n8n ficam somente em `src/lib/server/agent-webhooks.ts`:
 - `postagem`: `https://webhookk.bussolaexecutiva.com.br/webhook/69e204cf-2b74-45f0-b522-633e60085920`
 
 Nao importe `src/lib/server/agent-webhooks.ts` em components client-side.
+
+Regras de beta/admin-only:
+
+- `src/lib/agents.ts` define `adminOnly` e `availabilityLabel`.
+- `isAgentAvailableForUser(type, userNivel)` libera agente admin-only somente quando `users.nivel = 'admin'`.
+- `src/lib/agent-access.ts` aplica essa regra antes de `plano` e antes de `user_agent_access`.
+- Portanto, mesmo usuario comum com `plano = 'Todas'` e linhas ativas em `user_agent_access` nao pode usar `conversas_dificeis` nem `postagem` enquanto `adminOnly` estiver ativo.
+- Usuarios comuns devem ver `EM BREVE` e receber bloqueio 403 se tentarem acessar via API.
+- Admins conseguem visualizar e testar esses agentes normalmente.
 
 ## Contrato n8n
 
@@ -173,7 +184,7 @@ Essas rotas legadas tambem usam `userHasAgentAccess` e `src/lib/server/agent-web
 
 Leitura:
 
-- `GET /api/chats`: lista chats do usuario. Se `plano` for `Todas` ou `Ambas`, lista tudo; caso contrario filtra por linhas ativas em `user_agent_access`.
+- `GET /api/chats`: lista chats do usuario. Se `plano` for `Todas` ou `Ambas`, lista os agentes disponiveis para aquele nivel de usuario; caso contrario filtra por linhas ativas em `user_agent_access`. Agentes `adminOnly` nao aparecem para usuarios comuns.
 - `GET /api/chats/[chatId]`: detalhes do chat com validacao de dono, expiracao e permissao do agente.
 - `GET /api/chats/[chatId]/messages`: retorna registros de `scripts` com validacao de dono, expiracao e permissao do agente.
 
@@ -204,7 +215,12 @@ user_agent_access
 
 Regras:
 
-- `users.plano = 'Todas'`: acesso global a todos os agentes atuais.
+- `adminOnly` em `src/lib/agents.ts` tem prioridade sobre plano e `user_agent_access`.
+- Em 2026-06-30, `conversas_dificeis` e `postagem` estao `adminOnly: true`.
+- Para usuarios comuns, essas duas IAs ficam com selo `EM BREVE` e nao devem aceitar criacao/envio de chat.
+- Para admins (`users.nivel = 'admin'`), essas duas IAs ficam liberadas para teste.
+- Admins tem acesso vitalicio por regra de codigo: nao expiram por `users.data_expiracao` nem por `user_agent_access.expires_at`, e a UI nao deve mostrar aviso de vencimento para eles.
+- `users.plano = 'Todas'`: acesso global aos agentes disponiveis para o nivel do usuario. Nao ignora `adminOnly`.
 - `users.plano = 'Ambas'`: tratado como global legado.
 - `users.plano = 'Personalizado'` ou nome de IA: permissao efetiva vem de `user_agent_access`.
 - `users.plano = null`: nao deve liberar acesso automaticamente. A migracao atual normaliza usuarios existentes para `Todas`.
@@ -238,7 +254,16 @@ Ela faz:
 - Executa `UPDATE public.users SET plano = 'Todas';`
 - Cria/atualiza linhas `user_agent_access` para todos os usuarios e os quatro agentes.
 
-Essa migracao atende ao requisito de liberar todos os usuarios atuais para todas as IAs antes do controle individual futuro.
+Essa migracao atende ao requisito de criar permissao de banco para todos os usuarios atuais em todas as IAs. A disponibilidade final ainda passa pela regra `adminOnly` do app.
+
+Status de producao:
+
+- Migracao dos quatro agentes aplicada e validada pelo usuario.
+- Todos os usuarios existentes foram normalizados para `plano = 'Todas'`.
+- Linhas de `user_agent_access` dos quatro agentes foram criadas/atualizadas para os usuarios existentes.
+- PR da evolucao dos quatro agentes foi mergeado em `main` e deployado pela Vercel.
+- Ajuste posterior `adminOnly`/`EM BREVE` para `conversas_dificeis` e `postagem` foi commitado e enviado direto para `main` em 2026-06-30.
+- Em 2026-07-01, foi adicionada regra de admin vitalicio. O SQL de saneamento para admins atuais fica em `supabase/admin-lifetime-access.sql`.
 
 ## Banco de Dados Principal
 
@@ -255,6 +280,24 @@ Campos relevantes:
 - `nivel`
 - `plano`
 - `data_expiracao`
+
+Observacao do banco real em producao:
+
+- `users.id` esta como UUID.
+- Ao criar usuario por script/service role, informe `id: randomUUID()`; nao assumir autoincrement/default.
+- O login usa somente `public.users` com `senha` em bcrypt; nao precisa criar usuario separado no Supabase Auth.
+- Para admins, `data_expiracao` pode ficar `NULL`; o app trata `users.nivel = 'admin'` como acesso vitalicio.
+- Para manter o banco limpo, rode `supabase/admin-lifetime-access.sql` apos o deploy dessa regra.
+
+Usuario teste de producao:
+
+- Email: `teste.usuario@bussolaexecutiva.com.br`
+- Nome: `Usuario Teste`
+- `nivel`: `user`
+- `plano`: `Todas`
+- `data_expiracao`: `2026-07-30`
+- Objetivo: validar a visao de usuario comum. Deve acessar `comunicacao` e `apresentacao`, mas ver `conversas_dificeis` e `postagem` como `EM BREVE`.
+- Nao registrar senha em texto claro neste arquivo.
 
 ### `chats`
 

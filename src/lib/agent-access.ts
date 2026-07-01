@@ -55,12 +55,20 @@ export async function userHasAgentAccess(
   }
 
   const accessUser = user as AgentAccessUser;
+  const isAdmin = accessUser.nivel === 'admin';
 
   if (!isAgentAvailableForUser(agentType, accessUser.nivel)) {
     return {
       access: false,
       error: 'Este agente estara disponivel em breve.',
       status: 403,
+      user: accessUser,
+    };
+  }
+
+  if (isAdmin) {
+    return {
+      access: true,
       user: accessUser,
     };
   }

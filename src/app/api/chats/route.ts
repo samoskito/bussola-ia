@@ -74,9 +74,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Erro ao buscar dados do usuário' }, { status: 500 });
     }
 
+    const isAdmin = userData.nivel === 'admin';
+
     // Bloquear listagem caso plano expirado (e calcular dias restantes)
     let diasRestantes: number | undefined;
-    if (userData.data_expiracao) {
+    if (!isAdmin && userData.data_expiracao) {
       const hoje = new Date();
       hoje.setHours(0,0,0,0);
       const exp = new Date(userData.data_expiracao);
@@ -105,7 +107,7 @@ export async function GET(request: Request) {
       return isAgentAvailableForUser(chatAgentType, userData.nivel);
     });
 
-    const hasGlobalAgentAccess = userData.plano === 'Todas' || userData.plano === 'Ambas';
+    const hasGlobalAgentAccess = isAdmin || userData.plano === 'Todas' || userData.plano === 'Ambas';
 
     if (!hasGlobalAgentAccess) {
       const { data: allowedRows, error: allowedError } = await supabase
@@ -131,7 +133,12 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({ chats: filtered, expirado: false, diasRestantes, dataExpiracao: userData.data_expiracao || null });
+    return NextResponse.json({
+      chats: filtered,
+      expirado: false,
+      diasRestantes: isAdmin ? undefined : diasRestantes,
+      dataExpiracao: isAdmin ? null : userData.data_expiracao || null,
+    });
     
   } catch (error) {
     console.error('Erro ao processar requisição:', error);

@@ -45,10 +45,11 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
   const [expiredByApi, setExpiredByApi] = useState<boolean>(false);
   const [apiDiasRestantes, setApiDiasRestantes] = useState<number | undefined>(undefined);
   const [apiDataExpiracao, setApiDataExpiracao] = useState<string | undefined>(undefined);
+  const isAdmin = user?.nivel === 'admin';
   
   // Calcular aviso de expiração (compacto)
   let diasRestantes: number | undefined;
-  if (user?.data_expiracao) {
+  if (!isAdmin && user?.data_expiracao) {
     const hoje = new Date();
     hoje.setHours(0,0,0,0);
     const exp = new Date(user.data_expiracao);

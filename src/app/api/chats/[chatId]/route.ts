@@ -74,7 +74,7 @@ export async function GET(
     // Buscar dados do usuário para verificar expiração e plano
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, data_expiracao, plano')
+      .select('id, data_expiracao, plano, nivel')
       .eq('id', userId)
       .single();
 
@@ -84,8 +84,10 @@ export async function GET(
     }
 
     // Verificar expiração
+    const isAdmin = userData.nivel === 'admin';
+
     let diasRestantes: number | undefined;
-    if (userData.data_expiracao) {
+    if (!isAdmin && userData.data_expiracao) {
       const hoje = new Date();
       hoje.setHours(0,0,0,0);
       const exp = new Date(userData.data_expiracao);
@@ -106,7 +108,11 @@ export async function GET(
       );
     }
     
-    return NextResponse.json({ chat, diasRestantes, dataExpiracao: userData.data_expiracao || null });
+    return NextResponse.json({
+      chat,
+      diasRestantes: isAdmin ? undefined : diasRestantes,
+      dataExpiracao: isAdmin ? null : userData.data_expiracao || null,
+    });
     
   } catch (error) {
     console.error('Erro ao processar requisição:', error);

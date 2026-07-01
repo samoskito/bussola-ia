@@ -93,8 +93,9 @@ export default function ApresentacaoPage() {
   
   // Verificar acesso à IA de Apresentação para Reunião de Resultados
   const resultadoAcesso = verificarAcessoIA(user, 'Apresentação para Reunião de Resultados');
-  const diasParaAviso = typeof diasRestantesApi === 'number' ? diasRestantesApi : resultadoAcesso.diasRestantes;
-  const dataExpParaAviso = (typeof dataExpiracaoApi !== 'undefined') ? dataExpiracaoApi : user.data_expiracao;
+  const isAdmin = user.nivel === 'admin';
+  const diasParaAviso = !isAdmin && typeof diasRestantesApi === 'number' ? diasRestantesApi : isAdmin ? undefined : resultadoAcesso.diasRestantes;
+  const dataExpParaAviso = isAdmin ? null : (typeof dataExpiracaoApi !== 'undefined') ? dataExpiracaoApi : user.data_expiracao;
   
   // Se não tem acesso, mostrar tela de bloqueio
   if (!resultadoAcesso.acesso) {
@@ -103,7 +104,7 @@ export default function ApresentacaoPage() {
         motivo={resultadoAcesso.motivo || 'Você não tem acesso a esta IA'}
         expirado={resultadoAcesso.expirado}
         nomeIA="Apresentação para Reunião de Resultados"
-        dataExpiracao={user.data_expiracao}
+        dataExpiracao={isAdmin ? null : user.data_expiracao}
       />
     );
   }

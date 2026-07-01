@@ -59,8 +59,12 @@ export async function GET() {
       data_expiracao: user.data_expiracao
     });
     
+    const responseUser = user.nivel === 'admin'
+      ? { ...user, data_expiracao: null }
+      : user;
+
     return NextResponse.json(
-      { user },
+      { user: responseUser },
       { status: 200 }
     );
     

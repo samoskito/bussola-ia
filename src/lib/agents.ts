@@ -20,16 +20,16 @@ export const AGENTS = [
     name: 'Conversas Dificeis',
     description: 'Prepare conversas sensiveis com clareza, empatia e direção',
     icon: '/images/conversas-dificeis-logo.jpeg',
-    adminOnly: true,
-    availabilityLabel: 'EM BREVE',
+    adminOnly: false,
+    availabilityLabel: null,
   },
   {
     type: 'postagem',
     name: 'Postagem no Linkedin',
     description: 'Crie posts profissionais para LinkedIn com apoio da IA',
     icon: '/images/postagem-linkedin-logo.jpeg',
-    adminOnly: true,
-    availabilityLabel: 'EM BREVE',
+    adminOnly: false,
+    availabilityLabel: null,
   },
 ] as const;
 

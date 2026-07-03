@@ -12,7 +12,7 @@ Este arquivo e a memoria persistente do projeto. Em um chat novo, comece por aqu
 - Evolucoes recentes ja mergeadas/deployadas: `feature/four-ai-agents-access` e `feature/admin-only-coming-soon-agents`.
 - Stack: Next.js 15.3.8 App Router, React 19.1.0, TypeScript 5.4.5, Tailwind CSS, Supabase PostgreSQL/Storage, JWT proprio em cookie httpOnly.
 - IA: nao ha chamada direta a LLM no codigo. O app envia mensagens para webhooks n8n e espera que o n8n atualize `scripts.output`.
-- Estado de producao em 2026-06-30: quatro agentes cadastrados, mas `conversas_dificeis` e `postagem` estao em modo beta/admin-only com selo `EM BREVE` para usuarios comuns.
+- Estado de producao em 2026-07-03: quatro agentes cadastrados e liberados para usuarios com acesso valido. `conversas_dificeis` e `postagem` sairam do modo beta/admin-only.
 
 Antes de novas implementacoes, rode:
 
@@ -108,8 +108,8 @@ Agentes atuais:
 | --- | --- | --- | --- |
 | `comunicacao` | Comunicacao Executiva | `/images/comunicacao-executiva-logo.png` | usuarios liberados pelo plano |
 | `apresentacao` | Apresentacao para Reuniao de Resultados | `/images/apresentacao-resultados-logo.png` | usuarios liberados pelo plano |
-| `conversas_dificeis` | Conversas Dificeis | `/images/conversas-dificeis-logo.jpeg` | `adminOnly: true`, selo `EM BREVE` para usuarios comuns |
-| `postagem` | Postagem no Linkedin | `/images/postagem-linkedin-logo.jpeg` | `adminOnly: true`, selo `EM BREVE` para usuarios comuns |
+| `conversas_dificeis` | Conversas Dificeis | `/images/conversas-dificeis-logo.jpeg` | usuarios liberados pelo plano |
+| `postagem` | Postagem no Linkedin | `/images/postagem-linkedin-logo.jpeg` | usuarios liberados pelo plano |
 
 Webhooks n8n ficam somente em `src/lib/server/agent-webhooks.ts`:
 
@@ -120,14 +120,13 @@ Webhooks n8n ficam somente em `src/lib/server/agent-webhooks.ts`:
 
 Nao importe `src/lib/server/agent-webhooks.ts` em components client-side.
 
-Regras de beta/admin-only:
+Regras de disponibilidade dos agentes:
 
 - `src/lib/agents.ts` define `adminOnly` e `availabilityLabel`.
 - `isAgentAvailableForUser(type, userNivel)` libera agente admin-only somente quando `users.nivel = 'admin'`.
 - `src/lib/agent-access.ts` aplica essa regra antes de `plano` e antes de `user_agent_access`.
-- Portanto, mesmo usuario comum com `plano = 'Todas'` e linhas ativas em `user_agent_access` nao pode usar `conversas_dificeis` nem `postagem` enquanto `adminOnly` estiver ativo.
-- Usuarios comuns devem ver `EM BREVE` e receber bloqueio 403 se tentarem acessar via API.
-- Admins conseguem visualizar e testar esses agentes normalmente.
+- Em 2026-07-03, todos os quatro agentes estao com `adminOnly: false` e `availabilityLabel: null`.
+- Para reabrir um beta no futuro, marque `adminOnly: true` no agente desejado; usuarios comuns verao o selo definido em `availabilityLabel` e receberao bloqueio 403 se tentarem acessar via API.
 
 ## Contrato n8n
 
@@ -215,10 +214,7 @@ user_agent_access
 
 Regras:
 
-- `adminOnly` em `src/lib/agents.ts` tem prioridade sobre plano e `user_agent_access`.
-- Em 2026-06-30, `conversas_dificeis` e `postagem` estao `adminOnly: true`.
-- Para usuarios comuns, essas duas IAs ficam com selo `EM BREVE` e nao devem aceitar criacao/envio de chat.
-- Para admins (`users.nivel = 'admin'`), essas duas IAs ficam liberadas para teste.
+- `adminOnly` em `src/lib/agents.ts` tem prioridade sobre plano e `user_agent_access`, mas em 2026-07-03 todos os agentes estao publicos (`adminOnly: false`).
 - Admins tem acesso vitalicio por regra de codigo: nao expiram por `users.data_expiracao` nem por `user_agent_access.expires_at`, e a UI nao deve mostrar aviso de vencimento para eles.
 - `users.plano = 'Todas'`: acesso global aos agentes disponiveis para o nivel do usuario. Nao ignora `adminOnly`.
 - `users.plano = 'Ambas'`: tratado como global legado.
@@ -254,7 +250,7 @@ Ela faz:
 - Executa `UPDATE public.users SET plano = 'Todas';`
 - Cria/atualiza linhas `user_agent_access` para todos os usuarios e os quatro agentes.
 
-Essa migracao atende ao requisito de criar permissao de banco para todos os usuarios atuais em todas as IAs. A disponibilidade final ainda passa pela regra `adminOnly` do app.
+Essa migracao atende ao requisito de criar permissao de banco para todos os usuarios atuais em todas as IAs. A disponibilidade final ainda passa pela regra `adminOnly` do app caso algum agente seja colocado em beta novamente.
 
 Status de producao:
 
@@ -264,6 +260,7 @@ Status de producao:
 - PR da evolucao dos quatro agentes foi mergeado em `main` e deployado pela Vercel.
 - Ajuste posterior `adminOnly`/`EM BREVE` para `conversas_dificeis` e `postagem` foi commitado e enviado direto para `main` em 2026-06-30.
 - Em 2026-07-01, foi adicionada regra de admin vitalicio. O SQL de saneamento para admins atuais fica em `supabase/admin-lifetime-access.sql`.
+- Em 2026-07-03, `conversas_dificeis` e `postagem` foram liberados para todos os usuarios com acesso valido (`adminOnly: false`). Nao ha SQL novo necessario para essa liberacao.
 
 ## Banco de Dados Principal
 
@@ -296,7 +293,7 @@ Usuario teste de producao:
 - `nivel`: `user`
 - `plano`: `Todas`
 - `data_expiracao`: `2026-07-30`
-- Objetivo: validar a visao de usuario comum. Deve acessar `comunicacao` e `apresentacao`, mas ver `conversas_dificeis` e `postagem` como `EM BREVE`.
+- Objetivo: validar a visao de usuario comum. Desde 2026-07-03, deve acessar os quatro agentes se o plano/acesso estiver valido.
 - Nao registrar senha em texto claro neste arquivo.
 
 ### `chats`

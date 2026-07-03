@@ -94,17 +94,17 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
   };
 
   return (
-    <aside className="w-64 h-screen bg-gray-900 flex flex-col overflow-hidden border-r border-gray-800 shadow-lg">
+    <aside className="w-full h-screen min-h-0 bg-gray-900 flex flex-col overflow-hidden border-r border-gray-800 shadow-lg">
       {/* Logo */}
-      <div className="p-3" style={{ backgroundColor: '#010811' }}>
+      <div className="order-1 shrink-0 p-2 border-b border-gray-800" style={{ backgroundColor: '#010811' }}>
         <Link href="/dashboard">
           <div className="flex items-center justify-center">
             <Image 
               src="/images/executivia-logo.png" 
               alt="ExecutivIA" 
-              width={100} 
-              height={100} 
-              className="object-contain w-auto h-auto"
+              width={86}
+              height={86}
+              className="object-contain w-auto h-[86px]"
               priority
             />
           </div>
@@ -113,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
 
       {/* Aviso de expiração compacto */}
       {aviso && (
-        <div className={`mx-3 mt-3 mb-0 rounded-md text-xs px-3 py-2 border ${diasRestantes && diasRestantes <= 3 ? 'bg-red-500/10 border-red-500/40 text-red-300' : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300'}`}>
+        <div className={`order-2 shrink-0 mx-3 mt-3 mb-0 rounded-md text-xs px-3 py-2 border ${diasRestantes && diasRestantes <= 3 ? 'bg-red-500/10 border-red-500/40 text-red-300' : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300'}`}>
           <div className="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M10.29 3.86l-7.6 13.15A1.5 1.5 0 003.9 19.5h16.2a1.5 1.5 0 001.31-2.49L13.81 3.86a1.5 1.5 0 00-2.62 0z" />
@@ -124,7 +124,7 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
       )}
       
       {/* New Chat Button */}
-      <div className="px-3 py-3">
+      <div className="order-3 shrink-0 px-3 py-3">
         <button 
           onClick={handleNewChat}
           className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-white bg-[#FF6B00] hover:bg-[#E05E00] rounded-md transition-colors duration-200 shadow-md"
@@ -137,8 +137,8 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
       </div>
       
       {/* Chat History */}
-      <div className="px-3 mt-2">
-        <div className="flex items-center justify-between mb-2">
+      <div className="order-6 flex min-h-0 flex-1 flex-col px-3 py-3">
+        <div className="flex shrink-0 items-center justify-between mb-2">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Histórico de Chats</h2>
           {chats.length > 0 && (
             <button 
@@ -153,7 +153,7 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
         </div>
         
         {/* Chat List */}
-        <div className="overflow-y-auto max-h-[250px] pr-1 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
           {isLoading ? (
             <div className="flex justify-center items-center h-20">
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-[#FF6B00]"></div>
@@ -214,11 +214,11 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 group-hover:text-[#FF6B00]" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
                       </svg>
-                      <div className="ml-2 flex-1 overflow-hidden">
+                      <div className="ml-2 min-w-0 flex-1 overflow-hidden">
                         <div className="truncate font-medium">{chat.title || `Chat ${chat.id.slice(0, 8)}`}</div>
-                        <div className="text-xs text-gray-500 truncate flex items-center gap-2">
-                          <span>{formattedDate}</span>
-                          <span className={`${getAgentBadgeClass(chat.agent_type)} border px-2 py-0.5 rounded-full` }>
+                        <div className="text-xs text-gray-500 flex min-w-0 items-center gap-2">
+                          <span className="shrink-0">{formattedDate}</span>
+                          <span className={`${getAgentBadgeClass(chat.agent_type)} min-w-0 max-w-[8.5rem] truncate border px-2 py-0.5 rounded-full` }>
                             {getAgentLabel(chat.agent_type || 'comunicacao')}
                           </span>
                         </div>
@@ -233,10 +233,10 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
       </div>
       
       {/* Divider */}
-      <div className="border-t border-gray-800 my-3 mx-3"></div>
+      <div className="order-5 shrink-0 border-t border-gray-800 mx-3"></div>
       
       {/* Main Navigation */}
-      <nav className="px-3 mb-auto">
+      <nav className="order-4 shrink-0 px-3 pb-3">
         <ul className="space-y-1">
           <li>
             <Link 
@@ -312,7 +312,7 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
       </nav>
       
       {/* Logout Button */}
-      <div className="mt-auto p-4 border-t border-gray-800">
+      <div className="order-7 shrink-0 p-4 border-t border-gray-800">
         <LogoutButton 
           variant="text" 
           className="w-full flex items-center px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-md transition-colors duration-200"

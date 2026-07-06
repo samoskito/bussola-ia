@@ -199,9 +199,11 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-gray-300 tracking-wide">Seus chats</h3>
             <Link 
-              href="/script"
+              href="/dashboard"
               className="p-1.5 rounded-full bg-[#FF6B00]/10 hover:bg-[#FF6B00]/20 text-[#FF6B00] transition-colors duration-200"
               onClick={onClose}
+              aria-label="Novo chat"
+              title="Novo chat"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

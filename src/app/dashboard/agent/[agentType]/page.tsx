@@ -121,7 +121,7 @@ export default function AgentStartPage({ params }: AgentStartPageProps) {
               </div>
               <h1 className="text-lg font-semibold mb-2">{agent.name}</h1>
               <p className="text-sm text-yellow-100/90">
-                Esta IA esta em ajustes finais e sera liberada em breve para usuarios. Administradores ja podem testar.
+                {agent.availabilityMessage}
               </p>
             </div>
           </main>

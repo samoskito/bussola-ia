@@ -12,7 +12,7 @@ Este arquivo e a memoria persistente do projeto. Em um chat novo, comece por aqu
 - Evolucoes recentes ja mergeadas/deployadas: `feature/four-ai-agents-access` e `feature/admin-only-coming-soon-agents`.
 - Stack: Next.js 15.3.8 App Router, React 19.1.0, TypeScript 5.4.5, Tailwind CSS, Supabase PostgreSQL/Storage, JWT proprio em cookie httpOnly.
 - IA: nao ha chamada direta a LLM no codigo. O app envia mensagens para webhooks n8n e espera que o n8n atualize `scripts.output`.
-- Estado de producao em 2026-07-03: quatro agentes cadastrados e liberados para usuarios com acesso valido. `conversas_dificeis` e `postagem` sairam do modo beta/admin-only.
+- Estado do codigo em 2026-07-13: quatro agentes cadastrados. `postagem` esta temporariamente em manutencao, com acesso somente para admins; usuarios comuns veem `EM ATUALIZACAO`. Os outros tres agentes seguem liberados conforme o plano.
 
 Antes de novas implementacoes, rode:
 
@@ -109,7 +109,7 @@ Agentes atuais:
 | `comunicacao` | Comunicacao Executiva | `/images/comunicacao-executiva-logo.png` | usuarios liberados pelo plano |
 | `apresentacao` | Apresentacao para Reuniao de Resultados | `/images/apresentacao-resultados-logo.png` | usuarios liberados pelo plano |
 | `conversas_dificeis` | Conversas Dificeis | `/images/conversas-dificeis-logo.jpeg` | usuarios liberados pelo plano |
-| `postagem` | Postagem no Linkedin | `/images/postagem-linkedin-logo.jpeg` | usuarios liberados pelo plano |
+| `postagem` | Postagem no Linkedin | `/images/postagem-linkedin-logo.jpeg` | manutencao: somente admins; usuarios comuns veem `EM ATUALIZACAO` |
 
 Webhooks n8n ficam somente em `src/lib/server/agent-webhooks.ts`:
 
@@ -122,10 +122,10 @@ Nao importe `src/lib/server/agent-webhooks.ts` em components client-side.
 
 Regras de disponibilidade dos agentes:
 
-- `src/lib/agents.ts` define `adminOnly` e `availabilityLabel`.
+- `src/lib/agents.ts` define `adminOnly`, `availabilityLabel` e `availabilityMessage`.
 - `isAgentAvailableForUser(type, userNivel)` libera agente admin-only somente quando `users.nivel = 'admin'`.
 - `src/lib/agent-access.ts` aplica essa regra antes de `plano` e antes de `user_agent_access`.
-- Em 2026-07-03, todos os quatro agentes estao com `adminOnly: false` e `availabilityLabel: null`.
+- Em 2026-07-13, somente `postagem` esta com `adminOnly: true`, `availabilityLabel: 'EM ATUALIZACAO'` e mensagem de manutencao. Os outros tres agentes estao publicos.
 - Para reabrir um beta no futuro, marque `adminOnly: true` no agente desejado; usuarios comuns verao o selo definido em `availabilityLabel` e receberao bloqueio 403 se tentarem acessar via API.
 
 ## Contrato n8n
@@ -214,7 +214,7 @@ user_agent_access
 
 Regras:
 
-- `adminOnly` em `src/lib/agents.ts` tem prioridade sobre plano e `user_agent_access`, mas em 2026-07-03 todos os agentes estao publicos (`adminOnly: false`).
+- `adminOnly` em `src/lib/agents.ts` tem prioridade sobre plano e `user_agent_access`. Em 2026-07-13, `postagem` esta admin-only durante a manutencao.
 - Admins tem acesso vitalicio por regra de codigo: nao expiram por `users.data_expiracao` nem por `user_agent_access.expires_at`, e a UI nao deve mostrar aviso de vencimento para eles.
 - `users.plano = 'Todas'`: acesso global aos agentes disponiveis para o nivel do usuario. Nao ignora `adminOnly`.
 - `users.plano = 'Ambas'`: tratado como global legado.
@@ -261,6 +261,7 @@ Status de producao:
 - Ajuste posterior `adminOnly`/`EM BREVE` para `conversas_dificeis` e `postagem` foi commitado e enviado direto para `main` em 2026-06-30.
 - Em 2026-07-01, foi adicionada regra de admin vitalicio. O SQL de saneamento para admins atuais fica em `supabase/admin-lifetime-access.sql`.
 - Em 2026-07-03, `conversas_dificeis` e `postagem` foram liberados para todos os usuarios com acesso valido (`adminOnly: false`). Nao ha SQL novo necessario para essa liberacao.
+- Em 2026-07-13, `postagem` voltou temporariamente ao modo admin-only para manutencao. Usuarios comuns veem `EM ATUALIZACAO`; admins continuam testando. Essa mudanca e somente de codigo e nao exige SQL.
 
 ## Banco de Dados Principal
 
@@ -293,7 +294,7 @@ Usuario teste de producao:
 - `nivel`: `user`
 - `plano`: `Todas`
 - `data_expiracao`: `2026-07-30`
-- Objetivo: validar a visao de usuario comum. Desde 2026-07-03, deve acessar os quatro agentes se o plano/acesso estiver valido.
+- Objetivo: validar a visao de usuario comum. Em 2026-07-13, deve acessar os tres agentes publicos e ver `Postagem no Linkedin` bloqueada com `EM ATUALIZACAO`.
 - Nao registrar senha em texto claro neste arquivo.
 
 ### `chats`

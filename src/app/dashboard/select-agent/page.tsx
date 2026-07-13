@@ -66,7 +66,7 @@ export default function AgentSelectionPage() {
                   <h2 className="text-xl font-bold mb-3 text-[#FF6B00] group-hover:text-orange-400 transition-colors duration-300 text-center">{agent.name}</h2>
                   <p className="text-gray-400 text-center leading-relaxed">{agent.description}</p>
                   {isLocked && (
-                    <p className="mt-4 text-sm text-yellow-300/90 text-center">Disponivel em breve para usuarios.</p>
+                    <p className="mt-4 text-sm text-yellow-300/90 text-center">{agent.availabilityMessage}</p>
                   )}
                 </div>
                 );

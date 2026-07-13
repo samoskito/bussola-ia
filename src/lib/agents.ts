@@ -6,6 +6,7 @@ export const AGENTS = [
     icon: '/images/comunicacao-executiva-logo.png',
     adminOnly: false,
     availabilityLabel: null,
+    availabilityMessage: null,
   },
   {
     type: 'apresentacao',
@@ -14,6 +15,7 @@ export const AGENTS = [
     icon: '/images/apresentacao-resultados-logo.png',
     adminOnly: false,
     availabilityLabel: null,
+    availabilityMessage: null,
   },
   {
     type: 'conversas_dificeis',
@@ -22,14 +24,16 @@ export const AGENTS = [
     icon: '/images/conversas-dificeis-logo.jpeg',
     adminOnly: false,
     availabilityLabel: null,
+    availabilityMessage: null,
   },
   {
     type: 'postagem',
     name: 'Postagem no Linkedin',
     description: 'Crie posts profissionais para LinkedIn com apoio da IA',
     icon: '/images/postagem-linkedin-logo.jpeg',
-    adminOnly: false,
-    availabilityLabel: null,
+    adminOnly: true,
+    availabilityLabel: 'EM ATUALIZAÇÃO',
+    availabilityMessage: 'Esta IA está em atualização e ficará disponível novamente assim que a manutenção terminar.',
   },
 ] as const;
 
@@ -49,4 +53,8 @@ export function isAgentAdminOnly(type: string) {
 
 export function isAgentAvailableForUser(type: string, userNivel?: string | null) {
   return !isAgentAdminOnly(type) || userNivel === 'admin';
+}
+
+export function getAgentAvailabilityMessage(type: string) {
+  return getAgentByType(type)?.availabilityMessage || 'Este agente está temporariamente indisponível.';
 }

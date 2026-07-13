@@ -1,5 +1,5 @@
 import type { AgentType } from '@/lib/agents';
-import { isAgentAvailableForUser } from '@/lib/agents';
+import { getAgentAvailabilityMessage, isAgentAvailableForUser } from '@/lib/agents';
 
 type SupabaseLikeClient = {
   from: (table: string) => any;
@@ -60,7 +60,7 @@ export async function userHasAgentAccess(
   if (!isAgentAvailableForUser(agentType, accessUser.nivel)) {
     return {
       access: false,
-      error: 'Este agente estara disponivel em breve.',
+      error: getAgentAvailabilityMessage(agentType),
       status: 403,
       user: accessUser,
     };

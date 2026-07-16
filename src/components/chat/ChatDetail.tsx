@@ -376,9 +376,9 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType, age
   const resolvedAgentName = agentName || getAgentLabel(agentTypeState);
 
   return (
-    <div className="flex flex-col h-full min-h-[calc(100vh-80px)] w-full">
+    <div className="flex min-h-0 flex-col h-full w-full">
       {/* Messages Area */}
-      <div className="flex-grow overflow-y-auto space-y-3 md:space-y-4 px-3 md:px-6 py-3 md:py-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-3 md:space-y-4 px-3 md:px-6 py-3 md:py-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
         {messages.length === 0 && !isLoading && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-gray-400 max-w-md mx-auto px-4">
@@ -449,7 +449,7 @@ const ChatDetail: React.FC<ChatDetailProps> = ({ chatId, userName, chatType, age
       )}
 
       {/* Chat Input */}
-      <div className="w-full px-3 sm:px-5 md:px-8 py-4 md:py-6 bg-gray-900 border-t border-gray-800 sticky bottom-0">
+      <div className="shrink-0 w-full px-3 sm:px-5 md:px-8 py-4 md:py-6 bg-gray-900 border-t border-gray-800">
         <form onSubmit={handleSendMessage} className="relative w-full max-w-4xl mx-auto">
           <input
             type="text"

@@ -13,6 +13,7 @@ Este arquivo e a memoria persistente do projeto. Em um chat novo, comece por aqu
 - Stack: Next.js 15.3.8 App Router, React 19.1.0, TypeScript 5.4.5, Tailwind CSS, Supabase PostgreSQL/Storage, JWT proprio em cookie httpOnly.
 - IA: nao ha chamada direta a LLM no codigo. O app envia mensagens para webhooks n8n e espera que o n8n atualize `scripts.output`.
 - Estado do codigo em 2026-07-13: quatro agentes cadastrados. `postagem` esta temporariamente em manutencao, com acesso somente para admins; usuarios comuns veem `EM ATUALIZACAO`. Os outros tres agentes seguem liberados conforme o plano.
+- Ajuste local em 2026-07-16: o compositor do chat foi mantido visivel no celular mesmo quando o aviso de expiracao ocupa espaco. A correcao cobre conversa nova, chat existente e rotas legadas compativeis.
 
 Antes de novas implementacoes, rode:
 
@@ -339,6 +340,14 @@ Antes de reaproveitar o componente legado, confirme se as tabelas `mensagens` e 
 - `src/components/layout/Sidebar.tsx`: menu desktop com quatro agentes e historico com badge.
 - `src/components/layout/MobileMenu.tsx`: menu mobile com quatro agentes e historico com badge.
 - `src/components/layout/Header.tsx`: mostra badge do agente atual.
+
+Regra de layout do chat no celular:
+
+- As paginas de chat usam `h-[100dvh]` para acompanhar a altura visivel real do navegador movel.
+- O `main` e os wrappers intermediarios precisam de `min-h-0`, `flex-1` e coluna flexivel para a area de mensagens poder encolher e rolar.
+- O aviso de expiracao e o compositor usam `shrink-0`; o compositor deve permanecer inteiro no rodape.
+- Nao coloque um wrapper `h-full` depois de `AccessWarning`: aviso + chat com 100% de altura ultrapassa o `main`, e `overflow-hidden` corta o campo de mensagem.
+- Em 2026-07-16, esse comportamento foi validado em viewports `375x812` e `360x640`, com aviso de 7 dias visivel, para conversa nova e chat existente.
 
 Tema: escuro, Tailwind, cor primaria `#FF6B00`.
 

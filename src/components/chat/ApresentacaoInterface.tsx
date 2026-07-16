@@ -109,9 +109,9 @@ const ApresentacaoInterface: React.FC<ApresentacaoInterfaceProps> = ({ userName 
   };
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex min-h-0 flex-col h-full w-full">
       {/* Welcome Header */}
-      <div className="text-center py-6 md:py-10 bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800 px-4">
+      <div className="shrink-0 text-center py-6 md:py-10 bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800 px-4">
         <h1 className="text-2xl md:text-4xl font-bold">
           Olá, <span className="text-[#FF6B00]">{userName}.</span>
         </h1>
@@ -121,7 +121,7 @@ const ApresentacaoInterface: React.FC<ApresentacaoInterfaceProps> = ({ userName 
       </div>
       
       {/* Messages Area */}
-      <div className="flex-grow overflow-y-auto space-y-3 md:space-y-4 px-4 md:px-8 py-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-3 md:space-y-4 px-4 md:px-8 py-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
         {messages.length === 0 && !isLoading && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-gray-400 max-w-md mx-auto px-4">
@@ -193,7 +193,7 @@ const ApresentacaoInterface: React.FC<ApresentacaoInterfaceProps> = ({ userName 
       )}
 
       {/* Chat Input */}
-      <div className="w-full px-4 sm:px-6 py-4 md:py-6 bg-gray-900 border-t border-gray-800 shadow-lg">
+      <div className="shrink-0 w-full px-4 sm:px-6 py-4 md:py-6 bg-gray-900 border-t border-gray-800 shadow-lg">
         <form onSubmit={handleSendMessage} className="relative max-w-5xl mx-auto w-full">
           <input
             type="text"

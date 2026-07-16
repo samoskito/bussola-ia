@@ -145,7 +145,7 @@ export default function ChatPage({ params }: ChatPageProps) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-900">
+      <div className="flex h-screen h-[100dvh] items-center justify-center bg-gray-900">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
       </div>
     );
@@ -168,7 +168,7 @@ export default function ChatPage({ params }: ChatPageProps) {
   }
 
   return (
-    <div className="flex h-screen w-full bg-gray-900 text-white overflow-hidden">
+    <div className="flex h-screen h-[100dvh] w-full bg-gray-900 text-white overflow-hidden">
       {/* Sidebar - visível apenas em desktop */}
       <div className="hidden lg:flex lg:w-64 xl:w-72 2xl:w-80 border-r border-gray-800 shadow-xl">
         <Sidebar />
@@ -181,7 +181,7 @@ export default function ChatPage({ params }: ChatPageProps) {
         chats={chats}
       />
       
-      <div className="flex flex-col flex-1 overflow-hidden w-full">
+      <div className="flex min-h-0 flex-col flex-1 overflow-hidden w-full">
         <Header 
           userName={user?.nome || 'Usuário'} 
           title={chatTitle} 
@@ -192,15 +192,15 @@ export default function ChatPage({ params }: ChatPageProps) {
         {/* Toast de Expiração (<= 3 dias) */}
         <ExpiryToast daysRemaining={daysRemaining} dataExpiracao={user?.data_expiracao || null} />
         
-        <main className="flex-1 overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950 w-full">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-gray-900 to-gray-950 w-full">
           {/* Aviso de Expiração Próxima (agora dentro do main) */}
-          <div className="px-3 md:px-6 pt-3">
+          <div className="shrink-0 px-3 md:px-6 pt-3">
             <AccessWarning 
               diasRestantes={daysRemaining}
               dataExpiracao={user?.data_expiracao || null}
             />
           </div>
-          <div className="h-full w-full">
+          <div className="min-h-0 flex-1 w-full">
             {error ? (
               <div className="flex h-full items-center justify-center p-4">
                 <div className="bg-red-500 bg-opacity-10 border border-red-500 text-red-500 px-6 py-4 rounded-lg max-w-md text-center shadow-lg">

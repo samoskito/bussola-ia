@@ -31,9 +31,9 @@ export const AGENTS = [
     name: 'Postagem no Linkedin',
     description: 'Crie posts profissionais para LinkedIn com apoio da IA',
     icon: '/images/postagem-linkedin-logo.jpeg',
-    adminOnly: true,
-    availabilityLabel: 'EM ATUALIZAÇÃO',
-    availabilityMessage: 'Esta IA está em atualização e ficará disponível novamente assim que a manutenção terminar.',
+    adminOnly: false,
+    availabilityLabel: null,
+    availabilityMessage: null,
   },
 ] as const;
 

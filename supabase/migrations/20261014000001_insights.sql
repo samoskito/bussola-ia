@@ -109,7 +109,7 @@ ALTER TABLE public.insights_taxonomies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.insight_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.script_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.insights_budgets ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.insights_taxonomies, public.insight_jobs, public.script_insights, public.insights_budgets FROM anon, authenticated;
+REVOKE ALL ON public.insights_taxonomies, public.insight_jobs, public.script_insights, public.insights_budgets FROM PUBLIC, anon, authenticated;
 GRANT ALL ON public.insights_taxonomies, public.insight_jobs, public.script_insights, public.insights_budgets TO service_role;
 
 CREATE POLICY insights_taxonomies_service_only ON public.insights_taxonomies FOR ALL TO service_role USING (true) WITH CHECK (true);

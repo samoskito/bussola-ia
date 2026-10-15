@@ -131,6 +131,8 @@ export interface ProcessInsightOptions {
   repository: InsightRepository; classifier: InsightClassifier;
   maxMessages?: number; maxSpendUsd?: number; reserveUsdPerCall?: number; budgetScope?: string;
   now?: Date; clock?: () => Date; processingStart?: Date;
+  sourceIds?: readonly number[];
+  deadline?: Date;
 }
 export interface ProcessInsightResult {
   inspected: number; completed: number; skipped: number; excluded: number;
@@ -141,13 +143,13 @@ export interface ProcessInsightResult {
 }
 
 /** Luna Standard planning rate; provider billing can differ. Rounded upward to six decimals. */
-function conservativeLunaCost(usage: TokenUsage, reservation: number): number | null {
+function conservativeModelCost(usage: TokenUsage, reservation: number, pricing = { input: 0.1, output: 0.5 }): number | null {
   const valid = [usage.inputTokens, usage.outputTokens, usage.totalTokens, usage.reasoningTokens]
     .every(value => Number.isSafeInteger(value) && value >= 0);
   if (!valid || usage.inputTokens === 0 || usage.outputTokens === 0 ||
       usage.totalTokens !== usage.inputTokens + usage.outputTokens ||
       usage.reasoningTokens > usage.outputTokens) return null;
-  const cost = Math.ceil((usage.inputTokens * 0.1 + usage.outputTokens * 0.5)) / 1_000_000;
+  const cost = Math.ceil((usage.inputTokens * pricing.input + usage.outputTokens * pricing.output)) / 1_000_000;
   return cost <= reservation ? cost : null;
 }
 
@@ -164,11 +166,15 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
   const now = options.now ?? new Date();
   if (!Number.isFinite(now.getTime())) throw new Error('invalid_batch_time');
   if (options.processingStart && (!Number.isFinite(options.processingStart.getTime()) || options.processingStart > now)) throw new Error('invalid_processing_start');
+  if (options.sourceIds && (!options.sourceIds.length || options.sourceIds.length > 200 || options.sourceIds.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(options.sourceIds).size !== options.sourceIds.length)) throw new Error('invalid_pilot_sources');
+  if (options.deadline && !Number.isFinite(options.deadline.getTime())) throw new Error('invalid_deadline');
   const clock = options.clock ?? (options.now ? () => new Date(options.now!.getTime()) : () => new Date());
   const allSources = (await repository.listSources()).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id);
-  const sources = options.processingStart
+  const windowSources = options.processingStart
     ? allSources.filter(row => Date.parse(row.createdAt) >= options.processingStart!.getTime())
     : allSources;
+  const allowedSources = options.sourceIds ? new Set(options.sourceIds) : null;
+  const sources = allowedSources ? windowSources.filter(row => allowedSources.has(row.id)) : windowSources;
   const result: ProcessInsightResult = {
     inspected: 0, completed: 0, skipped: 0, excluded: 0, pending: 0, failed: 0,
     budgetStopped: false, hasMore: false, remainingUninspected: 0,
@@ -180,7 +186,8 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
   const excludedUsers = new Set<string>();
   let claimedCount = 0;
   for (const source of sources) {
-    if (claimedCount >= maxMessages) break;
+    // Leave time for the provider's 25s timeout and durable settlement.
+    if (claimedCount >= maxMessages || (options.deadline && clock().getTime() + 35_000 >= options.deadline.getTime())) break;
     result.inspected++;
     let level = levelCache.get(source.userId);
     if (level === undefined) {
@@ -251,7 +258,7 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
         result.usage.totalTokens += classified.usage.totalTokens;
         result.usage.reasoningTokens += classified.usage.reasoningTokens; // Subset of output, not additive.
         if (reserved) {
-          const estimated = conservativeLunaCost(classified.usage, reserveUsdPerCall);
+          const estimated = conservativeModelCost(classified.usage, reserveUsdPerCall, classifier.pricing);
           if (estimated !== null) {
             result.estimatedCostUsd += estimated;
             const release = Math.round((reserveUsdPerCall - estimated) * 1_000_000) / 1_000_000;
@@ -267,8 +274,9 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
           }
         }
       }
-    } catch {
-      await repository.fail(key, claim.token, clock(), 'classification_failed', 3);
+    } catch (error) {
+      const code = error instanceof Error && /^openai_(http_\d{3}|incomplete|refusal)$/.test(error.message) ? error.message : 'classification_failed';
+      await repository.fail(key, claim.token, clock(), code, 3);
       result.failed++;
     }
   }

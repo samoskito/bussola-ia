@@ -1,5 +1,5 @@
 import 'server-only';
-import { createOpenAIClassifier, type InsightClassifier } from './classifier';
+import { createOpenAIClassifier, getInsightsModel, type InsightClassifier } from './classifier';
 import { processInsightBatch, type InsightRepository, type ProcessInsightResult } from './processor';
 import { createSupabaseInsightRepository } from './supabase-repository';
 
@@ -22,6 +22,9 @@ export async function runDailyInsights(options: DailyInsightsOptions = {}): Prom
   // configuration plus an atomic durable reservation are required to run.
   if (!Number.isFinite(maxSpendUsd) || maxSpendUsd <= 0 || maxSpendUsd > 5) throw new Error('invalid_daily_budget');
   const budgetScope = env.INSIGHTS_BUDGET_SCOPE || 'insights-pilot';
+  const pilotIds = env.INSIGHTS_PILOT_SOURCE_IDS;
+  const sourceIds = pilotIds === undefined ? undefined : pilotIds.split(',').map(id => /^\d+$/.test(id) ? Number(id) : NaN);
+  if (sourceIds && (!sourceIds.length || sourceIds.length > 200 || sourceIds.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(sourceIds).size !== sourceIds.length)) throw new Error('invalid_pilot_sources');
   const now = options.now ?? new Date();
   let repository = options.repository;
   if (!repository) {
@@ -30,10 +33,11 @@ export async function runDailyInsights(options: DailyInsightsOptions = {}): Prom
       env, now, windowStart: new Date(now.getTime() - 33 * 86_400_000),
     });
   }
-  const classifier = options.classifier ?? createOpenAIClassifier({ apiKey: env.OPENAI_API_KEY });
+  const classifier = options.classifier ?? createOpenAIClassifier({ apiKey: env.OPENAI_API_KEY, model: getInsightsModel(env) });
   if (classifier.provider !== 'openai') throw new Error('daily_requires_openai_classifier');
-  return processInsightBatch({ repository, classifier, maxMessages: 50,
-    maxSpendUsd, reserveUsdPerCall: 0.005, budgetScope, now,
+  return processInsightBatch({ repository, classifier, maxMessages: 10,
+    maxSpendUsd, reserveUsdPerCall: getInsightsModel(env) === 'gpt-5.4-nano' ? 0.01 : 0.005, budgetScope, now,
+    sourceIds, deadline: new Date(Date.now() + 240_000),
     processingStart: new Date(now.getTime() - 30 * 86_400_000),
     clock: options.now ? () => new Date(options.now!.getTime()) : () => new Date() });
 }

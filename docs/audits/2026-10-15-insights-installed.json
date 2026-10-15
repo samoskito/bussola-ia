@@ -1,0 +1,28 @@
+{
+  "tables": [
+    {
+      "rls": true,
+      "name": "insight_jobs"
+    },
+    {
+      "rls": true,
+      "name": "insights_budgets"
+    },
+    {
+      "rls": true,
+      "name": "insights_taxonomies"
+    },
+    {
+      "rls": true,
+      "name": "script_insights"
+    }
+  ],
+  "sources": {
+    "chats": 2006,
+    "users": 1695,
+    "scripts": 9826
+  },
+  "functions": 7,
+  "taxonomies": 1,
+  "derivedRows": 0
+}

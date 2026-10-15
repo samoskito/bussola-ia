@@ -1,7 +1,7 @@
 import 'server-only';
 import type { createServerSupabaseClient } from '../supabase/server';
 import type { SourceMessage } from './types';
-import { CLASSIFIER_VERSION, validateClassification } from './classifier';
+import { CLASSIFIER_VERSION, getInsightsModel, validateClassification } from './classifier';
 import type { ClaimResult, InsightJob, InsightRepository, StoredInsight } from './processor';
 import { prepareInsightInput } from './privacy';
 import { TAXONOMY_VERSION } from './taxonomy';
@@ -86,6 +86,7 @@ export function createSupabaseInsightRepository(
   options: { env?: Env; now?: Date; windowStart?: Date; windowEnd?: Date } = {},
 ): InsightRepository {
   assertLive(options.env ?? process.env);
+  const model = getInsightsModel(options.env ?? process.env);
   const now = options.now ?? new Date();
   if (!Number.isFinite(now.getTime())) throw new Error('invalid_repository_time');
   const end = options.windowEnd ?? now;
@@ -164,7 +165,7 @@ export function createSupabaseInsightRepository(
       const { data, error } = await client.rpc('insights_claim_job', {
         p_job_key: key, p_script_id: sourceId, p_user_id: userId, p_source_hash: sourceHash,
         p_taxonomy_version: taxonomyVersion, p_classifier_version: classifierVersion,
-        p_provider: 'openai', p_model: 'gpt-6-luna',
+        p_provider: 'openai', p_model: model,
         p_now: claimNow.toISOString(), p_lock_ms: lockMs, p_max_attempts: maxAttempts,
       });
       assertNoDbError(error);
@@ -209,7 +210,7 @@ export function createSupabaseInsightRepository(
         const { data, error } = await client.from('script_insights')
           .select('script_id,user_id,chat_id,agent_type,source_created_at,source_hash,taxonomy_version,classifier_version,message_kind,topic_ids,normalized_demand,confidence,needs_review,processed_at,users!script_insights_user_id_fkey(nivel)')
           .eq('status', 'classified').gte('source_created_at', windowStart).lt('source_created_at', windowEnd)
-          .eq('taxonomy_version', TAXONOMY_VERSION).eq('classifier_version', `gpt-6-luna.${CLASSIFIER_VERSION}`)
+          .eq('taxonomy_version', TAXONOMY_VERSION).eq('classifier_version', `${model}.${CLASSIFIER_VERSION}`)
           .order('script_id', { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
         assertNoDbError(error);
         if (!Array.isArray(data)) throw new Error('invalid_insight_page');

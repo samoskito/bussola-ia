@@ -1,0 +1,19 @@
+# Insights — ativação do piloto em15/10/2026
+
+Autorização: migration, publicação e piloto até200 mensagens (primeiras50), teto totalUS$1. Hotmart/MCP remoto/executor diário fora desta rodada. Mudança de modelo autorizada em resposta específica: GPT-6 Luna retorna404 com chave do cliente, catálogo/models200 sem Luna; GPT-5.4 nano/models200 e escolhido pelo usuário. Nenhuma inferência a partir dos modelos disponíveis no Codex. Chave válida não prova saldo/faturamento; geração ainda não executada neste ponto.
+
+Validações:22 testes Node passaram; typecheck escopado0/global14 legados; PostgreSQL15.8 isolado passou com RLS/roles, exclusão admins, CAS/leases/idempotência, retries, orçamento concorrente/cap e troca de papel. Container removido. Build isolado passou com credenciais sintéticas; primeira execução sandbox bloqueou junction, repetida com sucesso fora do sandbox.
+
+Migration20261014000001_insights.sql aplicada manualmente pelo SQL Editor após ausência de objetos/funções conferida. Única alteração adicional na migration preparada: revogação explícita de PUBLIC nas quatro tabelas. Banco15.8,7RPCs/4tabelas com RLS/1taxonomia/0resultados instalados; fontes antes/depois1695users/2006chats/9826scripts, sem reescrita das fontes. UI alertou por DELETE dentro das definições de funções; o SQL aplicado é aditivo e não executa esses corpos na instalação. Histórico CLI não alterado; não usar db push genérico.
+
+Pré-instalação/recuperação: metadados antes/depois em insights-preflight.json/insights-installed.json; objetos derivados não existiam, nenhuma fonte sofreu DML. Backup protegido das fontes administrativas permanece local DPAPI; não representa backup integral de chats/scripts. Contenção mantém objetos e resultados, desativa OpenAI/worker e republica; não remover fontes/índices/tabelas como rollback automático.
+
+Amostra selecionada por GET, sem texto salvo:50poragente,200IDs privados, distribuição ao longo dos30dias; primeiras50 equilibradas por interleaving. Elegíveis com contexto dentro dos limites:295comunicação/130apresentação/587conversas/377postagem;29entradas administrativas excluídas,46entradas rejeitadas por limites de fonte/contexto. Manifesto privado .local-backups/insights-pilot-manifest.json. Não confundir essas contagens com o total de mensagens do relatório, que pode incluir outras pendentes/rejeitadas. Não é amostra aleatória representativa.
+
+Worker:10tentativas por lote,deadline240s com35s de margem; processamento restrito ao manifesto e contexto completo preservado. Novo INSIGHTS_MODEL controla adaptador, metadados e leitura/versionamento. Nano low,Responses/schema estrito,store:false,saída máxima1200tokens. Tarifas para estimativa:US$0,20entrada/US$1,25saída por milhão; reasoning incluído na saída. Reserva conservadoraUS$0,01por tentativa, liquidação por usage; falhas/uso desconhecido retêm reserva. Mesmo scope/capUS$1 para todas retomadas; não elevar nem trocar scope para contornar limite.
+
+Vercel Production: OPENAI_API_KEY e INSIGHTS_CRON_SECRET salvos como Secret sem exposição; segredo privado protegido DPAPI local. INSIGHTS_MODEL=gpt-5.4-nano, BUDGET_SCOPE=insights-pilot-20261015-v1 e PILOT_SOURCE_IDS=primeiras50. Modo live,OpenAI/processamento true,teto1 preparados; nenhum cron cadastrado. Admin/reset/JWT/SMTP existentes preservados. Essas variáveis exigem o novo código com guardas; publicar somente o commit revisado desta rodada, não redeploy do código anterior.
+
+Fontes oficiais verificadas: https://developers.openai.com/api/docs/models/gpt-5.4-nano e https://developers.openai.com/api/docs/guides/structured-outputs. Disponibilidade da conta provada por GET autenticado, sem classificação paga até este registro.
+
+Estado: preparado para publicar/rodar primeiras50; ainda não declarar piloto/classificação real concluídos.

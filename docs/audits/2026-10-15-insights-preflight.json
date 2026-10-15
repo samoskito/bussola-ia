@@ -1,0 +1,63 @@
+{
+  "objects": {
+    "insight_jobs": null,
+    "script_insights": null,
+    "insights_budgets": null,
+    "insights_taxonomies": null
+  },
+  "postgres": "15.8",
+  "functions": 0,
+  "timestamp": "2026-10-15T21:54:38.783717+00:00",
+  "sourceCounts": {
+    "chats": 2006,
+    "users": 1695,
+    "scripts": 9826
+  },
+  "referenceColumns": [
+    {
+      "type": "uuid",
+      "table": "users",
+      "column": "id"
+    },
+    {
+      "type": "varchar",
+      "table": "users",
+      "column": "nivel"
+    },
+    {
+      "type": "uuid",
+      "table": "chats",
+      "column": "id"
+    },
+    {
+      "type": "uuid",
+      "table": "chats",
+      "column": "user_id"
+    },
+    {
+      "type": "text",
+      "table": "chats",
+      "column": "agent_type"
+    },
+    {
+      "type": "int4",
+      "table": "scripts",
+      "column": "id"
+    },
+    {
+      "type": "uuid",
+      "table": "scripts",
+      "column": "user_id"
+    },
+    {
+      "type": "uuid",
+      "table": "scripts",
+      "column": "chatid"
+    },
+    {
+      "type": "timestamptz",
+      "table": "scripts",
+      "column": "created_at"
+    }
+  ]
+}

@@ -33,7 +33,7 @@ export async function buildLiveReport(filters: InsightFilters, now = new Date())
   if (getInsightsMode() !== 'live' || process.env.INSIGHTS_PROCESSING_ENABLED !== 'true') {
     throw new InsightsError(503, 'live_unavailable', 'Insights reais aguardam ativação e validação.');
   }
-  const [{ createSupabaseInsightRepository }, { createServerSupabaseClient }, { prepareInsightInput }, { TAXONOMY_VERSION }, { CLASSIFIER_VERSION }] = await Promise.all([
+  const [{ createSupabaseInsightRepository }, { createServerSupabaseClient }, { prepareInsightInput }, { TAXONOMY_VERSION }, { CLASSIFIER_VERSION, getInsightsModel }] = await Promise.all([
     import('./supabase-repository'), import('../supabase/server'), import('./privacy'), import('./taxonomy'), import('./classifier'),
   ]);
   const window = insightWindow(filters.days, now);
@@ -51,7 +51,7 @@ export async function buildLiveReport(filters: InsightFilters, now = new Date())
     chunk.forEach(([userId, level]) => levels.set(userId, level));
   }
   const currentSources = sources.map(source => ({ ...source, userLevel: levels.get(source.userId) ?? null }));
-  const classifierVersion = `gpt-6-luna.${CLASSIFIER_VERSION}`;
+  const classifierVersion = `${getInsightsModel()}.${CLASSIFIER_VERSION}`;
   const active = new Map(completed.filter(insight => insight.taxonomyVersion === TAXONOMY_VERSION && insight.classifierVersion === classifierVersion)
     .map(insight => [insight.sourceId, insight]));
   const jobByKey = new Map(jobs.map(job => [job.key, job]));

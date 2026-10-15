@@ -1,0 +1,45 @@
+{
+  "checkedAt": "2026-10-15T19:41:26.232Z",
+  "productionCommit": "9b9fb8304a12514e5894b1becb7776f6f952027b",
+  "deployments": {
+    "disabled": "7hdu7aJPS21wnqS8LiTprMiqkrhX",
+    "readOnly": "DuMQMrcVfS4V35RYUkVGZQTJtEcC",
+    "writes": "DFLCMBPpp1iuC3iVXZVx7P6iMZLa",
+    "email": "3EQ1L3y4wj1U5EoE3rtRxX3VV2u3"
+  },
+  "preexistingSourcesPreserved": true,
+  "insightsDisabled": true,
+  "openaiCalls": 0,
+  "hotmartDirectChanged": false,
+  "test": {
+    "testUsers": 1,
+    "auditActions": [
+      "created",
+      "access_updated",
+      "access_updated",
+      "invite_generated",
+      "profile_updated",
+      "invite_generated",
+      "invite_sent"
+    ],
+    "inviteStates": [
+      {
+        "used": false,
+        "action": "generate",
+        "expiresAt": "2026-10-15T20:38:47.013+00:00",
+        "invalidated": true,
+        "deliveryStatus": "not_requested"
+      },
+      {
+        "used": false,
+        "action": "send",
+        "expiresAt": "2026-10-15T20:42:09.173+00:00",
+        "invalidated": false,
+        "deliveryStatus": "sent"
+      }
+    ],
+    "ordinaryLevel": true,
+    "fourEnabledUntil22": 4
+  },
+  "recipientConfirmation": "pending"
+}

@@ -1,0 +1,27 @@
+# Publicação administrativa — diário em 15/10/2026
+
+Autorização recebida: aplicar exclusivamente duas migrations administrativas e publicar em etapas; testar com suporte@palmup.com.br. OpenAI e Hotmart direta permanecem desativadas.
+
+- Backup atual recuperável das quatro fontes já validado; snapshot19:06:16UTC,1694 usuários/4556 grants/437 tokens/1 template. Fora do Git, DPAPI.
+- Preflight renovado:1694 usuários,0 duplicidades/0emails vazios,0 contas do destinatário de teste; objetos novos ausentes antes da aplicação.
+- Aplicadas, em ordem:20261015000001_admin_users.sql e20261015000002_admin_invitations.sql. Conferência posterior: três tabelas novas com RLS, índice normalizado e funções presentes. Digests das quatro fontes originais iguais ao backup: nenhum registro preexistente alterado pelas migrations.
+- Incidente de ferramenta: setValue no editor SQL preenchido anexou texto em vez de substituí-lo; uma tentativa de consulta reenviou a primeira migration já instalada e foi recusada com42P07 no índice existente, antes de novos objetos. Verificado estado instalado; conteúdo então substituído por seleção total/colar. Não repetimos DDL após diagnóstico; segunda migration aplicada isoladamente com sucesso. Sem perda ou reescrita das fontes, conforme digests.
+- RPC/cache conferidos via Data API: validação de token inexistente retorna valid=false; consumo legado inválido retorna22023; leitura sem ator rejeitada P0001. Não consumiu token nem definiu senha. Anon recebeu401 para as três tabelas novas.
+- Código9b9fb8304a12514e5894b1becb7776f6f952027b publicado via fast-forward autorizado em main; remoto anterior2248dcd, sem divergência. Deploy inicial7hdu7aJPS21wnqS8LiTprMiqkrhX Ready em produção com admin disabled. GET /api/admin/users503 admin_users_disabled; primeiro acesso/recuperação/login200.
+- Etapa de leitura: ADMIN_USERS_MODE=live e LIVE_ENABLED=true salvos em Production; WRITES/EMAIL continuamfalse. DeployDuMQMrcVfS4V35RYUkVGZQTJtEcC iniciado; aguardando validação.
+- Testes Node administrativos/Insights sem falhas na repetição; MCP5/6 no sandbox (EACCES localhost),6/6 após repetir fora do sandbox. Não houve OpenAI.
+- Integração direta Hotmart não realizada; n8n preservado. Não foi fornecido fluxo comercial para homologação de retry/conflito23505. Índice passa a rejeitar novos e-mails normalizados duplicados; observar essa classe de falha no fluxo vigente, sem prometer preservação de overrides comerciais ainda não implementada.
+
+Estado: publicação e validação em andamento. Conta de teste ainda não criada, convite ainda não enviado nesta atualização. Não declarar senha/login do destinatário validados sem execução pelo próprio usuário.
+
+Etapa somente leitura concluída: deploymentDuMQMrcVfS4V35RYUkVGZQTJtEcC Ready; sessão administrativa real pesquisou o destinatário e obteve0resultados. Cadastro revisado com quatro IAs e22/10/2026 foi recusado no servidor enquanto WRITES=false; nenhuma conta criada. Insights com sessão admin respondeu insights_disabled. Escrita=true salva e novo deploy iniciado; EMAIL=false permanece. As flags são globais para administradores, não allowlist técnica do destinatário.
+
+Arquivos aplicados (SHA256): admin_users F317A70251DE83879CEFCDB0A052936E0014D7951D230925FFB9F16A780042DF; admin_invitations48A2E3C5F25057C26C168AB9D8C2118DC090DA0D321A13C467F8EF7EB11AADF5. Aplicação manual pelo SQL Editor; não foi alterado histórico de migrations da CLI. Não usar db push genérico: migration Insights continua não aplicada e não autorizada.
+
+Etapa escrita: deployDFLCMBPpp1iuC3iVXZVx7P6iMZLa Ready. Conta de teste criada exclusivamente pelo painel, user comum, quatro IAs até22/10/2026. Revogação Comunicação e data21/10 em Apresentação salvas e auditadas; outras validades preservadas. Tentativa de data14/10 vencida foi rejeitada, sem alteração. Estado final restaurado: quatro IAs habilitadas até22/10. Nome editado para PalmUp - Teste de produção, e-mail/telefone/acessos preservados. Busca por e-mail em maiúsculas retornou1registro. Link temporário gerado: origem canonical HTTPS, token no fragmento; nenhum token salvo em documentação ou consumido pelo agente. Etapa email=true em publicação3EQ1L3y4wj1U5EoE3rtRxX3VV2u3; envio ainda não executado.
+
+Publicação final:3EQ1L3y4wj1U5EoE3rtRxX3VV2u3 Ready, fonte9b9fb83, domínio https://ia.bussolaexecutiva.com.br. Admin live/leitura/escrita/email ativos, PASSWORD_RESET_ATOMIC_REQUIRED=true; Insights/OpenAI/processamento desativados e teto0, Hotmart/n8n sem alteração. Verificações GET sem sessão: admin401; login/primeiro acesso/recuperação200. Com admin: Insights retorna insights_disabled.
+
+Convite enviado pelo painel a suporte@palmup.com.br e aceito pelo serviço; banco confirma delivery_status=sent. Link anterior invalidado, convite atual não consumido na conferência16:43 BRT, expira17:42:09 BRT. Não presumir recebimento. Token não salvo em relatórios/prints; screenshot da ficha após reload sem URL secreta. Senha deve ser definida exclusivamente pelo destinatário. Nenhuma senha coletada/definida pelo agente.
+
+Verificação final:1conta de teste/user comum,4grants habilitados até22/10/2026;7eventos de auditoria (criação,duas edições de acesso,geração,edição perfil,geração/envio). Fontes preexistentes, excluindo somente o usuário/grants de teste, têm os mesmos quatro digests do backup. Resultado sanitizado2026-10-15-admin-rollout-result.json. Login/senha/visão das quatro IAs como destinatário ainda aguardam confirmação; tarefa ClickUp permanece em andamento. Não declarar aceite ponta a ponta ainda.

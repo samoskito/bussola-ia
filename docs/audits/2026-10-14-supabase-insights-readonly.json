@@ -1,0 +1,467 @@
+{
+  "configuration": [
+    {
+      "file": ".env.local",
+      "supabaseUrl": true,
+      "serviceKey": true,
+      "jwtSecret": true,
+      "openaiKey": false,
+      "anthropicKey": false
+    },
+    {
+      "file": ".env.production",
+      "supabaseUrl": true,
+      "serviceKey": true,
+      "jwtSecret": true,
+      "openaiKey": false,
+      "anthropicKey": false
+    }
+  ],
+  "source": ".env.local",
+  "sameSupabaseTarget": true,
+  "credentialRole": "service_role",
+  "window": {
+    "start": "2026-09-15T00:03:50.000Z",
+    "end": "2026-10-15T00:03:50.000Z",
+    "timezone": "America/Sao_Paulo",
+    "description": "30 rolling days ending at audit start"
+  },
+  "tables": {
+    "users": {
+      "exposed": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "string",
+          "format": "uuid",
+          "required": true
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "format": "character varying",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "format": "character varying",
+          "required": true
+        },
+        {
+          "name": "senha",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "telefone",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "avatar",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "rua",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "numero",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "bairro",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "cep",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "cidade",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "estado",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "pais",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "nivel",
+          "type": "string",
+          "format": "character varying",
+          "required": false
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        },
+        {
+          "name": "updated_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        },
+        {
+          "name": "cargo",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "empresa",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "idade",
+          "type": "integer",
+          "format": "integer",
+          "required": false
+        },
+        {
+          "name": "data_expiracao",
+          "type": "string",
+          "format": "date",
+          "required": false
+        },
+        {
+          "name": "plano",
+          "type": "string",
+          "format": "text",
+          "required": false
+        }
+      ],
+      "total": 1699
+    },
+    "chats": {
+      "exposed": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "string",
+          "format": "uuid",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "string",
+          "format": "uuid",
+          "required": true,
+          "relationship": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "format": "character varying",
+          "required": true
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        },
+        {
+          "name": "updated_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        },
+        {
+          "name": "agent_type",
+          "type": "string",
+          "format": "text",
+          "required": false
+        }
+      ],
+      "total": 1998,
+      "last30days": 273
+    },
+    "scripts": {
+      "exposed": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "format": "integer",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "string",
+          "format": "uuid",
+          "required": true,
+          "relationship": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>"
+        },
+        {
+          "name": "input",
+          "type": "string",
+          "format": "text",
+          "required": true
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "chatid",
+          "type": "string",
+          "format": "uuid",
+          "required": true,
+          "relationship": "Note:\nThis is a Foreign Key to `chats.id`.<fk table='chats' column='id'/>"
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        },
+        {
+          "name": "updated_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        }
+      ],
+      "total": 9798,
+      "last30days": 1486
+    },
+    "user_agent_access": {
+      "exposed": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "string",
+          "format": "uuid",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "string",
+          "format": "uuid",
+          "required": true,
+          "relationship": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>"
+        },
+        {
+          "name": "agent_type",
+          "type": "string",
+          "format": "text",
+          "required": true
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "format": "boolean",
+          "required": true
+        },
+        {
+          "name": "expires_at",
+          "type": "string",
+          "format": "date",
+          "required": false
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        },
+        {
+          "name": "updated_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": false
+        }
+      ],
+      "total": 4580
+    },
+    "mensagens": {
+      "exposed": false
+    },
+    "outputs": {
+      "exposed": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "format": "bigint",
+          "required": true
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "format": "timestamp with time zone",
+          "required": true
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "cargo",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "com quem",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "situação",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "historico",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "name": "feedback",
+          "type": "string",
+          "format": "text",
+          "required": false
+        }
+      ]
+    },
+    "arquivos": {
+      "exposed": false
+    },
+    "script_insights": {
+      "exposed": false
+    },
+    "insight_jobs": {
+      "exposed": false
+    },
+    "insight_taxonomies": {
+      "exposed": false
+    }
+  },
+  "scriptsQuality": {
+    "noInput": 0,
+    "emptyInput": 0,
+    "noOutput": 28,
+    "noChat": 0,
+    "whitespaceOnly": 0,
+    "unmatchedChatJoin": 0,
+    "unmatchedUserJoin": 0,
+    "scriptChatOwnerMismatch": 0
+  },
+  "activity": {
+    "observedMessages": 1486,
+    "expectedMessages": 1486,
+    "coverageMatches": true,
+    "distinctUsers": 129,
+    "distinctChats": 279,
+    "byAgent": {
+      "comunicacao": {
+        "messages": 310,
+        "distinctUsers": 61,
+        "distinctChats": 108,
+        "byUserRole": {
+          "user": 306,
+          "admin": 4
+        }
+      },
+      "conversas_dificeis": {
+        "messages": 647,
+        "distinctUsers": 58,
+        "distinctChats": 83,
+        "byUserRole": {
+          "user": 621,
+          "admin": 26
+        }
+      },
+      "postagem": {
+        "messages": 391,
+        "distinctUsers": 45,
+        "distinctChats": 68,
+        "byUserRole": {
+          "user": 391
+        }
+      },
+      "apresentacao": {
+        "messages": 138,
+        "distinctUsers": 16,
+        "distinctChats": 20,
+        "byUserRole": {
+          "user": 138
+        }
+      }
+    },
+    "messagesByUserRole": {
+      "user": 1456,
+      "admin": 30
+    },
+    "distinctUsersByRole": {
+      "user": 127,
+      "admin": 2
+    },
+    "messagesInChatsCreatedBeforeWindow": 17
+  },
+  "inputSize": {
+    "totalCharacters": 484877,
+    "averageCharacters": 326,
+    "medianCharacters": 84,
+    "p95Characters": 1076,
+    "maxCharacters": 33980
+  },
+  "databaseIntrospection": {
+    "scope": "PostgREST OpenAPI metadata and limited GET reads",
+    "rlsPoliciesVerified": false,
+    "indexDefinitionsVerified": false,
+    "checkConstraintsVerified": false,
+    "derivedTables": "Not present in exposed public OpenAPI schema; other schemas not inspected"
+  },
+  "credentialsAvailable": {
+    "databaseConnection": false,
+    "managementAccessToken": false
+  }
+}

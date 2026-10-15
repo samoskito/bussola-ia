@@ -11,7 +11,7 @@ Este arquivo e a memoria persistente do projeto. Em um chat novo, comece por aqu
 - Branch principal atual: `main`.
 - Evolucoes recentes ja mergeadas/deployadas: `feature/four-ai-agents-access` e `feature/admin-only-coming-soon-agents`.
 - Stack: Next.js 15.3.8 App Router, React 19.1.0, TypeScript 5.4.5, Tailwind CSS, Supabase PostgreSQL/Storage, JWT proprio em cookie httpOnly.
-- IA: nao ha chamada direta a LLM no codigo. O app envia mensagens para webhooks n8n e espera que o n8n atualize `scripts.output`.
+- IA do chat: o app envia mensagens para webhooks n8n e espera que o n8n atualize `scripts.output`. O modulo local de Insights agora tem adaptador OpenAI separado, desativado por padrao e ainda nao executado.
 - Estado do codigo em 2026-07-27: quatro agentes cadastrados e liberados para usuarios com acesso valido. `postagem` saiu do modo de manutencao/admin-only.
 - Ajuste publicado em 2026-07-16: o compositor do chat foi mantido visivel no celular mesmo quando o aviso de expiracao ocupa espaco. A correcao cobre conversa nova, chat existente e rotas legadas compativeis.
 
@@ -375,6 +375,27 @@ Nao implementado ainda. Plano recomendado:
 - `/api/webhook` nao valida assinatura. Antes de expor mais automacoes, adicionar autenticacao/assinatura.
 - O retorno n8n ativo deve enviar `scriptId` e uma resposta em `output`, `response`, `resposta` ou `message`.
 - Existem schemas SQL divergentes (`supabase/fix-schema.sql`, `scripts/setup-database.sql`). Nao execute SQL destrutivo sem revisar o banco real.
+
+## Planejamento de Insights de Demandas (2026-10-14)
+
+- Pedido: permitir que gestor/equipe acompanhe as principais demandas enviadas as quatro IAs e consulte relatorios no ChatGPT ou Claude que ja utiliza.
+- Direcao aprovada pelo usuario: painel + API de consulta + IA para classificar mensagens. Estrutura local implementada com dados simulados na branch `codex/insights-demo`, sem push/deploy/migration aplicada.
+- Plano proposto: `docs/plans/2026-10-14-insights-perguntas-implementation.md`.
+- Fonte identificada no codigo: `scripts.input` ligado a `chats`, com periodo por criacao do script e agente em `chats.agent_type`. Diferenciar demanda inicial de refinamentos; medir pessoas e conversas distintas.
+- Integracao proposta: classificador assincrono no backend, resultados derivados versionados e camada de insights compartilhada pelo painel e por MCP/API autenticada. Preservar contrato n8n.
+- Decisao posterior do usuario em 2026-10-14 substitui proposta de acesso da equipe no MVP: painel inicialmente exclusivo para admins, com visao global das quatro IAs e exclusao das mensagens de contas administrativas. Verificar nivel atual no servidor, inclusive para excluir contexto e exemplos. Permissoes de equipe ficam evolucao futura; nunca compartilhar service role.
+- Consulta no ChatGPT/Claude e classificacao no servidor sao integracoes diferentes. Sign in with ChatGPT permite uso de plano em apps elegiveis, mas elegibilidade deste SaaS nao foi confirmada; nao depender dessa opcao no MVP.
+- Escopo aprovado em 2026-10-14: quatro IAs, ultimos 30 dias e atualizacao diaria.
+- Auditoria do Supabase autorizada e executada somente com GET pela Data API: `docs/audits/2026-10-14-supabase-insights-readonly.md`. Credenciais locais funcionam e configuracoes local/producao apontam para o mesmo projeto. Nenhuma credencial ou texto de conversa salvo nos artefatos.
+- Snapshot encerrado em 14/10/2026 21:03:50 America/Sao_Paulo: 1.486 scripts em 30 dias, 129 pessoas, 279 conversas ativas; 273 chats criados no periodo. Nenhum vinculo ausente ou dono divergente; 28 outputs nulos e 30 mensagens de admins. Contagens sao mensagens, nao demandas classificadas.
+- Schema ativo confirmado por metadados e consultas: users/chats UUID, scripts integer; `scripts.chatid` relacionado a chats. Join scripts/chats exige hint explicito por duas FKs sobre as mesmas colunas. Tabelas derivadas planejadas nao aparecem no schema public exposto; nao foram inspecionados outros schemas.
+- Limites: policies RLS, indices, triggers e CHECK constraints nao auditados pela credencial Data API. Service role bypassa RLS. Chaves convencionais OpenAI/Anthropic nao encontradas nos envs locais; segredos na hospedagem nao verificados.
+- Recomendacao de modelo/custo, ainda nao executada: GPT-6 Luna reasoning low; piloto de 200 mensagens com comparacao de 50 no GPT-6.1 Sol e revisao humana. Das 1.486 mensagens do snapshot, 1.456 sao elegiveis apos excluir admins. Estimativa Standard com premissas/margem: piloto US$ 0,50–1,50; periodo completo com comparacao US$ 1–3; teto sugerido US$ 5 sem aprovacao de gasto. Detalhes em `docs/plans/2026-10-14-insights-modelo-custo-piloto.md`.
+- Pendencias: aprovacao de provedor/modelo/orcamento e permissao para piloto real, credencial API segura, acesso para inspecao completa/migrations e ambiente de validacao, executor diario e plataforma/plano exatos do gestor. Identificar contas de teste nao administrativas se houver exclusao adicional. Nenhuma chamada paga, classificacao real, migration ou deploy executado.
+- Handoff de implementacao: `docs/plans/2026-10-14-insights-handoff.md`. Painel `/dashboard/insights`, seis GETs admin e POST do executor com segredo separado, flags privadas desativadas por padrao. Demo apenas fora de producao; chave sozinha nao habilita processamento.
+- Preparados classifier mock/OpenAI Luna low, processor paginado por lotes, persistencia Supabase via RPC, reserva de orçamento e migration aditiva com 4 tabelas. Nenhum cron agendado. APIs de consulta nao iniciam classificacao.
+- Validacao local: 18 testes sinteticos passaram, dry-run sem rede e teste visual desktop/mobile/filtros/exportacao/estados passou. Typecheck insights/UI tocada sem erros; typecheck global tem erros legados. Corrigido somente caractere JSX preexistente em profile para destravar verificacao. Build local aprovado; SQL ainda nao executado/validado em Postgres.
+- Conector externo MCP/OAuth permanece etapa futura. Antes de ativar: validar SQL/concorrencia em ambiente autorizado, configurar chave/segredo/orcamento e limitar amostra. Atualizacao diaria depende de executor externo percorrendo lotes; nenhuma automacao foi criada.
 
 ## Ordem Recomendada Para Novas Funcionalidades
 

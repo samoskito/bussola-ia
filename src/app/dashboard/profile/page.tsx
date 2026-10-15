@@ -745,7 +745,7 @@ export default function ProfilePage() {
                         disabled={templateTesting}
                         className="w-full h-[42px] bg-gray-800 border border-gray-700 focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00] text-white rounded-md px-3 text-sm outline-none"
                       >
-                        <option value="auto">Automatico (SMTP -> API)</option>
+                        <option value="auto">Automatico (SMTP -&gt; API)</option>
                         <option value="brevo_api">Somente Brevo API</option>
                         <option value="smtp">Somente SMTP</option>
                       </select>

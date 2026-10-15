@@ -275,7 +275,8 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
         }
       }
     } catch (error) {
-      const code = error instanceof Error && /^openai_(http_\d{3}|incomplete|refusal)$/.test(error.message) ? error.message : 'classification_failed';
+      const safeCodes = /^(openai_(http_\d{3}|incomplete|refusal)|invalid_(classification_shape|message_kind|topic_ids|normalized_demand|confidence|review_flag|openai_response|openai_output|openai_json)|unclassifiable_with_topic|missing_topic|uncertain_without_review)$/;
+      const code = error instanceof Error && error.name === 'AbortError' ? 'openai_timeout' : error instanceof Error && safeCodes.test(error.message) ? error.message : 'classification_failed';
       await repository.fail(key, claim.token, clock(), code, 3);
       result.failed++;
     }

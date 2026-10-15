@@ -20,6 +20,11 @@ test('deadline yields without acquiring a lease or spending when insufficient ti
  const result=await processInsightBatch({repository:repo,classifier,now,deadline:new Date(now.getTime()+30_000)});
  assert.equal(calls,0);assert.equal(result.hasMore,true);assert.equal((await repo.listJobs()).length,0);
 });
+test('provider diagnostics persist only bounded codes, never arbitrary exception content',async()=>{
+ for(const [failure,expected] of [[new Error('invalid_normalized_demand'),'invalid_normalized_demand'],[Object.assign(new Error('aborted'),{name:'AbortError'}),'openai_timeout'],[new Error('private source or provider detail'),'classification_failed']]){
+ const repo=createInMemoryInsightRepository([source()]);const classifier={provider:'mock',version:'pilot.v1',async classify(){throw failure;}};
+ const result=await processInsightBatch({repository:repo,classifier,now});assert.equal(result.failed,1);const jobs=await repo.listJobs();assert.equal(jobs[0].errorCode,expected);assert.ok(!JSON.stringify(jobs).includes('private source'));}
+});
 test('daily pilot rejects empty, duplicate, invalid or oversized manifests before database access',async()=>{
  const env={INSIGHTS_MODE:'live',INSIGHTS_PROCESSING_ENABLED:'true',INSIGHTS_OPENAI_ENABLED:'true',OPENAI_API_KEY:'synthetic',INSIGHTS_MAX_SPEND_USD:'1'};
  for(const ids of ['', '1,1','x','0',Array.from({length:201},(_,i)=>i+1).join(',')])await assert.rejects(runDailyInsights({env:{...env,INSIGHTS_PILOT_SOURCE_IDS:ids}}),/pilot_sources/);

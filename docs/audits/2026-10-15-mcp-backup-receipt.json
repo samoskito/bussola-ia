@@ -1,0 +1,23 @@
+{
+  "project": "iszynegxctqdfrmizila",
+  "startedAt": "2026-10-15T23:18:21.004Z",
+  "finishedAt": "2026-10-15T23:18:24.210Z",
+  "consistency": "per-table REST reads, not single MVCC transaction",
+  "counts": {
+    "users": 1695,
+    "user_agent_access": 4560,
+    "password_reset_tokens": 437,
+    "email_templates": 1,
+    "admin_user_revisions": 1,
+    "admin_user_audit": 8,
+    "admin_user_invitations": 2,
+    "insights_taxonomies": 1,
+    "insight_jobs": 200,
+    "script_insights": 200,
+    "insights_budgets": 1
+  },
+  "encrypted": true,
+  "decryptionEqual": true,
+  "sha256": "1be7e6fb5e777d960f023fefb560d3da142df6fdf1d8cc35b868c98210ed21ad",
+  "scope": "11 tables; excludes chats/scripts/Storage; no full database restoration claimed"
+}

@@ -1,0 +1,85 @@
+{
+  "phase": "closed",
+  "checkedAt": "2026-10-15T23:22:05.208Z",
+  "results": [
+    {
+      "path": "/api/insights-mcp",
+      "status": 503,
+      "expected": 503,
+      "cache": "private, no-store, max-age=0",
+      "challenge": null
+    },
+    {
+      "path": "/api/insights-mcp",
+      "status": 503,
+      "expected": 503,
+      "cache": "private, no-store, max-age=0",
+      "challenge": null
+    },
+    {
+      "path": "/.well-known/oauth-protected-resource/api/insights-mcp",
+      "status": 503,
+      "expected": 503,
+      "cache": "no-store",
+      "challenge": null
+    },
+    {
+      "path": "/.well-known/oauth-authorization-server",
+      "status": 503,
+      "expected": 503,
+      "cache": "no-store",
+      "challenge": null
+    },
+    {
+      "path": "/auth/login",
+      "status": 200,
+      "expected": 200,
+      "cache": "public, max-age=0, must-revalidate",
+      "challenge": null
+    },
+    {
+      "path": "/auth/insights-mcp",
+      "status": 200,
+      "expected": 200,
+      "cache": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "challenge": null
+    },
+    {
+      "path": "/api/insights/report?days=30&agentType=all",
+      "status": 401,
+      "expected": 401,
+      "cache": "private, no-store, max-age=0",
+      "challenge": null
+    },
+    {
+      "path": "/api/admin/users",
+      "status": 401,
+      "expected": 401,
+      "cache": "no-store",
+      "challenge": null
+    },
+    {
+      "path": "/api/insights/process",
+      "status": 401,
+      "expected": 401,
+      "cache": "private, no-store",
+      "challenge": null
+    },
+    {
+      "table": "insights_mcp_oauth_consents",
+      "anonStatus": 401
+    },
+    {
+      "table": "insights_mcp_oauth_grants",
+      "anonStatus": 401
+    },
+    {
+      "table": "insights_mcp_oauth_codes",
+      "anonStatus": 401
+    },
+    {
+      "table": "insights_mcp_oauth_tokens",
+      "anonStatus": 401
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "counts": {
+    "chats": 2006,
+    "users": 1695,
+    "access": 4560,
+    "scripts": 9826,
+    "classified": 200
+  },
+  "oauthRpc": false,
+  "checkedAt": "2026-10-15T23:20:56.333912+00:00",
+  "userDigest": "e86eaf3b25a1f988396583c929b24f4f",
+  "oauthTables": 0,
+  "accessDigest": "e51da5475719e952e894721e9363d032",
+  "classifiedDigest": "9a6681f87ef2969e5618cd3e5da5e8cd"
+}

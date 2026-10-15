@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-10-15T22:32:21.105Z",
+  "mode": "live",
+  "filters": {
+    "days": 30,
+    "agentType": "all"
+  },
+  "summary": {
+    "eligibleMessages": 1435,
+    "classifiedMessages": 200,
+    "pendingMessages": 1235,
+    "failedMessages": 0,
+    "excludedAdminMessages": 29,
+    "distinctUsers": 127,
+    "distinctChats": 273,
+    "coveragePercent": 13.9
+  },
+  "topicCounts": [
+    {
+      "id": "comunicacao_clara",
+      "messages": 108,
+      "distinctUsers": 63
+    },
+    {
+      "id": "lideranca",
+      "messages": 102,
+      "distinctUsers": 63
+    },
+    {
+      "id": "narrativa_executiva",
+      "messages": 60,
+      "distinctUsers": 32
+    },
+    {
+      "id": "conflitos",
+      "messages": 51,
+      "distinctUsers": 38
+    },
+    {
+      "id": "resultados",
+      "messages": 50,
+      "distinctUsers": 26
+    },
+    {
+      "id": "posicionamento_linkedin",
+      "messages": 41,
+      "distinctUsers": 26
+    },
+    {
+      "id": "outros",
+      "messages": 30,
+      "distinctUsers": 27
+    },
+    {
+      "id": "feedback",
+      "messages": 27,
+      "distinctUsers": 25
+    }
+  ],
+  "dailyScheduleActive": false
+}

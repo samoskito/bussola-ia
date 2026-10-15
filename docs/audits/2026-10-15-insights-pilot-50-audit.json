@@ -1,0 +1,34 @@
+{
+  "budget": {
+    "scope": "insights-pilot-20261015-v1",
+    "capUsd": 1,
+    "reservedUsd": 0.063149
+  },
+  "byAgent": {
+    "postagem": 12,
+    "comunicacao": 13,
+    "apresentacao": 13,
+    "conversas_dificeis": 12
+  },
+  "sources": {
+    "chats": 2006,
+    "users": 1695,
+    "scripts": 9826
+  },
+  "checkedAt": "2026-10-15T22:22:13.453732+00:00",
+  "jobStates": {
+    "completed": 50
+  },
+  "classified": 50,
+  "knownUsage": {
+    "input": 27988,
+    "output": 6022,
+    "estimatedStandardUsd": 0.0131251
+  },
+  "needsReview": 11,
+  "unclassifiable": 0,
+  "adminOrUnknownRows": 0,
+  "invalidReviewFlags": 0,
+  "oversizedSummaries": 0,
+  "invalidTopicAssignments": 0
+}

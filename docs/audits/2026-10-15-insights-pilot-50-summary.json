@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-10-15T22:17:01.931Z",
+  "model": "gpt-5.4-nano",
+  "target": 50,
+  "completed": 50,
+  "byAgent": {
+    "comunicacao": 13,
+    "postagem": 12,
+    "conversas_dificeis": 12,
+    "apresentacao": 13
+  },
+  "needsReview": 11,
+  "batches": [
+    {
+      "mode": "live",
+      "inspected": 50,
+      "completed": 1,
+      "skipped": 49,
+      "excluded": 0,
+      "pending": 0,
+      "failed": 0,
+      "budgetStopped": false,
+      "hasMore": false,
+      "remainingUninspected": 0,
+      "reservedUsd": 0.01,
+      "releasedUsd": 0.009718,
+      "estimatedCostUsd": 0.000282,
+      "budgetSettlementFailed": 0,
+      "usage": {
+        "inputTokens": 501,
+        "outputTokens": 145,
+        "totalTokens": 646,
+        "reasoningTokens": 62
+      }
+    }
+  ]
+}

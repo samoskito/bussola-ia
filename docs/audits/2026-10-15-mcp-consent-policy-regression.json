@@ -1,0 +1,13 @@
+{
+  "original": {
+    "origin": "null",
+    "accepted": false
+  },
+  "corrected": {
+    "origin": "http://127.0.0.1:49200",
+    "expected": "http://127.0.0.1:49200",
+    "accepted": true
+  },
+  "synthetic": true,
+  "noDatabase": true
+}

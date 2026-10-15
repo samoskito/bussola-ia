@@ -6,7 +6,10 @@ export async function middleware(request: NextRequest) {
     if (path === '/auth/insights-mcp') {
       const response = NextResponse.next();
       response.headers.set('Cache-Control', 'private, no-store, max-age=0');
-      response.headers.set('Referrer-Policy', 'no-referrer');
+      // A no-referrer document makes native form POSTs send Origin: null.
+      // same-origin preserves our strict Origin+CSRF check while withholding
+      // the Referer on cross-origin navigation to Claude/ChatGPT.
+      response.headers.set('Referrer-Policy', 'same-origin');
       response.headers.set('X-Frame-Options', 'DENY');
       // form-action 'self' can also block the authorized external OAuth 303.
       // POST target is fixed in the page; Origin/nonce checks protect the handler.

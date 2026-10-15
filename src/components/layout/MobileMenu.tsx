@@ -134,6 +134,12 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
               Insights de demandas
             </Link>
           )}
+          {user?.nivel === 'admin' && (
+            <Link href="/dashboard/users" onClick={onClose} aria-current={isActive('/dashboard/users') ? 'page' : undefined} className={`flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium ${isActive('/dashboard/users') ? 'bg-[#FF6B00]/10 text-orange-300' : 'text-gray-300 hover:bg-gray-800'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400`}>
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m8-7.87a4 4 0 0 1 0 7.75" /></svg>
+              Usuários e acessos
+            </Link>
+          )}
           {AGENTS.map((agent) => {
             const href = `/dashboard/agent/${agent.type}`;
             const isLocked = !isAgentAvailableForUser(agent.type, user?.nivel);

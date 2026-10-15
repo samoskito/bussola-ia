@@ -2,6 +2,27 @@
 
 Status: estrutura implementada na branch local `codex/insights-demo`. Sem push, deploy, aplicação de migration, agendamento ou classificação de conversas reais. A demonstração usa dados inteiramente sintéticos.
 
+## Ponto de retomada aprovado pelo usuário — 2026-10-14
+
+Atualização 15/10/2026: plano organizado no ClickUp, espaço Geral → pasta Bússola IA → [Plano de ação — Insights, OpenAI e MCP](https://app.clickup.com/30916694/v/l/li/1400710000001965). São 15 tarefas (4 concluídas localmente, 1 impedimento por chave/orçamento e 10 a fazer), com critérios e dependências. IDs e snapshot em `docs/plans/2026-10-15-clickup-insights.md`. Outras demandas devem usar listas separadas; consultar estado atual das tarefas antes de retomar.
+
+**Decisão mais recente:** aguardar a chave OpenAI do cliente, prevista para amanhã. O usuário descartou o teste do ChatGPT via túnel temporário. Retomar a preparação de uma integração hospedada para testar com dados reais; essa intenção não autoriza automaticamente migrations, publicação ou chamadas pagas agora. Nenhum túnel foi criado.
+
+**Já pronto:** painel admin com filtros/relatórios/exportação e validação manual inicial do usuário; API de consulta; pipeline e adaptador OpenAI desativados; migration aditiva preparada; MCP local somente leitura com cinco ferramentas e dados simulados. Commits locais de referência: `f3019ba` (Insights) e `9efec3e` (MCP demo). Testes locais registrados abaixo; conexão ChatGPT real e processamento real ainda não testados.
+
+**O que falta para subir, em ordem:**
+
+1. Receber/configurar a chave como segredo no servidor, sem colá-la no chat ou versioná-la. Confirmar organização, disponibilidade do modelo, autorização do piloto e teto de gasto; US$ 5 é sugestão ainda não aprovada.
+2. Confirmar acesso e ambiente autorizado para validar a migration/RPCs, permissões, concorrência e orçamento. Aplicar em produção somente após validação e autorização específica.
+3. Executar um lote real pequeno e delimitado, excluindo admins; revisar qualidade das categorias, minimização, contagens e custo antes de ampliar para 30 dias.
+4. Implementar o caminho remoto do MCP: fonte real compartilhada com o painel, HTTPS, autenticação e autorização admin/escopos. O servidor demo atual rejeita produção e não deve simplesmente ser exposto com dados reais.
+5. Confirmar recurso/permissões de MCP personalizado na conta ChatGPT do gestor; cadastrar o conector e validar as ferramentas após a hospedagem autorizada. Nenhuma chave OpenAI ou service role deve ser entregue ao ChatGPT.
+6. Preparar publicação com configuração segura e executor diário que percorra os lotes; validar login, acesso negado a usuários comuns e consulta ponta a ponta. Publicar/ativar somente no checkpoint autorizado.
+
+**Distinção para a retomada:** a chave OpenAI paga a classificação no backend. A consulta dos relatórios pelo ChatGPT usa o MCP e a conta do gestor, sujeita às permissões/limites dessa conta. Ter a chave não resolve, por si só, banco, hospedagem ou autenticação do MCP e não ativa nenhuma flag.
+
+**Próxima ação:** quando o usuário trouxer a chave, revisar este handoff e o estado atual do repositório/configuração, concluir as preparações e apresentar lote, custo máximo e alterações de banco/publicação concretos antes de ativar. Até lá, manter OpenAI/processamento desligados; sem push, deploy, migrations ou agendamento. Servidores locais de demonstração são temporários e podem precisar ser reiniciados na próxima sessão.
+
 ## Entrega
 
 - `/dashboard/insights`: painel admin com quatro IAs, período, ranking por pessoas distintas, volume por agente, gráfico acessível, exemplos mínimos e exportação CSV/JSON. Banner de demonstração persistente e layout desktop/mobile.

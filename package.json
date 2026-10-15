@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test:insights": "node --test tests/insights/*.test.cjs",
     "insights:demo": "node scripts/insights-dry-run.cjs",
-    "test:mcp": "node --test tests/mcp/*.test.cjs"
+    "test:mcp": "node --test tests/mcp/*.test.cjs",
+    "test:admin-users": "node --test tests/admin-users/*.test.cjs"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",

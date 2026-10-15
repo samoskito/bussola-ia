@@ -333,6 +333,8 @@ Antes de reaproveitar o componente legado, confirme se as tabelas `mensagens` e 
 
 ## UI e Navegacao
 
+Atualização 15/10/2026: painel admin local `/dashboard/users` implementado com fixtures e APIs em `/api/admin/users`. `ADMIN_USERS_MODE=demo` apenas fora de production, padrão disabled; sem live/banco de usuários real. Autorização consulta somente papel atual do admin, mutações são em memória. Primeiro acesso demo gera link `/auth/update-password/demo` de1h/uso único, envio simulado; não envia/salva senha. Sem migrations ou e-mails reais. Handoff e limites: `docs/plans/2026-10-15-admin-usuarios-handoff.md`. 16 testes admin +18 Insights passaram; typecheck escopado sem erros e14 legados globais. Chrome desktop/mobile com sessão sintética/APIs interceptadas passou; login real não validado nesta entrega.
+
 - `src/app/dashboard/page.tsx`: cards dos quatro agentes com logo.
 - `src/app/dashboard/select-agent/page.tsx`: selecao alternativa usando `AGENTS`.
 - `src/app/dashboard/agent/[agentType]/page.tsx`: tela generica para iniciar chat.
@@ -354,6 +356,10 @@ Regra de layout do chat no celular:
 Tema: escuro, Tailwind, cor primaria `#FF6B00`.
 
 ## Futuro: Hotmart Direto
+
+Decisão posterior em 15/10/2026: confirmado fluxo Hotmart → n8n → base. Integração direta incluída no plano admin (ClickUp lista `1400710000001966`, agora 15 tarefas), com transição validada antes de desligar somente fluxo comercial substituído; preservar n8n dos chats. Regra cadastral aprovada: preencher apenas campos vazios, manter existentes e sinalizar divergências. Substitui a pendência de sobrescrita mencionada abaixo. Acesso manual segue protegido por revisão admin. Sem alterações de produção. Ver `docs/plans/2026-10-15-admin-usuarios-brainstorm.md`.
+
+Atualização de contexto em 15/10/2026: usuário informa que a automação Hotmart já está pronta, possivelmente fora deste checkout; a seção abaixo é histórica e não comprova ausência da integração externa. Conferir fluxo real antes de modificá-lo. Nova demanda em brainstorming: painel admin para usuários/acessos, separado de Insights, lista ClickUp `1400710000001966`. Registro em `docs/plans/2026-10-15-admin-usuarios-brainstorm.md`. Decisão: Hotmart enriquece cadastro automaticamente; mudança conflitante com acesso manual exige decisão do admin. Regra de sobrescrita de campos divergentes ainda pendente. Nenhuma implementação ou alteração real nesta etapa.
 
 Nao implementado ainda. Plano recomendado:
 
@@ -378,6 +384,9 @@ Nao implementado ainda. Plano recomendado:
 
 ## Planejamento de Insights de Demandas (2026-10-14)
 
+- Controle no ClickUp criado em 15/10/2026: Geral → Bússola IA → lista Plano de ação — Insights, OpenAI e MCP (`1400710000001965`), 15 tarefas com critérios/dependências. Mapeamento em `docs/plans/2026-10-15-clickup-insights.md`. Consultar tarefas atuais antes de retomar; novas demandas ficam em listas separadas, sem misturar planos.
+
+- Ponto de retomada mais recente: usuario decidiu aguardar a chave OpenAI do cliente e dispensou tunel temporario para testar no ChatGPT. Continuar pela integracao hospedada com dados reais somente apos preparar e autorizar piloto/custo, banco e publicacao. Chave sozinha nao ativa o pipeline; MCP remoto com fonte real, HTTPS e autenticacao/autorizacao ainda precisa ser implementado. Checklist de retomada registrado no inicio de `docs/plans/2026-10-14-insights-handoff.md`. Nenhuma nova ativacao autorizada/executada nesta pausa.
 - Pedido: permitir que gestor/equipe acompanhe as principais demandas enviadas as quatro IAs e consulte relatorios no ChatGPT ou Claude que ja utiliza.
 - Direcao aprovada pelo usuario: painel + API de consulta + IA para classificar mensagens. Estrutura local implementada com dados simulados na branch `codex/insights-demo`, sem push/deploy/migration aplicada.
 - Plano proposto: `docs/plans/2026-10-14-insights-perguntas-implementation.md`.

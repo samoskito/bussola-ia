@@ -257,6 +257,14 @@ const Sidebar: React.FC<SidebarProps> = ({ initialChats = [] }) => {
               </Link>
             </li>
           )}
+          {isAdmin && (
+            <li>
+              <Link href="/dashboard/users" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-orange-300 hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m8-7.87a4 4 0 0 1 0 7.75" /></svg>
+                Usuários e acessos
+              </Link>
+            </li>
+          )}
           {AGENTS.map((agent) => {
             const isLocked = !isAgentAvailableForUser(agent.type, user?.nivel);
             const content = (

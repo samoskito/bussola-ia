@@ -61,7 +61,7 @@ Não habilitar flags só porque a chave chegou. Antes de inferência real:
 5. Configurar um executor diário autorizado que percorra os lotes, respeitando `hasMore`, orçamento, atraso de retries e limite do piloto. Um único lote de 50 não processa o backfill de 1.456 mensagens. Não há cron ativo; o POST é apenas o hook preparado. Cada invocação pode consumir até 50 chamadas, então validar tempo de execução e continuidade antes de escolher hospedagem.
 6. Validar login real admin/negação user, contagens contra SQL e atualização do painel; só então planejar publicação autorizada.
 
-Conector MCP/OAuth para ChatGPT/Claude não foi implementado ou publicado nesta entrega. A API e a camada de relatório estão preparadas; autenticação do conector e conta/plano do gestor continuam etapa específica.
+Atualização posterior: MCP local demo implementado em `mcp/insights`, com cinco ferramentas somente leitura, SDK oficial, transportes STDIO e HTTP loopback e as mesmas fixtures do painel. Ver `mcp/insights/README.md`. Seis testes MCP com clientes oficiais passaram; as configurações de Claude Desktop/Codex são exemplos não instalados. OAuth/HTTPS e conexão remota na conta ChatGPT/Claude não foram implementados/publicados. Autenticação remota e conta/plano do gestor continuam etapa específica.
 
 ## Validação e limites
 

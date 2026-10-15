@@ -1,0 +1,14 @@
+{
+  "name": "bussola-insights-mcp-local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local read-only MCP demonstration using synthetic Bussola Insights reports",
+  "scripts": {
+    "start": "node server.cjs --transport stdio",
+    "http": "node server.cjs --transport http"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "bussola-insights-demo": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "C:\\Users\\samue\\Documents\\bussola-ia-main\\mcp\\insights\\server.cjs",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "MCP_INSIGHTS_MODE": "demo",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# Example only: no client settings were installed or changed.
+[mcp_servers.bussola-insights-demo]
+command = 'C:\Program Files\nodejs\node.exe'
+args = ['C:\Users\samue\Documents\bussola-ia-main\mcp\insights\server.cjs', '--transport', 'stdio']
+
+[mcp_servers.bussola-insights-demo.env]
+MCP_INSIGHTS_MODE = 'demo'
+NODE_ENV = 'development'

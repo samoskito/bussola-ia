@@ -44,6 +44,19 @@ const selectedAgents = (value: unknown): AgentType[] => {
   return value as AgentType[];
 };
 
+const individualAccess = (value: unknown): UpdateAdminAccessInput['access'] => {
+  if (!Array.isArray(value) || value.length !== types.length) fail('Informe as quatro IAs e suas validades.');
+  const entries = (value as unknown[]).map(item => {
+    only(item as object, ['agentType', 'enabled', 'expiresAt']);
+    const entry = item as UpdateAdminAccessInput['access'][number];
+    if (!types.includes(entry.agentType) || typeof entry.enabled !== 'boolean') fail('Acesso por IA inválido.');
+    return { agentType: entry.agentType, enabled: entry.enabled, expiresAt: date(entry.expiresAt) };
+  });
+  if (new Set(entries.map(item => item.agentType)).size !== types.length) fail('Informe cada IA uma única vez.');
+  return entries;
+};
+const earliestExpiry = (global: string | null, individual: string | null) => global === null ? individual : individual === null ? global : global < individual ? global : individual;
+
 // Expiration is an inclusive calendar date in the product's Brazilian timezone,
 // not a UTC instant parsed with new Date('YYYY-MM-DD').
 const calendarDate = (value: Date) => {
@@ -66,7 +79,7 @@ export function createDemoAdminUsersStore(now: () => Date = () => new Date()) {
       const grant = grants.find(item => item.agentType === agentType);
       const source = user.nivel === 'admin' ? 'admin' as const : global ? 'global' as const : grant?.enabled ? 'individual' as const : 'none' as const;
       const effective = isAgentAvailableForUser(agentType, user.nivel) && (user.nivel === 'admin' || (!expired(user.data_expiracao) && (global || Boolean(grant?.enabled && !expired(grant.expiresAt)))));
-      return { agentType, enabled: user.nivel === 'admin' || global || Boolean(grant?.enabled), expiresAt: user.nivel === 'admin' ? null : global ? user.data_expiracao : grant?.expiresAt ?? null, effective, source };
+      return { agentType, enabled: user.nivel === 'admin' || global || Boolean(grant?.enabled), expiresAt: user.nivel === 'admin' ? null : global ? user.data_expiracao : earliestExpiry(user.data_expiracao, grant?.expiresAt ?? null), effective, source };
     });
     const status: AdminUserStatus = access.some(item => item.effective) ? 'active' : access.some(item => item.enabled) ? 'expired' : 'none';
     const inviteStatus = !invitation ? 'none' : invitation.status === 'consumed' ? 'consumed' : invitation.expiresAt <= timestamp() ? 'expired' : invitation.status;
@@ -140,17 +153,25 @@ export function createDemoAdminUsersStore(now: () => Date = () => new Date()) {
       return view(user);
     },
     setAccess(id: string, input: UpdateAdminAccessInput, actor: string) {
-      only(input, ['revision', 'agentTypes', 'expiresAt', 'reason']);
+      only(input, ['revision', 'access', 'reason']);
       const user = read(id); revision(user, input.revision);
       if (user.nivel === 'admin') fail('O acesso vitalício de administradores não pode ser editado.', 'admin_access_locked', 403);
-      const agents = selectedAgents(input.agentTypes), expiresAt = date(input.expiresAt), note = reason(input.reason, true);
-      if (agents.length && expiresAt && expired(expiresAt)) fail('A validade do acesso deve ser hoje ou uma data futura.');
+      const access = individualAccess(input.access), note = reason(input.reason, true);
       const before = view(user);
-      // Materialize all four desired grants, removing global-plan bypass atomically.
+      for (const entry of access) {
+        const previous = before.access.find(item => item.agentType === entry.agentType)!;
+        if (entry.enabled && entry.expiresAt && expired(entry.expiresAt) && (!previous.enabled || entry.expiresAt !== previous.expiresAt)) fail('Uma nova validade deve ser hoje ou uma data futura.');
+      }
+      // The displayed dates include any global cap. Materialize the requested
+      // per-agent state before removing that cap, preserving unchanged grants.
       user.plano = 'Personalizado'; user.data_expiracao = null;
-      user.grants = types.map(agentType => ({ agentType, enabled: agents.includes(agentType), expiresAt: agents.includes(agentType) ? expiresAt : null }));
+      user.grants = types.map(agentType => {
+        const desired = access.find(item => item.agentType === agentType)!;
+        const previous = user.grants.find(item => item.agentType === agentType);
+        return previous && previous.enabled === desired.enabled && previous.expiresAt === desired.expiresAt ? previous : { ...desired };
+      });
       user.revision++;
-      audit(user, actor, 'access_updated', note, { before: { plano: before.plano, data_expiracao: before.data_expiracao, access: before.access }, after: { plano: user.plano, data_expiracao: null, agentTypes: agents, expiresAt } });
+      audit(user, actor, 'access_updated', note, { before: { plano: before.plano, data_expiracao: before.data_expiracao, access: before.access }, after: { plano: user.plano, data_expiracao: null, access } });
       return view(user);
     },
     issueInvite(id: string, input: { revision: number; action: 'generate' | 'send'; reason?: string }, actor: string, origin = 'http://localhost:3000'): AdminInviteResult {

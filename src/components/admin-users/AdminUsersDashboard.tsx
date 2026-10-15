@@ -18,7 +18,8 @@ async function api<T>(path = '', method = 'GET', body?: unknown): Promise<T> {
   if (!response.ok) throw new RequestError(response.status, response.status === 401 ? 'Sua sessão expirou. Entre novamente.' : response.status === 403 ? 'Acesso exclusivo para administradores.' : response.status === 503 ? 'Administração desativada ou indisponível. As ações estão bloqueadas.' : data.error || data.message || 'Não foi possível concluir a operação.', data.code);
   return data;
 }
-type Editor = { kind: 'create' | 'profile' | 'access'; nome: string; email: string; telefone: string; agentTypes: AgentType[]; expiresAt: string; reason: string; review: boolean; mixedExpiry: boolean; expirationConfirmed: boolean };
+type AccessDraft = Pick<AdminUser['access'][number], 'agentType' | 'enabled' | 'expiresAt'>;
+type Editor = { kind: 'create' | 'profile' | 'access'; nome: string; email: string; telefone: string; agentTypes: AgentType[]; expiresAt: string; access: AccessDraft[]; reason: string; review: boolean };
 
 export default function AdminUsersDashboard({ mode: initialMode = 'demo' }: { mode?: 'demo' | 'live' }) {
   const [q, setQ] = useState('');
@@ -43,6 +44,7 @@ export default function AdminUsersDashboard({ mode: initialMode = 'demo' }: { mo
   const isDemo = mode === 'demo';
   const detailRequest = useRef(0);
   const editorRef = useRef<HTMLDialogElement>(null);
+  const editorTitleRef = useRef<HTMLHeadingElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   function fail(err: unknown) {
     setError(err instanceof Error ? err.message : 'Falha de conexão. Tente novamente.');
@@ -62,6 +64,10 @@ export default function AdminUsersDashboard({ mode: initialMode = 'demo' }: { mo
     if (editor) { opener.current = document.activeElement as HTMLElement; editorRef.current?.showModal(); }
     else { editorRef.current?.close(); opener.current?.focus(); }
   }, [Boolean(editor)]);
+  useEffect(() => {
+    editorRef.current?.scrollTo(0, 0);
+    if (editor?.review) editorTitleRef.current?.focus({ preventScroll: true });
+  }, [editor?.review]);
   useEffect(() => { if (inviteAction) inviteDialogRef.current?.showModal(); else inviteDialogRef.current?.close(); }, [Boolean(inviteAction)]);
   async function select(user: AdminUser) {
     const id = ++detailRequest.current;
@@ -74,20 +80,25 @@ export default function AdminUsersDashboard({ mode: initialMode = 'demo' }: { mo
   }
   function open(kind: Editor['kind']) {
     setError('');
-    const currentExpiries = Array.from(new Set((selected?.access || []).filter(a => a.enabled).map(a => a.expiresAt || '')));
-    const mixedExpiry = kind === 'access' && currentExpiries.length > 1;
-    setEditor({ mixedExpiry, expirationConfirmed: !mixedExpiry, kind, nome: kind === 'create' ? '' : selected?.nome || '', email: kind === 'create' ? '' : selected?.email || '', telefone: kind === 'create' ? '' : selected?.telefone || '', agentTypes: kind === 'create' ? [] : selected?.access.filter(a => a.enabled).map(a => a.agentType) || [], expiresAt: kind === 'create' ? '' : currentExpiries.length === 1 ? currentExpiries[0] : selected?.data_expiracao || '', reason: '', review: false });
+    const access = AGENTS.map(agent => {
+      const current = selected?.access.find(item => item.agentType === agent.type);
+      return { agentType: agent.type, enabled: current?.enabled ?? false, expiresAt: current?.expiresAt ?? null };
+    });
+    setEditor({ kind, nome: kind === 'create' ? '' : selected?.nome || '', email: kind === 'create' ? '' : selected?.email || '', telefone: kind === 'create' ? '' : selected?.telefone || '', agentTypes: [], expiresAt: '', access, reason: '', review: false });
   }
   function change(values: Partial<Editor>) { setEditor(e => e ? { ...e, ...values } : null); }
+  function changeAccess(agentType: AgentType, values: Partial<Pick<AccessDraft, 'enabled' | 'expiresAt'>>) {
+    setEditor(current => current ? { ...current, access: current.access.map(item => item.agentType === agentType ? { ...item, ...values } : item) } : null);
+  }
   async function save() {
     if (!editor || busy || blocked) return;
     setBusy(true); setError('');
     try {
       const profile = { nome: editor.nome, email: editor.email, telefone: editor.telefone || null, reason: editor.reason };
       const access = { agentTypes: editor.agentTypes, expiresAt: editor.expiresAt || null, reason: editor.reason };
-      const result = editor.kind === 'create' ? await api<{ user: AdminUser }>('', 'POST', { ...profile, ...access }) : editor.kind === 'profile' ? await api<{ user: AdminUser }>(`/${selected!.id}`, 'PATCH', { ...profile, revision: selected!.revision }) : await api<{ user: AdminUser }>(`/${selected!.id}/access`, 'POST', { ...access, revision: selected!.revision });
+      const result = editor.kind === 'create' ? await api<{ user: AdminUser }>('', 'POST', { ...profile, ...access }) : editor.kind === 'profile' ? await api<{ user: AdminUser }>(`/${selected!.id}`, 'PATCH', { ...profile, revision: selected!.revision }) : await api<{ user: AdminUser }>(`/${selected!.id}/access`, 'POST', { access: editor.access, reason: editor.reason, revision: selected!.revision });
       setEditor(null); await select(result.user); await load(); setNotice(isDemo ? 'Alteração salva somente na demonstração.' : 'Alteração salva.');
-    } catch (err) { fail(err); if (err instanceof RequestError && err.status === 409 && err.code === 'revision_conflict' && selected) { await select(selected); change({ review: false }); setError('O cadastro mudou. Confira os dados atualizados e revise novamente.'); } }
+    } catch (err) { fail(err); if (err instanceof RequestError && err.status === 409 && err.code === 'revision_conflict' && selected) { setEditor(null); await select(selected); setError('O cadastro mudou. Reabra a edição, confira os dados atualizados e refaça sua alteração.'); } }
     finally { setBusy(false); }
   }
   async function issueInvite(action: 'generate' | 'send', reason: string) {
@@ -152,11 +163,15 @@ export default function AdminUsersDashboard({ mode: initialMode = 'demo' }: { mo
     </dialog>
     <dialog ref={editorRef} onCancel={e => { if (busy) e.preventDefault(); else setEditor(null); }} className="m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-xl overflow-y-auto rounded-xl border border-gray-700 bg-gray-900 p-0 text-white shadow-2xl backdrop:bg-black/80" aria-labelledby="editor-title">
       {editor && <form className="p-5 sm:p-7" onSubmit={(e: FormEvent) => { e.preventDefault(); if (editor.review) save(); else change({ review: true }); }}>
-        <p className="mb-2 text-[10px] uppercase tracking-widest text-orange-300">{isDemo ? 'Demo local' : 'Administração'} · {editor.review ? '02 / Revisão' : '01 / Preparação'}</p><h2 id="editor-title" className="text-2xl font-semibold">{editor.review ? 'Confira antes de salvar' : editor.kind === 'create' ? 'Novo usuário' : editor.kind === 'profile' ? 'Editar cadastro' : 'Gerenciar acessos'}</h2>
+        <p className="mb-2 text-[10px] uppercase tracking-widest text-orange-300">{isDemo ? 'Demo local' : 'Administração'} · {editor.review ? '02 / Revisão' : '01 / Preparação'}</p><h2 id="editor-title" ref={editorTitleRef} tabIndex={-1} className="text-2xl font-semibold outline-none">{editor.review ? 'Confira antes de salvar' : editor.kind === 'create' ? 'Novo usuário' : editor.kind === 'profile' ? 'Editar cadastro' : 'Gerenciar acessos'}</h2>
         {error && <p role="alert" className="mt-4 text-sm text-red-300">{error}</p>}
-        {editor.review ? <div className="my-5 space-y-4 rounded-lg border border-gray-700 bg-gray-950 p-4 text-sm"><p className="text-xs leading-relaxed text-orange-200">{isDemo ? 'Somente dados fictícios serão alterados. Nenhum convite é enviado ao salvar.' : 'Esta alteração será aplicada ao cadastro abaixo. Nenhum convite é enviado ao salvar.'}</p>{editor.kind !== 'access' && <><p><span className="block text-xs text-gray-500">Nome</span>{editor.kind === 'profile' && `${selected?.nome} → `}{editor.nome}</p><p className="break-all"><span className="block text-xs text-gray-500">E-mail</span>{editor.kind === 'profile' && `${selected?.email} → `}{editor.email}</p><p><span className="block text-xs text-gray-500">Telefone</span>{editor.kind === 'profile' && `${selected?.telefone || 'Vazio'} → `}{editor.telefone || 'Vazio'}</p></>}{editor.kind !== 'profile' && <><p><span className="block text-xs text-gray-500">Antes</span>{editor.kind === 'create' ? 'Novo cadastro sem acessos' : selected?.access.filter(a => a.enabled).map(a => `${getAgentLabel(a.agentType)}${a.effective ? '' : ' (expirado/bloqueado)'}`).join(', ') || 'Nenhuma IA liberada'}</p><p><span className="block text-xs text-gray-500">Depois · conjunto completo de IAs</span>{editor.agentTypes.map(getAgentLabel).join(', ') || 'Nenhuma IA liberada'}</p><p className="text-xs text-gray-400">IAs desmarcadas serão revogadas. Plano global será convertido para acessos individuais ao salvar.</p>{editor.kind === 'access' && <div><span className="block text-xs text-gray-500">Validades antes</span>{selected?.access.filter(a => a.enabled).map(a => <p key={a.agentType} className="mt-1 text-xs">{getAgentLabel(a.agentType)}: {date(a.expiresAt)}</p>)}</div>}<p>Nova validade das IAs selecionadas: {date(editor.expiresAt || null)}</p></>}<p><span className="block text-xs text-gray-500">Motivo registrado</span>{editor.reason}</p></div> : <div className="my-5 space-y-4">
+        {editor.review ? <div className="my-5 space-y-4 rounded-lg border border-gray-700 bg-gray-950 p-4 text-sm"><p className="text-xs leading-relaxed text-orange-200">{isDemo ? 'Somente dados fictícios serão alterados. Nenhum convite é enviado ao salvar.' : 'Esta alteração será aplicada ao cadastro abaixo. Nenhum convite é enviado ao salvar.'}</p>{editor.kind !== 'access' && <><p><span className="block text-xs text-gray-500">Nome</span>{editor.kind === 'profile' && `${selected?.nome} → `}{editor.nome}</p><p className="break-all"><span className="block text-xs text-gray-500">E-mail</span>{editor.kind === 'profile' && `${selected?.email} → `}{editor.email}</p><p><span className="block text-xs text-gray-500">Telefone</span>{editor.kind === 'profile' && `${selected?.telefone || 'Vazio'} → `}{editor.telefone || 'Vazio'}</p></>}
+          {editor.kind === 'create' && <><p><span className="block text-xs text-gray-500">Antes</span>Novo cadastro sem acessos</p><p><span className="block text-xs text-gray-500">Depois · conjunto completo de IAs</span>{editor.agentTypes.map(getAgentLabel).join(', ') || 'Nenhuma IA liberada'}</p><p>Validade das IAs selecionadas: {editor.expiresAt ? `${date(editor.expiresAt)} (inclusive)` : 'Sem vencimento'}</p></>}
+          {editor.kind === 'access' && <><AccessReview before={selected?.access || []} after={editor.access} /><p className="text-xs leading-relaxed text-gray-400">IAs desmarcadas serão revogadas. As datas de cada IA serão mantidas conforme a revisão. Plano global será convertido para acessos individuais ao salvar.</p></>}
+          <p><span className="block text-xs text-gray-500">Motivo registrado</span>{editor.reason}</p></div> : <div className="my-5 space-y-4">
           {editor.kind !== 'access' && <><label className="block text-xs text-gray-400">Nome<input required maxLength={120} className={field} value={editor.nome} onChange={e => change({ nome: e.target.value })} /></label><label className="block text-xs text-gray-400">E-mail<input required type="email" maxLength={254} className={field} value={editor.email} onChange={e => change({ email: e.target.value })} /></label><label className="block text-xs text-gray-400">Telefone<input type="tel" maxLength={30} className={field} value={editor.telefone} onChange={e => change({ telefone: e.target.value })} /></label></>}
-          {editor.kind !== 'profile' && <><fieldset><legend className="mb-2 text-xs text-gray-400">IAs que ficarão liberadas</legend>{AGENTS.map(a => <label className="mb-2 flex items-start gap-3 rounded-lg border border-gray-700 p-3 text-sm" key={a.type}><input type="checkbox" className="mt-1 accent-orange-500" checked={editor.agentTypes.includes(a.type)} onChange={e => change({ agentTypes: e.target.checked ? [...editor.agentTypes, a.type] : editor.agentTypes.filter(t => t !== a.type) })} />{a.name}</label>)}</fieldset><p className="text-xs leading-relaxed text-gray-400">Marque o conjunto final. Desmarcar revoga; alterar a data renova as IAs marcadas. Ao editar, o plano global será convertido para permissões individuais.</p><label className="block text-xs text-gray-400">Validade das IAs selecionadas<input type="date" min={new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())} className={field} value={editor.expiresAt} onChange={e => change({ expiresAt: e.target.value, expirationConfirmed: true })} /><span className="mt-1 block text-gray-500">Em branco: sem vencimento.</span></label>{editor.mixedExpiry && <label className="flex items-start gap-3 rounded-lg border border-orange-400/40 p-3 text-xs leading-relaxed text-orange-200"><input required type="checkbox" className="mt-1 accent-orange-500" checked={editor.expirationConfirmed} onChange={e => change({ expirationConfirmed: e.target.checked })} />As IAs possuem validades diferentes. Confirmo aplicar {editor.expiresAt ? date(editor.expiresAt) : 'acesso sem vencimento'} a todas as IAs selecionadas.</label>}</>}
+          {editor.kind === 'create' && <><fieldset><legend className="mb-2 text-xs text-gray-400">IAs que ficarão liberadas</legend>{AGENTS.map(a => <label className="mb-2 flex items-start gap-3 rounded-lg border border-gray-700 p-3 text-sm" key={a.type}><input type="checkbox" className="mt-1 accent-orange-500" checked={editor.agentTypes.includes(a.type)} onChange={e => change({ agentTypes: e.target.checked ? [...editor.agentTypes, a.type] : editor.agentTypes.filter(t => t !== a.type) })} />{a.name}</label>)}</fieldset><label className="block text-xs text-gray-400">Validade das IAs selecionadas<input type="date" min={new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())} className={field} value={editor.expiresAt} onChange={e => change({ expiresAt: e.target.value })} /><span className="mt-1 block text-gray-500">Em branco: sem vencimento. A data inclui o dia informado.</span></label></>}
+          {editor.kind === 'access' && <><fieldset><legend className="mb-2 text-xs text-gray-400">Acesso e validade de cada IA</legend>{editor.access.map(item => <div className="mb-3 rounded-lg border border-gray-700 p-3" key={item.agentType}><label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 accent-orange-500" checked={item.enabled} onChange={e => changeAccess(item.agentType, { enabled: e.target.checked })} />{getAgentLabel(item.agentType)}</label><label className="mt-3 block text-xs text-gray-400">Validade de {getAgentLabel(item.agentType)}<input type="date" className={field} value={item.expiresAt || ''} onChange={e => changeAccess(item.agentType, { expiresAt: e.target.value || null })} /><span className="mt-1 block text-gray-500">{item.expiresAt ? `Até ${date(item.expiresAt)}, inclusive.` : 'Sem vencimento (campo em branco).'}{!item.enabled && ' IA desmarcada: sem acesso, mesmo com uma data registrada.'}</span></label></div>)}</fieldset><p className="text-xs leading-relaxed text-gray-400">Cada data vale somente para sua IA. Desmarcar revoga o acesso; mantenha os demais campos para preservar as outras permissões. Ao salvar, o plano global será convertido para acessos individuais.</p></>}
           <label className="block text-xs text-gray-400">Motivo da alteração<textarea required minLength={5} maxLength={500} rows={2} className={field} placeholder="Ex.: bônus aprovado pelo atendimento" value={editor.reason} onChange={e => change({ reason: e.target.value })} /></label>
           {editor.kind === 'create' && <p className="text-xs text-gray-500">Cadastro de usuário comum. O convite de primeiro acesso pode ser gerado depois.</p>}
         </div>}
@@ -164,6 +179,20 @@ export default function AdminUsersDashboard({ mode: initialMode = 'demo' }: { mo
       </form>}
     </dialog>
   </div>;
+}
+
+function AccessReview({ before, after }: { before: AdminUser['access']; after: AccessDraft[] }) {
+  return <div className="space-y-3">{after.map(item => {
+    const previous = before.find(access => access.agentType === item.agentType);
+    const changed = previous?.enabled !== item.enabled || previous?.expiresAt !== item.expiresAt;
+    return <section key={item.agentType} aria-label={`Revisão de ${getAgentLabel(item.agentType)}`} className="rounded-lg border border-gray-700 p-3">
+      <h3 className="text-sm font-medium">{getAgentLabel(item.agentType)}</h3><p className={`mt-1 text-xs ${changed ? 'text-orange-300' : 'text-gray-500'}`}>{changed ? 'Será alterada' : 'Mantida'}</p>
+      <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+        <div><h4 className="text-gray-500">Antes</h4><p className="mt-1">{previous?.enabled ? 'Liberada' : 'Sem acesso'}{previous?.enabled && !previous.effective ? ' (prazo vencido ou bloqueio global)' : ''}</p><p className="mt-1">Validade: {previous?.expiresAt ? `${date(previous.expiresAt)} (inclusive)` : 'Sem vencimento'}</p></div>
+        <div><h4 className="text-gray-500">Depois</h4><p className="mt-1">{item.enabled ? 'Liberada' : 'Sem acesso (revogada)'}</p><p className="mt-1">Validade: {item.expiresAt ? `${date(item.expiresAt)} (inclusive)` : 'Sem vencimento'}</p></div>
+      </div>
+    </section>;
+  })}</div>;
 }
 
 function Badge({ status }: { status: AdminUser['status'] }) { return <span className={`h-fit rounded-full border px-2.5 py-1 text-[10px] font-medium ${status === 'active' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : status === 'expired' ? 'border-amber-400/30 bg-amber-400/10 text-amber-300' : 'border-gray-700 text-gray-400'}`}>{statusLabel[status]}</span>; }

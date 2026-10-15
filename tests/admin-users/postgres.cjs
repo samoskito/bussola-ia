@@ -21,6 +21,8 @@ const query = input => sql(prefix + input);
 const read = () => JSON.parse(query(`SELECT public.admin_users_read('${admin}','${user}');`));
 const mutate = (op, id, revision, data, passwordHash = null) => query(`SELECT public.admin_users_mutate('${admin}',${lit(op)},${id ? lit(id) : 'NULL'},${revision ? lit(revision) : 'NULL'},${json(data)},${passwordHash ? lit(passwordHash) : 'NULL'});`);
 const assertFail = (statement, pattern) => assert.match(sql(prefix + statement, false), pattern);
+const accessInput = row => row.access.map(({ agentType, enabled, expiresAt }) => ({ agentType, enabled, expiresAt }));
+const grantRows = () => JSON.parse(sql(`SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY agent_type),'[]') FROM user_agent_access a WHERE user_id='${user}';`));
 const fixture = `
 CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
 CREATE SCHEMA auth; GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
@@ -61,12 +63,72 @@ async function concurrent(input) {
     assert.match(sql(`SET ROLE anon; SELECT public.admin_users_read('${admin}',NULL);`, false), /permission denied/);
     assertFail(`SELECT public.admin_users_read('${user}',NULL);`, /forbidden/);
     const before = row.revision;
-    row = JSON.parse(mutate('access', user, before, {agentTypes:['comunicacao','apresentacao','conversas_dificeis'],expiresAt:null,reason:'Revogacao parcial ficticia'}));
+    row = JSON.parse(mutate('access', user, before, {access:accessInput(row).map(a => a.agentType === 'postagem' ? {...a,enabled:false} : a),reason:'Revogacao parcial ficticia'}));
     assert.equal(row.plano, 'Personalizado'); assert.equal(row.access.filter(a => a.effective).length, 3);
     assertFail(`SELECT public.admin_users_mutate('${admin}','profile','${user}',${lit(before)},${json({nome:'Conflito',reason:'Revisao obsoleta'})});`, /revision_conflict/);
     assertFail(`SELECT public.admin_users_mutate('${admin}','profile','${admin}',${lit(row.revision)},${json({nome:'Nao permitido',reason:'Protecao admin'})});`, /admin_target_locked/);
     sql(`UPDATE users SET telefone='novo no n8n ficticio' WHERE id='${user}';`);
     assert.notEqual(read().revision, row.revision, 'External updates change snapshot revision');
+    // Exact synthetic commercial case: LinkedIn 2027, three other IAs 2026.
+    // Use external fixture inserts so this preservation test is independent of
+    // today's date and the panel's prohibition on newly granted expired access.
+    sql(`UPDATE user_agent_access SET enabled=true, expires_at=CASE WHEN agent_type='postagem' THEN '2027-12-31'::date ELSE '2026-12-31'::date END, created_at='2020-01-01', updated_at='2020-01-02' WHERE user_id='${user}';`);
+    row = read();
+    const originalGrants = grantRows();
+    const originalUser = JSON.parse(sql(`SELECT to_jsonb(u) FROM users u WHERE id='${user}';`));
+    row = JSON.parse(mutate('access', user, row.revision, {access:accessInput(row).map(a => a.agentType==='comunicacao'?{...a,expiresAt:'2099-01-31'}:a),reason:'Renovar somente Comunicacao'}));
+    assert.deepEqual(grantRows().filter(a=>a.agent_type!=='comunicacao'),originalGrants.filter(a=>a.agent_type!=='comunicacao'),'Unchanged rows preserve IDs, timestamps and all metadata');
+    assert.deepEqual(JSON.parse(sql(`SELECT to_jsonb(u) FROM users u WHERE id='${user}';`)), originalUser, 'Unchanged source user fields are preserved');
+    const renewed = grantRows();
+    row = JSON.parse(mutate('access', user, row.revision, {access:accessInput(row).map(a => a.agentType==='comunicacao'?{...a,enabled:false}:a),reason:'Revogar somente Comunicacao'}));
+    assert.deepEqual(grantRows().filter(a=>a.agent_type!=='comunicacao'),renewed.filter(a=>a.agent_type!=='comunicacao'));
+    assert.equal(row.access.find(a=>a.agentType==='postagem').expiresAt,'2027-12-31');
+    const revoked = grantRows();
+    row = JSON.parse(mutate('access', user, row.revision, {access:accessInput(row),reason:'Salvar sem alterar grants'}));
+    assert.deepEqual(grantRows(),revoked,'A no-op access submission never touches grant timestamps');
+    const good = accessInput(row), stableRevision = row.revision;
+    const auditCount = sql(`SELECT count(*) FROM admin_user_audit WHERE user_id='${user}';`);
+    const invalidPayloads = [
+      {agentTypes:['postagem'],expiresAt:null,reason:'Contrato legado'},
+      {access:good,expiresAt:null,reason:'Contrato misto'},
+      ...[null,{},[],good.slice(1),[...good,good[0]],[good[0],good[0],...good.slice(2)],
+        [null,...good.slice(1)], [1,...good.slice(1)],
+        good.map((a,i)=>i?a:{...a,agentType:'unknown'}),
+        good.map((a,i)=>i?a:{...a,enabled:'true'}),
+        good.map((a,i)=>i?a:{agentType:a.agentType,enabled:true}),
+        good.map((a,i)=>i?a:{...a,expiresAt:'2026-02-30'}),
+        good.map((a,i)=>i?a:{...a,extra:true}),
+        good.map((a,i)=>i?a:{...a,enabled:true,expiresAt:'2000-01-01'})
+      ].map(access=>({access,reason:'Payload invalido'})),
+    ];
+    for(const data of invalidPayloads) assertFail(`SELECT public.admin_users_mutate('${admin}','access','${user}',${lit(stableRevision)},${json(data)});`,/invalid_input/);
+    assert.equal(read().revision,stableRevision,'Failed inputs cannot change revision');
+    assert.deepEqual(grantRows(),revoked,'Failed inputs cannot change grants');
+    assert.equal(sql(`SELECT count(*) FROM admin_user_audit WHERE user_id='${user}';`),auditCount,'Failed inputs cannot write audit');
+    // Global plans ignore underlying grant dates/enabled flags. Convert from
+    // the displayed global entitlement even with missing or stale grant rows.
+    for(const plan of ['Todas','Ambas']) {
+      sql(`UPDATE users SET plano=${lit(plan)},data_expiracao='2098-11-30' WHERE id='${user}'; DELETE FROM user_agent_access WHERE user_id='${user}' AND agent_type='apresentacao'; UPDATE user_agent_access SET enabled=false,expires_at='2000-01-01' WHERE user_id='${user}';`);
+      row=read(); assert.ok(row.access.every(a=>a.enabled&&a.expiresAt==='2098-11-30'));
+      row=JSON.parse(mutate('access',user,row.revision,{access:accessInput(row).map(a=>a.agentType==='postagem'?{...a,enabled:false}:a),reason:'Individualizar plano global'}));
+      assert.equal(row.plano,'Personalizado'); assert.equal(row.data_expiracao,null);
+      assert.ok(row.access.filter(a=>a.agentType!=='postagem').every(a=>a.enabled&&a.effective&&a.expiresAt==='2098-11-30'));
+      assert.equal(row.access.find(a=>a.agentType==='postagem').enabled,false);
+    }
+    // A residual global cap on an individual plan must remain an effective
+    // cap after materialization; clearing it cannot reactivate expired access.
+    sql(`UPDATE users SET plano='Personalizado',data_expiracao='2000-12-31' WHERE id='${user}'; UPDATE user_agent_access SET enabled=true,expires_at=CASE WHEN agent_type='postagem' THEN '2000-06-30'::date ELSE '2099-12-31'::date END WHERE user_id='${user}';`);
+    row=read();
+    assert.equal(row.access.find(a=>a.agentType==='postagem').expiresAt,'2000-06-30');
+    assert.ok(row.access.filter(a=>a.agentType!=='postagem').every(a=>a.expiresAt==='2000-12-31'&&!a.effective));
+    row=JSON.parse(mutate('access',user,row.revision,{access:accessInput(row).map(a=>a.agentType==='comunicacao'?{...a,expiresAt:'2099-01-31'}:a),reason:'Renovar apenas uma preservando cap residual'}));
+    assert.equal(row.data_expiracao,null);
+    assert.ok(row.access.filter(a=>a.agentType!=='comunicacao').every(a=>!a.effective));
+    assert.equal(row.access.find(a=>a.agentType==='postagem').expiresAt,'2000-06-30');
+    // Same full payload cannot be replayed after an external grant change.
+    const priorRevision=row.revision;
+    sql(`UPDATE user_agent_access SET expires_at='2099-06-30' WHERE user_id='${user}' AND agent_type='postagem';`);
+    assertFail(`SELECT public.admin_users_mutate('${admin}','access','${user}',${lit(priorRevision)},${json({access:accessInput(row),reason:'Snapshot obsoleto'})});`,/revision_conflict/);
     const bcrypt = require('bcryptjs'); const passwordHash = await bcrypt.hash('senha-ficticia-local-apenas', 12);
     const created = JSON.parse(mutate('create', null, null, {nome:'Nova Pessoa',email:'novo@example.invalid',telefone:null,agentTypes:['comunicacao'],expiresAt:null,reason:'Criacao ficticia'}, passwordHash));
     assert.equal(created.nivel, 'user'); assert.ok(created.id);
@@ -110,7 +172,7 @@ async function concurrent(input) {
     assert.equal(pair.filter(r => r.code === 0).length, 1); assert.match(pair.find(r => r.code !== 0).err, /revision_conflict/);
     const audit = query(`SELECT public.admin_users_audit_read('${admin}','${user}');`);
     assert.doesNotMatch(audit, new RegExp(tokenHash)); assert.doesNotMatch(audit, /token_hash|\$2b\$/);
-    console.log(JSON.stringify({postgres:'passed',migrations:2,permissions:true,globalRevocation:true,externalRevision:true,duplicates:true,invitationSingleUse:true,concurrentRevision:true,auditNoSecrets:true,network:'none',productionAccess:false}));
+    console.log(JSON.stringify({postgres:'passed',migrations:2,permissions:true,individualExpiryPreserved:true,unchangedGrantMetadata:true,granularValidation:true,globalRevocation:true,residualCapPreserved:true,externalRevision:true,duplicates:true,invitationSingleUse:true,concurrentRevision:true,auditNoSecrets:true,network:'none',productionAccess:false}));
   } finally {
     if (started) { const stop = cli(['stop', name]); if (stop.status !== 0) throw new Error('Could not stop isolated test container'); }
   }

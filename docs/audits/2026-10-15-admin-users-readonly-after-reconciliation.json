@@ -1,0 +1,176 @@
+{
+  "timestamp": "2026-10-15T15:21:44.521Z",
+  "method": "GET only",
+  "writes": 0,
+  "tables": {
+    "users": {
+      "present": true,
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nome": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "email": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "senha": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "telefone": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "avatar": {
+          "type": "string",
+          "format": "text"
+        },
+        "rua": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "numero": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "bairro": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "cep": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "cidade": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "estado": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "pais": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "nivel": {
+          "type": "string",
+          "format": "character varying"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        },
+        "cargo": {
+          "type": "string",
+          "format": "text"
+        },
+        "empresa": {
+          "type": "string",
+          "format": "text"
+        },
+        "idade": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "data_expiracao": {
+          "type": "string",
+          "format": "date"
+        },
+        "plano": {
+          "type": "string",
+          "format": "text"
+        }
+      }
+    },
+    "user_agent_access": {
+      "present": true,
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "agent_type": {
+          "type": "string",
+          "format": "text"
+        },
+        "enabled": {
+          "type": "boolean",
+          "format": "boolean"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        }
+      }
+    },
+    "password_reset_tokens": {
+      "present": true,
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "email": {
+          "type": "string",
+          "format": "text"
+        },
+        "token_hash": {
+          "type": "string",
+          "format": "text"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        },
+        "used_at": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        }
+      }
+    }
+  },
+  "identity": {
+    "users": 1693,
+    "complete": true,
+    "missingEmail": 0,
+    "blankEmail": 0,
+    "normalizedDuplicateGroups": 0
+  },
+  "emailConfiguration": {
+    "smtpHost": true,
+    "smtpUser": true,
+    "smtpPass": true,
+    "smtpFrom": true,
+    "brevoApiKey": true
+  },
+  "limitations": [
+    "Policies, triggers, constraints and SQL privileges not inspected by Data API metadata.",
+    "No actual mail delivery or database mutation tested."
+  ]
+}

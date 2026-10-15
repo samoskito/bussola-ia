@@ -421,3 +421,13 @@ Nao implementado ainda. Plano recomendado:
 6. Usar `AGENTS` para metadados publicos e `agent-webhooks.ts` para URL server-only.
 7. Usar `userHasAgentAccess` para permissoes server-side.
 8. Atualizar este arquivo quando arquitetura, schema, fluxo ou proximos passos mudarem.
+
+## Operações reais pontuais — atualização em 15/10/2026
+
+A revisão de identidades foi concluída com autorização: seis exclusões sem histórico, duas validades ajustadas, cinco contas principais com 26 chats/91 scripts preservados; auditoria posterior encontrou1693 usuários, zero duplicidades e zero e-mails vazios. Também aplicada uma concessão comercial pontual P1 com validades diferentes por IA, backup privado e verificação independente. Detalhes no handoff admin e plano de reconciliação; as menções anteriores a bloqueio por duplicidades são históricas. Nenhuma migration aplicada, publicação, ativação live, e-mail, OpenAI ou alteração de fluxo n8n/Hotmart. Segundo payload comercial ainda pendente.
+
+Atualização P2 em15/10/2026 12:35 BRT: segunda compra atendida com conta nova user/Todas válida até11/11/2026 e link de definição de senha pelo fluxo legado, aceito via SMTP. As duas compras pontuais foram atendidas. Sem migrations/publicação/ativação live; handoff admin contém evidências e pendência de revisão da chave Brevo API (401; SMTP funcionou). Não usar NEXT_PUBLIC_APP_URL local localhost em links reais. Tokens e dados pessoais permanecem somente no armazenamento privado criptografado, fora do Git.
+
+Revisão final administrativa15/10/2026: testes locais e build isolado passaram; publicação AINDA condicionada a preservar validades individuais distintas e corrigir rollback do consumidor atômico de senha. Relatório docs/audits/2026-10-15-admin-final-review.md; roteiro docs/plans/2026-10-15-admin-publicacao.md. Sem novas operações reais, migrations ou deploy. E-mail de teste aguardado; chave OpenAI deve ser inserida localmente pelo usuário em OPENAI_API_KEY com flags desativadas, nunca enviada no chat.
+
+Correções pré-publicação15/10/2026 concluídas localmente: edição porIA com vigências preservadas e recuperação RPC independente das flags do painel. Nova variável PASSWORD_RESET_ATOMIC_REQUIRED deve permanecertrue no rollout/rollback após instalação.66 testes Node, PostgreSQL isolado, browser mock/mobile e build isolado passaram; typecheck escopado0/global14 legados. E-mail futuro suporte@palmup.com.br registrado, sem criar/enviar nesta rodada. Chave OpenAI presente localmente e nenhum gasto/ativação; roteiros/handoff atualizados. Sem migrations remotas, push ou publicação.

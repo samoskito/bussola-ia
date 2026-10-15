@@ -72,14 +72,12 @@ test('access edits require matching revision, a reason and do not change unrelat
   const originalRevision = user.revision;
   await assert.rejects(async () => (store.setAccess(user.id, {
     revision: originalRevision,
-    agentTypes: ['postagem'],
-    expiresAt: '2026-12-31',
+    access: user.access.map(({ agentType, enabled, expiresAt }) => ({ agentType, enabled: agentType === 'comunicacao' ? false : enabled, expiresAt })),
     reason: '',
   }, ACTOR)), error => error.status === 400);
   user = await store.setAccess(user.id, {
     revision: originalRevision,
-    agentTypes: ['postagem'],
-    expiresAt: '2026-12-31',
+    access: user.access.map(({ agentType, enabled, expiresAt }) => ({ agentType, enabled: agentType === 'comunicacao' ? false : enabled, expiresAt })),
     reason: 'Revogar Comunicação',
   }, ACTOR);
   assert.equal(user.revision, originalRevision + 1);
@@ -126,8 +124,7 @@ test('revoking one agent from global access materializes only the remaining effe
   for (const agent of AGENTS) assert.equal(effective(global, agent).effective, true);
   const updated = await store.setAccess(global.id, {
     revision: global.revision,
-    agentTypes: AGENTS.filter(agent => agent !== 'comunicacao'),
-    expiresAt: global.data_expiracao,
+    access: global.access.map(({ agentType, enabled, expiresAt }) => ({ agentType, enabled: agentType === 'comunicacao' ? false : enabled, expiresAt })),
     reason: 'Revogação individual no demo',
   }, ACTOR);
   assert.equal(updated.plano, 'Personalizado');
@@ -137,8 +134,7 @@ test('revoking one agent from global access materializes only the remaining effe
   const admin = await store.get('demo-user-5');
   await assert.rejects(async () => store.setAccess(admin.id, {
     revision: admin.revision,
-    agentTypes: [],
-    expiresAt: null,
+    access: [],
     reason: 'Não permitido',
   }, ACTOR), error => error.status === 403);
 });
@@ -187,3 +183,54 @@ test('email edit invalidates outstanding invitation; invitation links require lo
   await assert.rejects(async () => store.consumeInvite(token), error => error.status === 400);
 });
 
+
+const accessInput = user => user.access.map(({ agentType, enabled, expiresAt }) => ({ agentType, enabled, expiresAt }));
+test('different dates survive renewing and revoking a single IA, including expired unchanged grants', () => {
+  const time = clock(), store = createDemoAdminUsersStore(time.now);
+  let user = create(store, 'individual-dates', { agentTypes: AGENTS, expiresAt: '2026-12-31' });
+  user = store.setAccess(user.id, { revision: user.revision, access: accessInput(user).map(a => a.agentType === 'postagem' ? { ...a, expiresAt: '2027-12-31' } : a), reason: 'LinkedIn 2027 e outras 2026' }, ACTOR);
+  const others = user.access.filter(a => a.agentType !== 'comunicacao');
+  user = store.setAccess(user.id, { revision: user.revision, access: accessInput(user).map(a => a.agentType === 'comunicacao' ? { ...a, expiresAt: '2027-01-31' } : a), reason: 'Renovar somente Comunicação' }, ACTOR);
+  assert.deepEqual(user.access.filter(a => a.agentType !== 'comunicacao'), others);
+  user = store.setAccess(user.id, { revision: user.revision, access: accessInput(user).map(a => a.agentType === 'comunicacao' ? { ...a, enabled: false } : a), reason: 'Revogar somente Comunicação' }, ACTOR);
+  assert.deepEqual(user.access.filter(a => a.agentType !== 'comunicacao'), others);
+  time.advance(90 * 86400000);
+  const expired = store.get(user.id);
+  user = store.setAccess(user.id, { revision: expired.revision, access: accessInput(expired).map(a => a.agentType === 'postagem' ? { ...a, expiresAt: '2028-01-31' } : a), reason: 'Preservar expirados' }, ACTOR);
+  assert.equal(effective(user, 'apresentacao').expiresAt, '2026-12-31');
+  assert.equal(effective(user, 'apresentacao').effective, false);
+  const audit = store.audit(user.id)[0];
+  assert.equal(audit.changes.after.access.length, 4);
+});
+
+test('complete granular payload rejects duplicates, malformed fields, legacy contract and new expired grants', () => {
+  const store = createDemoAdminUsersStore(clock().now), user = create(store, 'payload');
+  const access = accessInput(user);
+  const bad = [null, [], access.slice(0, 3), [...access, access[0]], [access[0], access[0], ...access.slice(2)],
+    access.map((a, i) => i ? a : { ...a, agentType: 'unknown' }),
+    access.map((a, i) => i ? a : { ...a, enabled: 'true' }),
+    access.map((a, i) => i ? a : { ...a, expiresAt: '2026-02-30' }),
+    access.map((a, i) => i ? a : { ...a, expiresAt: '2020-01-01' }),
+    access.map((a, i) => i ? a : { ...a, extra: true }),
+    access.map((a, i) => i ? a : { agentType: a.agentType, enabled: a.enabled }),
+    [null, ...access.slice(1)]];
+  for (const value of bad) assert.throws(() => store.setAccess(user.id, { revision: user.revision, access: value, reason: 'Payload inválido' }, ACTOR), error => error.status === 400);
+  assert.throws(() => store.setAccess(user.id, { revision: user.revision, agentTypes: ['postagem'], expiresAt: null, reason: 'Legado' }, ACTOR), error => error.status === 400);
+  assert.deepEqual(store.get(user.id), user);
+  assert.equal(store.audit(user.id).length, 1);
+});
+
+test('global expired and unlimited legacy plans and residual individual cap preserve other IA dates', () => {
+  const store = createDemoAdminUsersStore(clock().now);
+  for (const id of ['demo-user-1', 'demo-user-3', 'demo-user-6', 'demo-user-7']) {
+    const user = store.get(id), before = user.access.filter(a => a.agentType !== 'comunicacao');
+    const updated = store.setAccess(id, { revision: user.revision, access: accessInput(user).map(a => a.agentType === 'comunicacao' ? { ...a, enabled: false } : a), reason: 'Preservar vigência ao individualizar' }, ACTOR);
+    assert.equal(updated.data_expiracao, null);
+    for (const prior of before) {
+      const after = effective(updated, prior.agentType);
+      assert.equal(after.expiresAt, prior.expiresAt);
+      assert.equal(after.enabled, prior.enabled);
+      assert.equal(after.effective, prior.effective);
+    }
+  }
+});

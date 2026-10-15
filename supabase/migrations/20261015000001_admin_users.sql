@@ -100,7 +100,7 @@ BEGIN
   SELECT jsonb_agg(jsonb_build_object(
     'agentType', x.agent_type,
     'enabled', COALESCE(v_user.nivel = 'admin', false) OR COALESCE(v_user.plano IN ('Todas', 'Ambas'), false) OR COALESCE(a.enabled, false),
-    'expiresAt', CASE WHEN v_user.nivel = 'admin' THEN NULL WHEN v_user.plano IN ('Todas', 'Ambas') THEN v_user.data_expiracao::date ELSE a.expires_at END,
+    'expiresAt', CASE WHEN v_user.nivel = 'admin' THEN NULL WHEN v_user.plano IN ('Todas', 'Ambas') THEN v_user.data_expiracao::date ELSE least(v_user.data_expiracao::date, a.expires_at) END,
     'effective', COALESCE(v_user.nivel = 'admin', false) OR (
       (v_user.data_expiracao IS NULL OR v_user.data_expiracao::date >= v_today)
       AND (COALESCE(v_user.plano IN ('Todas', 'Ambas'), false) OR (COALESCE(a.enabled, false) AND (a.expires_at IS NULL OR a.expires_at >= v_today)))
@@ -189,13 +189,14 @@ DECLARE
   v_id uuid := p_user_id; v_user public.users%ROWTYPE;
   v_allowed text[]; v_reason text; v_email text; v_nome text; v_phone text;
   v_agents text[] := ARRAY[]::text[]; v_expires date; v_today date := (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date;
+  v_entry jsonb; v_previous jsonb;
   v_before jsonb; v_after jsonb; v_changes jsonb; v_action text; v_email_changed boolean := false;
 BEGIN
   PERFORM public.admin_users_assert_admin(p_actor);
   IF p_operation IS NULL OR p_operation NOT IN ('create', 'profile', 'access') OR p_input IS NULL OR jsonb_typeof(p_input) <> 'object' THEN
     RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001';
   END IF;
-  v_allowed := CASE p_operation WHEN 'create' THEN ARRAY['nome','email','telefone','agentTypes','expiresAt','reason'] WHEN 'profile' THEN ARRAY['nome','email','telefone','reason'] ELSE ARRAY['agentTypes','expiresAt','reason'] END;
+  v_allowed := CASE p_operation WHEN 'create' THEN ARRAY['nome','email','telefone','agentTypes','expiresAt','reason'] WHEN 'profile' THEN ARRAY['nome','email','telefone','reason'] ELSE ARRAY['access','reason'] END;
   IF EXISTS (SELECT 1 FROM jsonb_object_keys(p_input) k WHERE NOT (k = ANY(v_allowed))) THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
   v_reason := btrim(p_input->>'reason');
   IF jsonb_typeof(p_input->'reason') IS DISTINCT FROM 'string' OR v_reason IS NULL OR length(v_reason) NOT BETWEEN 1 AND 500 OR v_reason ~ '[[:cntrl:]]' THEN
@@ -213,7 +214,7 @@ BEGIN
     v_phone := NULLIF(btrim(p_input->>'telefone'), '');
     IF jsonb_typeof(p_input->'telefone') <> 'string' OR (v_phone IS NOT NULL AND (length(v_phone) NOT BETWEEN 5 AND 30 OR v_phone !~ '^[+0-9 ().-]+$' OR v_phone ~ '[[:cntrl:]]')) THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
   END IF;
-  IF p_operation IN ('create', 'access') THEN
+  IF p_operation = 'create' THEN
     IF jsonb_typeof(p_input->'agentTypes') IS DISTINCT FROM 'array' OR jsonb_array_length(p_input->'agentTypes') > 4
       OR EXISTS (SELECT 1 FROM jsonb_array_elements(p_input->'agentTypes') a WHERE jsonb_typeof(a) <> 'string' OR a#>>'{}' NOT IN ('comunicacao','apresentacao','conversas_dificeis','postagem')) THEN
       RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001';
@@ -226,6 +227,28 @@ BEGIN
       EXCEPTION WHEN OTHERS THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END;
       IF to_char(v_expires, 'YYYY-MM-DD') <> p_input->>'expiresAt' OR (cardinality(v_agents) > 0 AND v_expires < v_today) THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
     END IF;
+  END IF;
+
+  IF p_operation = 'access' THEN
+    IF jsonb_typeof(p_input->'access') IS DISTINCT FROM 'array' THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
+    IF jsonb_array_length(p_input->'access') <> 4 THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
+    FOR v_entry IN SELECT value FROM jsonb_array_elements(p_input->'access') LOOP
+      IF jsonb_typeof(v_entry) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
+      IF NOT (v_entry ?& ARRAY['agentType','enabled','expiresAt'])
+        OR EXISTS (SELECT 1 FROM jsonb_object_keys(v_entry) k WHERE k NOT IN ('agentType','enabled','expiresAt'))
+        OR jsonb_typeof(v_entry->'agentType') IS DISTINCT FROM 'string'
+        OR v_entry->>'agentType' NOT IN ('comunicacao','apresentacao','conversas_dificeis','postagem')
+        OR jsonb_typeof(v_entry->'enabled') IS DISTINCT FROM 'boolean' THEN
+        RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001';
+      END IF;
+      IF v_entry->'expiresAt' <> 'null'::jsonb THEN
+        IF jsonb_typeof(v_entry->'expiresAt') <> 'string' OR v_entry->>'expiresAt' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
+        BEGIN v_expires := (v_entry->>'expiresAt')::date;
+        EXCEPTION WHEN OTHERS THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END;
+        IF to_char(v_expires, 'YYYY-MM-DD') <> v_entry->>'expiresAt' THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
+      END IF;
+    END LOOP;
+    IF (SELECT count(DISTINCT a->>'agentType') FROM jsonb_array_elements(p_input->'access') a) <> 4 THEN RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001'; END IF;
   END IF;
 
   IF p_operation = 'create' THEN
@@ -270,13 +293,28 @@ BEGIN
     v_action := 'profile_updated';
     v_changes := jsonb_build_object('fields', (SELECT jsonb_agg(k ORDER BY k) FROM jsonb_object_keys(p_input) k WHERE k <> 'reason'), 'invitationInvalidated', v_email_changed);
   ELSE
-    UPDATE public.users SET plano = 'Personalizado', data_expiracao = NULL WHERE id = v_id;
+    -- Preserve existing expired entitlements, but do not grant a new expired
+    -- entitlement. Compare with the locked, displayed state (including caps).
+    FOR v_entry IN SELECT value FROM jsonb_array_elements(p_input->'access') LOOP
+      SELECT a INTO v_previous FROM jsonb_array_elements(v_before->'access') a WHERE a->>'agentType' = v_entry->>'agentType';
+      IF (v_entry->>'enabled')::boolean AND (v_entry->>'expiresAt')::date < v_today
+        AND (NOT (v_previous->>'enabled')::boolean OR v_entry->'expiresAt' IS DISTINCT FROM v_previous->'expiresAt') THEN
+        RAISE EXCEPTION USING MESSAGE = 'admin_users:invalid_input', ERRCODE = 'P0001';
+      END IF;
+    END LOOP;
+    UPDATE public.users SET plano = 'Personalizado', data_expiracao = NULL
+      WHERE id = v_id AND (plano IS DISTINCT FROM 'Personalizado' OR data_expiracao IS NOT NULL);
+    -- The complete DTO carries the global entitlement when converting Todas/
+    -- Ambas and the minimum global/individual cap for other plans. Only actual
+    -- changes touch grant timestamps; IDs and other columns remain intact.
     INSERT INTO public.user_agent_access(user_id, agent_type, enabled, expires_at)
-    SELECT v_id, x, x = ANY(v_agents), CASE WHEN x = ANY(v_agents) THEN v_expires ELSE NULL END
-    FROM unnest(ARRAY['comunicacao','apresentacao','conversas_dificeis','postagem']) x
-    ON CONFLICT (user_id, agent_type) DO UPDATE SET enabled = EXCLUDED.enabled, expires_at = EXCLUDED.expires_at, updated_at = now();
+    SELECT v_id, a->>'agentType', (a->>'enabled')::boolean, (a->>'expiresAt')::date
+    FROM jsonb_array_elements(p_input->'access') a
+    ON CONFLICT (user_id, agent_type) DO UPDATE SET enabled = EXCLUDED.enabled, expires_at = EXCLUDED.expires_at, updated_at = now()
+      WHERE public.user_agent_access.enabled IS DISTINCT FROM EXCLUDED.enabled
+        OR public.user_agent_access.expires_at IS DISTINCT FROM EXCLUDED.expires_at;
     v_action := 'access_updated';
-    v_changes := jsonb_build_object('before', jsonb_build_object('plano', v_before->'plano', 'data_expiracao', v_before->'data_expiracao', 'access', v_before->'access'), 'after', jsonb_build_object('plano', 'Personalizado', 'data_expiracao', NULL, 'agentTypes', v_agents, 'expiresAt', v_expires));
+    v_changes := jsonb_build_object('before', jsonb_build_object('plano', v_before->'plano', 'data_expiracao', v_before->'data_expiracao', 'access', v_before->'access'), 'after', jsonb_build_object('plano', 'Personalizado', 'data_expiracao', NULL, 'access', p_input->'access'));
   END IF;
   -- The legacy recovery flow binds its tokens to email rather than user UUID.
   -- Never let pending tokens follow an email that is newly assigned/reassigned.

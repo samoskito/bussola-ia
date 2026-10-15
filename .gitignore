@@ -36,3 +36,6 @@ next-env.d.ts
 
 # Supabase
 .supabase/
+
+# Private recovery snapshots; encrypted and never versioned.
+/.local-backups/

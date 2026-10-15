@@ -56,8 +56,7 @@ export interface UpdateAdminUserInput {
 }
 export interface UpdateAdminAccessInput {
   revision: number | string;
-  agentTypes: AgentType[];
-  expiresAt: string | null;
+  access: { agentType: AgentType; enabled: boolean; expiresAt: string | null }[];
   reason: string;
 }
 export interface AdminInviteResult {

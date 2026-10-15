@@ -238,7 +238,8 @@ GRANT EXECUTE ON FUNCTION public.admin_users_invite_delivery(uuid, uuid, text) T
 GRANT EXECUTE ON FUNCTION public.admin_users_consume_invite(text, text) TO service_role;
 
 -- Existing forgot-password tokens must serialize with managed invitation use.
--- The app selects this path only when the managed live-write gate is active.
+-- The app prefers this consumer independently of panel gates. After rollout,
+-- PASSWORD_RESET_ATOMIC_REQUIRED must remain true even when the panel is disabled.
 CREATE FUNCTION public.admin_users_consume_legacy_reset(p_email text, p_token_hash text, p_password_hash text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE v_user_id uuid; v_token_id uuid; v_now timestamptz;

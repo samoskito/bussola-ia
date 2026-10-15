@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-10-15T15:21:58.901Z",
+  "method": "GET only; backup comparison",
+  "verified": true,
+  "removedAccounts": 6,
+  "removedDependentGrants": 24,
+  "preservedPrimaryAccounts": 5,
+  "preservedChats": 26,
+  "preservedScripts": 91,
+  "profilesPasswordsAndGrantsPreserved": true,
+  "cases": [
+    {
+      "group": "G1",
+      "expiry": "2026-11-30",
+      "plan": "Todas",
+      "chats": 21,
+      "scripts": 74
+    },
+    {
+      "group": "G2",
+      "expiry": "2030-03-06",
+      "plan": "Todas",
+      "chats": 2,
+      "scripts": 3
+    },
+    {
+      "group": "G3",
+      "expiry": "2026-11-30",
+      "plan": "Todas",
+      "chats": 0,
+      "scripts": 0
+    },
+    {
+      "group": "G4",
+      "expiry": "2027-07-24",
+      "plan": "Ambas",
+      "chats": 1,
+      "scripts": 12
+    },
+    {
+      "group": "G5",
+      "expiry": "2027-09-22",
+      "plan": "Postagem no Linkedin",
+      "chats": 2,
+      "scripts": 2
+    }
+  ]
+}

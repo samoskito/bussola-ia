@@ -113,10 +113,18 @@ export function createLiveAdminUsersRepository(providedClient?: AdminUsersRpcCli
       return rpc('admin_users_mutate', { p_actor: actor, p_operation: 'profile', p_user_id: id, p_expected_revision: expectedRevision, p_input: data, p_password_hash: null });
     },
     async setAccess(id: string, input: UpdateAdminAccessInput, actor: string): Promise<AdminUser> {
-      writeGate(); uuid(actor); uuid(id); allow(input, ['revision', 'agentTypes', 'expiresAt', 'reason']);
+      writeGate(); uuid(actor); uuid(id); allow(input, ['revision', 'access', 'reason']);
       const expectedRevision = revision(input.revision);
-      if (!Object.prototype.hasOwnProperty.call(input, 'agentTypes') || !Object.prototype.hasOwnProperty.call(input, 'expiresAt')) invalid('Informe a seleção completa e a validade desejada.');
-      const data = { ...access(input), reason: reason(input.reason) };
+      if (!Array.isArray(input.access) || input.access.length !== agents.length) invalid('Informe as quatro IAs e suas validades.');
+      const entries = input.access.map(entry => {
+        allow(entry, ['agentType', 'enabled', 'expiresAt']);
+        if (!agents.includes(entry.agentType) || typeof entry.enabled !== 'boolean') invalid('Acesso por IA inválido.');
+        return { agentType: entry.agentType, enabled: entry.enabled, expiresAt: expiry(entry.expiresAt) };
+      });
+      if (new Set(entries.map(entry => entry.agentType)).size !== agents.length) invalid('Informe cada IA uma única vez.');
+      // Existing expired dates must survive unrelated edits. The transaction
+      // checks whether an expired enabled grant is unchanged under its lock.
+      const data = { access: entries, reason: reason(input.reason) };
       return rpc('admin_users_mutate', { p_actor: actor, p_operation: 'access', p_user_id: id, p_expected_revision: expectedRevision, p_input: data, p_password_hash: null });
     },
     async audit(id: string, actor: string): Promise<AdminUserAudit[]> {

@@ -21,6 +21,7 @@ const actor = '10000000-0000-4000-8000-000000000001';
 const userId = '20000000-0000-4000-8000-000000000002';
 const revision = '0123456789abcdef0123456789abcdef';
 const reason = 'Venda manual aprovada';
+const access = ['comunicacao', 'apresentacao', 'conversas_dificeis', 'postagem'].map(agentType => ({ agentType, enabled: true, expiresAt: agentType === 'postagem' ? '2027-12-31' : '2026-12-31' }));
 const profile = { nome: 'Pessoa Exemplo', email: ' PESSOA@USUARIOS.EXAMPLE ', telefone: '+55 11 90000-0000', reason };
 function fakeClient(response = { data: { id: userId, revision }, error: null }) {
   const calls = [];
@@ -44,7 +45,7 @@ test('live repository gates constructor-free reads and writes before all RPCs', 
   process.env.ADMIN_USERS_LIVE_ENABLED = 'true'; process.env.ADMIN_USERS_WRITES_ENABLED = 'false';
   await assert.rejects(repo.create(profile, actor), error => error.status === 503);
   await assert.rejects(repo.update(userId, { revision, nome: 'Novo Nome', reason }, actor), error => error.status === 503);
-  await assert.rejects(repo.setAccess(userId, { revision, agentTypes: [], expiresAt: null, reason }, actor), error => error.status === 503);
+  await assert.rejects(repo.setAccess(userId, { revision, access, reason }, actor), error => error.status === 503);
   await repo.get(userId, actor);
   assert.equal(client.calls.length, 1);
   process.env.ADMIN_USERS_MODE = 'demo'; process.env.NODE_ENV = 'development';
@@ -102,11 +103,11 @@ test('profile and access reject unknown fields, malformed dates and numeric demo
   }
   assert.equal(client.calls.length, 0);
   await repo.update(userId, { revision, nome: ' Novo Nome ', telefone: null, reason }, actor);
-  await repo.setAccess(userId, { revision, agentTypes: ['postagem'], expiresAt: null, reason }, actor);
+  await repo.setAccess(userId, { revision, access, reason }, actor);
   assert.deepEqual(client.calls[0].args.p_input, { nome: 'Novo Nome', telefone: null, reason });
   assert.equal(client.calls[0].args.p_expected_revision, revision);
   assert.equal(client.calls[0].args.p_operation, 'profile');
-  assert.deepEqual(client.calls[1].args.p_input, { agentTypes: ['postagem'], expiresAt: null, reason });
+  assert.deepEqual(client.calls[1].args.p_input, { access, reason });
   assert.equal(client.calls[1].args.p_operation, 'access');
 }));
 
@@ -136,4 +137,24 @@ test('storage error mapping reports safe conflicts and hides database diagnostic
   await assert.rejects(missingData.get(userId, actor), error => error.status === 503);
   const offline = createLiveAdminUsersRepository(fakeClient(() => { throw new Error('network denied'); }));
   await assert.rejects(offline.get(userId, actor), error => error.status === 503 && !error.message.includes('network denied'));
+}));
+
+test('granular access validates the complete strict contract before RPC and forwards each distinct date', () => withLive(async () => {
+  const client = fakeClient(), repo = createLiveAdminUsersRepository(client);
+  for (const value of [null, [], access.slice(1), [...access, access[0]], [access[0], access[0], ...access.slice(2)],
+    access.map((a, i) => i ? a : { ...a, enabled: 'true' }), access.map((a, i) => i ? a : { ...a, expiresAt: '2026-02-30' }),
+    access.map((a, i) => i ? a : { ...a, agentType: 'unknown' }), access.map((a, i) => i ? a : { ...a, extra: 1 }),
+    access.map((a, i) => i ? a : { agentType: a.agentType, enabled: true }), [null, ...access.slice(1)]]) {
+    await assert.rejects(repo.setAccess(userId, { revision, access: value, reason }, actor), e => e.status === 400);
+  }
+  await assert.rejects(repo.setAccess(userId, { revision, access, agentTypes: [], reason }, actor), e => e.status === 400);
+  assert.equal(client.calls.length, 0);
+  await repo.setAccess(userId, { revision, access, reason }, actor);
+  assert.deepEqual(client.calls[0].args.p_input, { access, reason });
+  assert.equal(client.calls[0].args.p_expected_revision, revision);
+  // SQL must compare old expiry under its lock; repository must not reject an
+  // otherwise valid expired grant that an unrelated edit needs to preserve.
+  const expired = access.map((a, i) => i ? a : { ...a, expiresAt: '2000-01-01' });
+  await repo.setAccess(userId, { revision, access: expired, reason }, actor);
+  assert.deepEqual(client.calls[1].args.p_input.access, expired);
 }));

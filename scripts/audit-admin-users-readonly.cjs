@@ -34,6 +34,7 @@ async function get(resource, params = {}, metadata = false) {
     if (rows.length < 500) {complete=true; break;}
   }
   const report = { timestamp:new Date().toISOString(), method:'GET only', writes:0, tables, identity:{users,complete,missingEmail,blankEmail,normalizedDuplicateGroups:[...counts.values()].filter(count=>count>1).length}, emailConfiguration:{smtpHost:!!env.SMTP_HOST,smtpUser:!!env.SMTP_USER,smtpPass:!!env.SMTP_PASS,smtpFrom:!!env.SMTP_FROM,brevoApiKey:!!env.BREVO_API_KEY}, limitations:['Policies, triggers, constraints and SQL privileges not inspected by Data API metadata.','No actual mail delivery or database mutation tested.'] };
-  fs.writeFileSync(path.join(root,'docs/audits/2026-10-15-admin-users-readonly.json'),JSON.stringify(report,null,2)+'\n');
+  const suffix = process.argv.includes('--after-reconciliation') ? '-after-reconciliation' : '';
+  fs.writeFileSync(path.join(root,`docs/audits/2026-10-15-admin-users-readonly${suffix}.json`),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify(report));
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

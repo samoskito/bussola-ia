@@ -1,5 +1,6 @@
 import type { AgentType } from '@/lib/agents';
 import { getAgentAvailabilityMessage, isAgentAvailableForUser } from '@/lib/agents';
+import { hasAccessDateExpired } from './access-date';
 
 type SupabaseLikeClient = {
   from: (table: string) => any;
@@ -22,17 +23,7 @@ export interface AgentAccessResult {
   user?: AgentAccessUser;
 }
 
-const hasDateExpired = (dateValue?: string | null) => {
-  if (!dateValue) return false;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const expiration = new Date(dateValue);
-  expiration.setHours(0, 0, 0, 0);
-
-  return today > expiration;
-};
+const hasDateExpired = hasAccessDateExpired;
 
 export async function userHasAgentAccess(
   supabase: SupabaseLikeClient,

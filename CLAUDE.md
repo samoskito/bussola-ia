@@ -333,6 +333,8 @@ Antes de reaproveitar o componente legado, confirme se as tabelas `mensagens` e 
 
 ## UI e Navegacao
 
+Atualização posterior em15/10/2026: usuário aprovou inicialmente demo e priorizou terminar painel antes de Hotmart direta. Caminho live preparado (RPC/auditoria, duas migrations, convites SMTP/Brevo e senha real), mas gates reais todos desativados e nenhuma migration aplicada no Supabase. Validação SQL real passou em PostgreSQL temporário sem rede, com fixtures apenas. Auditoria GET-only atual encontrou1699 usuários,5 grupos de e-mails duplicados trim/lower e1 vazio; índice único preparado aborta se duplicados persistirem. Não resolver identidades automaticamente. Snapshot seguro em `docs/audits/2026-10-15-admin-users-readonly.json`; handoff atualizado prevalece sobre descrição original demo abaixo. ClickUp revisão de identidades `17ty0uzry32`, ativação futura `17ty0uzry33`. Sem e-mails reais, push ou deploy.
+
 Atualização 15/10/2026: painel admin local `/dashboard/users` implementado com fixtures e APIs em `/api/admin/users`. `ADMIN_USERS_MODE=demo` apenas fora de production, padrão disabled; sem live/banco de usuários real. Autorização consulta somente papel atual do admin, mutações são em memória. Primeiro acesso demo gera link `/auth/update-password/demo` de1h/uso único, envio simulado; não envia/salva senha. Sem migrations ou e-mails reais. Handoff e limites: `docs/plans/2026-10-15-admin-usuarios-handoff.md`. 16 testes admin +18 Insights passaram; typecheck escopado sem erros e14 legados globais. Chrome desktop/mobile com sessão sintética/APIs interceptadas passou; login real não validado nesta entrega.
 
 - `src/app/dashboard/page.tsx`: cards dos quatro agentes com logo.

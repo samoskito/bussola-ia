@@ -12,6 +12,7 @@ export async function middleware(request: NextRequest) {
       '/auth/forgot-password',
       '/auth/reset-password',
       '/auth/update-password',
+      '/auth/first-access',
     ];
     
     // Permitir acesso a arquivos estáticos e imagens

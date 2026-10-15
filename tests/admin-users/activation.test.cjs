@@ -3,6 +3,21 @@ const assert = require('node:assert/strict');
 const { fs, path, root, load } = require('./helpers.cjs');
 
 const { getAdminUsersMode, requireAdminUsersDemo } = load('config');
+const { requireAdminUsersWrites, requireAdminUsersEmail } = load('config');
+
+test('real mode, writes and email each require their own explicit switch', () => {
+  const env = { NODE_ENV: 'production', ADMIN_USERS_MODE: 'live' };
+  assert.equal(getAdminUsersMode(env), 'disabled');
+  env.ADMIN_USERS_LIVE_ENABLED = 'true';
+  assert.equal(getAdminUsersMode(env), 'live');
+  assert.throws(() => requireAdminUsersDemo(env));
+  assert.throws(() => requireAdminUsersWrites(env), error => error.code === 'admin_users_writes_disabled');
+  env.ADMIN_USERS_WRITES_ENABLED = 'true';
+  assert.doesNotThrow(() => requireAdminUsersWrites(env));
+  assert.throws(() => requireAdminUsersEmail(env), error => error.code === 'admin_users_email_disabled');
+  env.ADMIN_USERS_EMAIL_ENABLED = 'true';
+  assert.doesNotThrow(() => requireAdminUsersEmail(env));
+});
 
 test('admin user demo is disabled by default and cannot run in production', () => {
   const original = { mode: process.env.ADMIN_USERS_MODE, nodeEnv: process.env.NODE_ENV };

@@ -3,7 +3,8 @@ import { AGENTS, isAgentAvailableForUser, type AgentType } from '../agents';
 import { AdminUsersError } from './config';
 import type { AdminUser, AdminUserAudit, AdminUserList, AdminUserStatus, AdminInviteResult, CreateAdminUserInput, UpdateAdminUserInput, UpdateAdminAccessInput } from './types';
 
-type StoredUser = Omit<AdminUser, 'access' | 'status' | 'invite'> & {
+type StoredUser = Omit<AdminUser, 'access' | 'status' | 'invite' | 'revision'> & {
+  revision: number;
   grants: { agentType: AgentType; enabled: boolean; expiresAt: string | null }[];
   invitation?: { hash: string; expiresAt: string; status: 'generated' | 'simulated_sent' | 'consumed' };
 };
@@ -152,10 +153,11 @@ export function createDemoAdminUsersStore(now: () => Date = () => new Date()) {
       audit(user, actor, 'access_updated', note, { before: { plano: before.plano, data_expiracao: before.data_expiracao, access: before.access }, after: { plano: user.plano, data_expiracao: null, agentTypes: agents, expiresAt } });
       return view(user);
     },
-    issueInvite(id: string, input: { revision: number; action: 'generate' | 'send' }, actor: string, origin = 'http://localhost:3000'): AdminInviteResult {
-      only(input, ['revision', 'action']);
+    issueInvite(id: string, input: { revision: number; action: 'generate' | 'send'; reason?: string }, actor: string, origin = 'http://localhost:3000'): AdminInviteResult {
+      only(input, ['revision', 'action', 'reason']);
       const user = read(id); revision(user, input.revision);
       if (!['generate', 'send'].includes(input.action)) fail('Ação de convite inválida.');
+      if (input.reason !== undefined) reason(input.reason, true);
       let base: URL;
       try { base = new URL(origin); } catch { return fail('Origem local inválida.'); }
       if (!['localhost', '127.0.0.1', '[::1]'].includes(base.hostname) || !['http:', 'https:'].includes(base.protocol)) fail('Convites de demonstração exigem uma origem local.');

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getAdminUsersMode } from '@/lib/admin-users/config';
 
 export const runtime = 'nodejs';
 
@@ -54,6 +55,16 @@ export async function POST(request: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // When managed invitations are activated, both password flows share one
+    // transaction/lock order and revalidate tokens after taking the user lock.
+    if (getAdminUsersMode() === 'live' && process.env.ADMIN_USERS_WRITES_ENABLED === 'true') {
+      const result = await supabase.rpc('admin_users_consume_legacy_reset', {
+        p_email: email, p_token_hash: tokenHash, p_password_hash: hashedPassword,
+      });
+      if (result.error || !result.data?.success) return NextResponse.json({ error: 'Token inválido ou expirado' }, { status: 400 });
+      return NextResponse.json({ success: true, message: 'Senha atualizada com sucesso' });
+    }
 
     const { data: updatedUser, error: updateUserError } = await supabase
       .from('users')

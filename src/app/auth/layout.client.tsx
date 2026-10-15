@@ -15,7 +15,7 @@ export default function AuthLayoutClient({
   useEffect(() => {
     // Se o usuário já estiver autenticado, redirecionar para o dashboard
     // Admins may preview the isolated demo invitation; its API remains demo-gated.
-    if (!loading && user && window.location.pathname !== '/auth/update-password/demo') {
+    if (!loading && user && !['/auth/update-password/demo', '/auth/first-access'].includes(window.location.pathname)) {
       router.push('/dashboard');
     }
   }, [user, loading, router]);

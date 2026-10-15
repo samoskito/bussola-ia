@@ -16,23 +16,23 @@ export interface AdminUser {
   nivel: 'user' | 'admin';
   plano: string | null;
   data_expiracao: string | null;
-  revision: number;
+  revision: number | string;
   status: AdminUserStatus;
   access: AdminUserAccess[];
   createdAt: string;
-  invite: { status: 'none' | 'generated' | 'simulated_sent' | 'consumed' | 'expired'; expiresAt: string | null };
+  invite: { status: 'none' | 'generated' | 'simulated_sent' | 'sent' | 'send_failed' | 'consumed' | 'expired'; expiresAt: string | null };
 }
 export interface AdminUserAudit {
   id: string;
   userId: string;
   actor: string;
-  action: 'created' | 'profile_updated' | 'access_updated' | 'invite_generated' | 'invite_simulated_sent' | 'demo_password_confirmed';
+  action: 'created' | 'profile_updated' | 'access_updated' | 'invite_generated' | 'invite_simulated_sent' | 'invite_sent' | 'invite_send_failed' | 'password_defined' | 'demo_password_confirmed';
   reason: string;
   createdAt: string;
   changes: Record<string, unknown>;
 }
 export interface AdminUserList {
-  mode: 'demo';
+  mode: 'demo' | 'live';
   users: AdminUser[];
   total: number;
   page: number;
@@ -48,19 +48,19 @@ export interface CreateAdminUserInput {
   reason?: string;
 }
 export interface UpdateAdminUserInput {
-  revision: number;
+  revision: number | string;
   nome?: string;
   email?: string;
   telefone?: string | null;
   reason?: string;
 }
 export interface UpdateAdminAccessInput {
-  revision: number;
+  revision: number | string;
   agentTypes: AgentType[];
   expiresAt: string | null;
   reason: string;
 }
 export interface AdminInviteResult {
   user: AdminUser;
-  invite: { url: string; expiresAt: string; simulated: true; action: 'generate' | 'send' };
+  invite: { url: string; expiresAt: string; simulated: boolean; action: 'generate' | 'send' };
 }

@@ -2,6 +2,8 @@
 
 Estado em 15/10/2026: preparação e duas correções locais autorizadas; implementadas com testes repetidos. Migrations remotas, publicação, ativação e novos envios reais NÃO autorizados nesta etapa. Documento não executa operações. Hotmart direta e Insights/OpenAI/MCP ficam fora deste lançamento.
 
+Preflight remoto posterior somente em leitura concluído: `docs/audits/2026-10-15-admin-production-preflight.md`. Schema compatível e sem duplicidades; teste adicional PostgreSQL15.8 passou. Projeto Vercel correto samoskitos-projects/bussola-ia, domínio ia.bussolaexecutiva.com.br, produção ainda2248dcd. Antes da aplicação faltam backup atual recuperável, configuração explícita das envs do próximo build e verificação do fluxo comercial n8n para o novo índice. Nenhuma configuração foi alterada nessa auditoria.
+
 ## Escopo e origem da revisão
 
 Usuário quer publicar busca/cadastro/edição de usuários, gestão das quatro IAs, auditoria e primeiro acesso por link, exclusivamente para administradores. Destinatário de teste informado: suporte@palmup.com.br; pode ser conta nova, mas pesquisar novamente antes de criar na etapa autorizada de integração real. Não criar/enviar nesta rodada de correções. Não usar compradores reais para testes de alteração/revogação/senha.
@@ -35,9 +37,9 @@ Conferir variáveis no ambiente Production da hospedagem; presença local não c
 
 Configurações adicionais:
 
-- `ADMIN_USERS_APP_URL=https://bussola-ia.vercel.app`, origem fixa do convite novo, confirmar domínio final antes do deploy.
-- `EMAIL_APP_URL=https://bussola-ia.vercel.app` para recuperação existente; revisar também APP_URL/NEXT_PUBLIC_APP_URL e a configuração de build em vercel.json. Não usar o localhost existente no .env.local para links reais.
-- Supabase URL/service role e JWT da autenticação existente, somente no servidor; preservar sessões e variáveis existentes.
+- `ADMIN_USERS_APP_URL=https://ia.bussolaexecutiva.com.br`, origem fixa recomendada do convite novo, domínio principal conferido na Vercel.
+- EMAIL_APP_URL existente na Vercel usa https://bussola-ia.vercel.app e o alias é válido. Recomenda-se alinhar para https://ia.bussolaexecutiva.com.br; revisar também APP_URL/NEXT_PUBLIC_APP_URL e a configuração de build em vercel.json (que ainda define alias). Não usar o localhost existente no .env.local para links reais.
+- Configurar explicitamente NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY no projeto correto, pois não aparecem no inventário de projeto/Shared consultado. A service role é somente servidor, sem prefixo NEXT_PUBLIC. JWT já presente: preservar valor para não interromper sessões.
 - SMTP_HOST/PORT/SECURE/USER/PASS/FROM: revisar valores sem expô-los. SMTP aceitou mensagem pontual P2; ainda falta teste do convite novo na hospedagem. Brevo API recusou401: corrigir a credencial ou não configurar esse fallback; não declarar fallback funcional.
 - `INSIGHTS_MODE=disabled`, `INSIGHTS_OPENAI_ENABLED=false`, `INSIGHTS_PROCESSING_ENABLED=false`, `INSIGHTS_MAX_SPEND_USD=0`. Chave OpenAI não é pré-requisito do painel admin. Não configurar executor/cron nem publicar MCP remoto nesta entrega.
 
@@ -49,7 +51,7 @@ Na hospedagem, mudança de env normalmente exige nova versão/deploy; não presu
 
 - Registrar SHA anterior em produção, SHA candidato, configurações anteriores e responsável pela janela. Definir versão de contenção compatível com reset atômico; o artefato antigo sem essa correção não é alvo seguro de rollback com convites ativos.
 - Exportar backup completo recuperável dos objetos/dados afetados, incluindo usuários, grants, tokens existentes e definições de funções/constraints/policies. Os backups privados pontuais de11 contas/P1/P2 NÃO substituem backup completo para migrations.
-- Verificar acesso de restauração e capacidade real de backup/PITR do projeto; não presumir disponibilidade pelo plano.
+- Backup físico diário mais recente conferido em15/10/2026 00:53:56 BRT, anterior às mudanças de hoje; Restore está disponível, mas não foi testado. PITR não está habilitado e não deve ser contratado automaticamente. Preparar cópia atual recuperável e plano de restauração antes das migrations; não presumir backup recente só pelo plano.
 - Rodar auditoria somente leitura de identidades e revisar SQL das duas migrations em sua versão exata.
 - Conferir privilégios de anon/authenticated/service_role, RLS e grants das novas RPCs; confirmar que não existe objeto parcial/conflitante de tentativa anterior. Preparar PASSWORD_RESET_ATOMIC_REQUIRED=true na configuração da versão nova sem iniciar deploy prematuro.
 

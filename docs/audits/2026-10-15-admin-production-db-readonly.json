@@ -1,0 +1,691 @@
+{
+  "timestamp": "2026-10-15T18:42:49.202Z",
+  "project": "iszynegxctqdfrmizila",
+  "method": "SQL BEGIN READ ONLY",
+  "sections": {
+    "01_identity": {
+      "users": 1694,
+      "emptyEmails": 0,
+      "duplicateGroups": 0,
+      "postgresVersion": "15.8",
+      "testEmailMatches": 0
+    },
+    "02_columns": [
+      {
+        "type": "uuid",
+        "table": "email_templates",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "email_templates",
+        "column": "template_key",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "email_templates",
+        "column": "subject",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "email_templates",
+        "column": "html_content",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "uuid",
+        "table": "email_templates",
+        "column": "updated_by",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamptz",
+        "table": "email_templates",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "NO"
+      },
+      {
+        "type": "timestamptz",
+        "table": "email_templates",
+        "column": "updated_at",
+        "default": "now()",
+        "nullable": "NO"
+      },
+      {
+        "type": "uuid",
+        "table": "password_reset_tokens",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "password_reset_tokens",
+        "column": "email",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "password_reset_tokens",
+        "column": "token_hash",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "timestamptz",
+        "table": "password_reset_tokens",
+        "column": "expires_at",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "timestamptz",
+        "table": "password_reset_tokens",
+        "column": "used_at",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamptz",
+        "table": "password_reset_tokens",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "NO"
+      },
+      {
+        "type": "uuid",
+        "table": "user_agent_access",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": "NO"
+      },
+      {
+        "type": "uuid",
+        "table": "user_agent_access",
+        "column": "user_id",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "user_agent_access",
+        "column": "agent_type",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "bool",
+        "table": "user_agent_access",
+        "column": "enabled",
+        "default": "true",
+        "nullable": "NO"
+      },
+      {
+        "type": "date",
+        "table": "user_agent_access",
+        "column": "expires_at",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamptz",
+        "table": "user_agent_access",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamptz",
+        "table": "user_agent_access",
+        "column": "updated_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "uuid",
+        "table": "users",
+        "column": "id",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "nome",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "email",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "senha",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "telefone",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "users",
+        "column": "avatar",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "rua",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "numero",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "bairro",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "cep",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "cidade",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "estado",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "pais",
+        "default": "'Brasil'::character varying",
+        "nullable": "YES"
+      },
+      {
+        "type": "varchar",
+        "table": "users",
+        "column": "nivel",
+        "default": "'user'::character varying",
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamptz",
+        "table": "users",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamptz",
+        "table": "users",
+        "column": "updated_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "users",
+        "column": "cargo",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "users",
+        "column": "empresa",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "int4",
+        "table": "users",
+        "column": "idade",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "date",
+        "table": "users",
+        "column": "data_expiracao",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "users",
+        "column": "plano",
+        "default": null,
+        "nullable": "YES"
+      }
+    ],
+    "03_constraints": [
+      {
+        "name": "chats_user_id_fkey",
+        "table": "public.chats",
+        "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "fk_user",
+        "table": "public.chats",
+        "definition": "FOREIGN KEY (user_id) REFERENCES users(id)"
+      },
+      {
+        "name": "email_templates_pkey",
+        "table": "public.email_templates",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "name": "email_templates_template_key_key",
+        "table": "public.email_templates",
+        "definition": "UNIQUE (template_key)"
+      },
+      {
+        "name": "email_templates_updated_by_fkey",
+        "table": "public.email_templates",
+        "definition": "FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "password_reset_tokens_pkey",
+        "table": "public.password_reset_tokens",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "name": "fk_user",
+        "table": "public.scripts",
+        "definition": "FOREIGN KEY (user_id) REFERENCES users(id)"
+      },
+      {
+        "name": "scripts_user_id_fkey",
+        "table": "public.scripts",
+        "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "user_agent_access_agent_type_check",
+        "table": "public.user_agent_access",
+        "definition": "CHECK ((agent_type = ANY (ARRAY['comunicacao'::text, 'apresentacao'::text, 'conversas_dificeis'::text, 'postagem'::text])))"
+      },
+      {
+        "name": "user_agent_access_pkey",
+        "table": "public.user_agent_access",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "name": "user_agent_access_user_id_agent_type_key",
+        "table": "public.user_agent_access",
+        "definition": "UNIQUE (user_id, agent_type)"
+      },
+      {
+        "name": "user_agent_access_user_id_fkey",
+        "table": "public.user_agent_access",
+        "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "users_email_key",
+        "table": "public.users",
+        "definition": "UNIQUE (email)"
+      },
+      {
+        "name": "users_nivel_check",
+        "table": "public.users",
+        "definition": "CHECK (((nivel)::text = ANY ((ARRAY['admin'::character varying, 'user'::character varying])::text[])))"
+      },
+      {
+        "name": "users_pkey",
+        "table": "public.users",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "name": "users_plano_check",
+        "table": "public.users",
+        "definition": "CHECK (((plano IS NULL) OR (plano = ANY (ARRAY['Todas'::text, 'Comunicação Executiva'::text, 'Apresentação para Reunião de Resultados'::text, 'Conversas Dificeis'::text, 'Postagem no Linkedin'::text, 'Personalizado'::text, 'Ambas'::text]))))"
+      }
+    ],
+    "04_rls": [
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "email_templates",
+        "forced": false
+      },
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "password_reset_tokens",
+        "forced": false
+      },
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "user_agent_access",
+        "forced": false
+      },
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "users",
+        "forced": false
+      }
+    ],
+    "05_policies": [
+      {
+        "cmd": "ALL",
+        "qual": "false",
+        "roles": [
+          "public"
+        ],
+        "tablename": "email_templates",
+        "permissive": "PERMISSIVE",
+        "policyname": "deny_all_email_templates",
+        "schemaname": "public",
+        "with_check": "false"
+      },
+      {
+        "cmd": "ALL",
+        "qual": "false",
+        "roles": [
+          "public"
+        ],
+        "tablename": "password_reset_tokens",
+        "permissive": "PERMISSIVE",
+        "policyname": "deny_all_password_reset_tokens",
+        "schemaname": "public",
+        "with_check": "false"
+      },
+      {
+        "cmd": "ALL",
+        "qual": "(auth.role() = 'service_role'::text)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "user_agent_access",
+        "permissive": "PERMISSIVE",
+        "policyname": "user_agent_access_service_role_all",
+        "schemaname": "public",
+        "with_check": "(auth.role() = 'service_role'::text)"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "((auth.uid())::text = (id)::text)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "users",
+        "permissive": "PERMISSIVE",
+        "policyname": "users_select_own",
+        "schemaname": "public",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "((auth.uid())::text = (id)::text)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "users",
+        "permissive": "PERMISSIVE",
+        "policyname": "users_update_own",
+        "schemaname": "public",
+        "with_check": "((auth.uid())::text = (id)::text)"
+      }
+    ],
+    "06_privileges": [
+      {
+        "role": "anon",
+        "table": "email_templates",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "anon",
+        "table": "password_reset_tokens",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "anon",
+        "table": "user_agent_access",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "anon",
+        "table": "users",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "authenticated",
+        "table": "email_templates",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "authenticated",
+        "table": "password_reset_tokens",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "authenticated",
+        "table": "user_agent_access",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "authenticated",
+        "table": "users",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "service_role",
+        "table": "email_templates",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "service_role",
+        "table": "password_reset_tokens",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "service_role",
+        "table": "user_agent_access",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      },
+      {
+        "role": "service_role",
+        "table": "users",
+        "delete": true,
+        "insert": true,
+        "select": true,
+        "update": true,
+        "schemaUsage": true
+      }
+    ],
+    "07_triggers": [
+      {
+        "table": "users",
+        "function": "update_updated_at_column()",
+        "definition": "CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+      }
+    ],
+    "08_objects": {
+      "audit": null,
+      "sha256": "sha256(bytea)",
+      "authRole": "auth.role()",
+      "revisions": null,
+      "invitations": null,
+      "normalizedIndex": null
+    },
+    "09_admin_functions": [],
+    "10_indexes": [
+      {
+        "name": "email_templates_pkey",
+        "table": "email_templates",
+        "definition": "CREATE UNIQUE INDEX email_templates_pkey ON public.email_templates USING btree (id)"
+      },
+      {
+        "name": "email_templates_template_key_key",
+        "table": "email_templates",
+        "definition": "CREATE UNIQUE INDEX email_templates_template_key_key ON public.email_templates USING btree (template_key)"
+      },
+      {
+        "name": "idx_email_templates_template_key",
+        "table": "email_templates",
+        "definition": "CREATE INDEX idx_email_templates_template_key ON public.email_templates USING btree (template_key)"
+      },
+      {
+        "name": "idx_password_reset_tokens_email",
+        "table": "password_reset_tokens",
+        "definition": "CREATE INDEX idx_password_reset_tokens_email ON public.password_reset_tokens USING btree (email)"
+      },
+      {
+        "name": "idx_password_reset_tokens_expires_at",
+        "table": "password_reset_tokens",
+        "definition": "CREATE INDEX idx_password_reset_tokens_expires_at ON public.password_reset_tokens USING btree (expires_at)"
+      },
+      {
+        "name": "idx_password_reset_tokens_token_hash",
+        "table": "password_reset_tokens",
+        "definition": "CREATE INDEX idx_password_reset_tokens_token_hash ON public.password_reset_tokens USING btree (token_hash)"
+      },
+      {
+        "name": "password_reset_tokens_pkey",
+        "table": "password_reset_tokens",
+        "definition": "CREATE UNIQUE INDEX password_reset_tokens_pkey ON public.password_reset_tokens USING btree (id)"
+      },
+      {
+        "name": "idx_user_agent_access_agent_type",
+        "table": "user_agent_access",
+        "definition": "CREATE INDEX idx_user_agent_access_agent_type ON public.user_agent_access USING btree (agent_type)"
+      },
+      {
+        "name": "idx_user_agent_access_enabled",
+        "table": "user_agent_access",
+        "definition": "CREATE INDEX idx_user_agent_access_enabled ON public.user_agent_access USING btree (enabled)"
+      },
+      {
+        "name": "idx_user_agent_access_expires_at",
+        "table": "user_agent_access",
+        "definition": "CREATE INDEX idx_user_agent_access_expires_at ON public.user_agent_access USING btree (expires_at)"
+      },
+      {
+        "name": "idx_user_agent_access_user_id",
+        "table": "user_agent_access",
+        "definition": "CREATE INDEX idx_user_agent_access_user_id ON public.user_agent_access USING btree (user_id)"
+      },
+      {
+        "name": "user_agent_access_pkey",
+        "table": "user_agent_access",
+        "definition": "CREATE UNIQUE INDEX user_agent_access_pkey ON public.user_agent_access USING btree (id)"
+      },
+      {
+        "name": "user_agent_access_user_id_agent_type_key",
+        "table": "user_agent_access",
+        "definition": "CREATE UNIQUE INDEX user_agent_access_user_id_agent_type_key ON public.user_agent_access USING btree (user_id, agent_type)"
+      },
+      {
+        "name": "idx_users_data_expiracao",
+        "table": "users",
+        "definition": "CREATE INDEX idx_users_data_expiracao ON public.users USING btree (data_expiracao)"
+      },
+      {
+        "name": "idx_users_email",
+        "table": "users",
+        "definition": "CREATE INDEX idx_users_email ON public.users USING btree (email)"
+      },
+      {
+        "name": "idx_users_plano",
+        "table": "users",
+        "definition": "CREATE INDEX idx_users_plano ON public.users USING btree (plano)"
+      },
+      {
+        "name": "users_email_key",
+        "table": "users",
+        "definition": "CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email)"
+      },
+      {
+        "name": "users_pkey",
+        "table": "users",
+        "definition": "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"
+      }
+    ]
+  }
+}

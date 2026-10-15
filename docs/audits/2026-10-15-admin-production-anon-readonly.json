@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-10-15T18:46:43.122Z",
+  "results": [
+    {
+      "table": "users",
+      "status": 200,
+      "visibleCount": "0",
+      "bodyRows": 0
+    },
+    {
+      "table": "user_agent_access",
+      "status": 200,
+      "visibleCount": "0",
+      "bodyRows": 0
+    },
+    {
+      "table": "password_reset_tokens",
+      "status": 200,
+      "visibleCount": "0",
+      "bodyRows": 0
+    },
+    {
+      "table": "email_templates",
+      "status": 200,
+      "visibleCount": "0",
+      "bodyRows": 0
+    }
+  ]
+}

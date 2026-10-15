@@ -26,14 +26,14 @@
       {
         "used": false,
         "action": "generate",
-        "expiresAt": "2026-10-15T20:38:47.013+00:00",
+        "expiresAt": "2026-10-15T17:38:47.013-03:00",
         "invalidated": true,
         "deliveryStatus": "not_requested"
       },
       {
         "used": false,
         "action": "send",
-        "expiresAt": "2026-10-15T20:42:09.173+00:00",
+        "expiresAt": "2026-10-15T17:42:09.173-03:00",
         "invalidated": false,
         "deliveryStatus": "sent"
       }
@@ -41,5 +41,5 @@
     "ordinaryLevel": true,
     "fourEnabledUntil22": 4
   },
-  "recipientConfirmation": "pending"
+  "recipientConfirmation": "User confirmed receipt, self-defined password and successful login; read-only DB confirmed sent invitation consumed and password_defined audit event."
 }

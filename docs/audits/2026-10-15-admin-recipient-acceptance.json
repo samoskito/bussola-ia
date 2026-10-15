@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-10-15T19:45:28.997Z",
+  "method": "read-only database confirmation plus user-reported receipt/password/login",
+  "testUsers": 1,
+  "ordinaryLevel": true,
+  "fourEnabledUntil22": 4,
+  "sentInviteConsumed": true,
+  "passwordDefinedEvents": 1,
+  "receiptPasswordAndLoginConfirmedByUser": true
+}

@@ -14,8 +14,9 @@ export default function AuthLayoutClient({
 
   useEffect(() => {
     // Se o usuário já estiver autenticado, redirecionar para o dashboard
-    // Admins may preview the isolated demo invitation; its API remains demo-gated.
-    if (!loading && user && !['/auth/update-password/demo', '/auth/first-access'].includes(window.location.pathname)) {
+    // LoginForm owns the safe post-login continuation. Consent performs its
+    // own server-side current-admin check and must remain visible after login.
+    if (!loading && user && !['/auth/login', '/auth/insights-mcp', '/auth/update-password/demo', '/auth/first-access'].includes(window.location.pathname)) {
       router.push('/dashboard');
     }
   }, [user, loading, router]);

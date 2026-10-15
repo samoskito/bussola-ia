@@ -25,7 +25,7 @@ type AuthError = {
 export type AuthContextType = {
   user: AppUser;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<AuthError>;
+  signIn: (email: string, password: string, options?: { redirect?: boolean }) => Promise<AuthError>;
   signOut: () => Promise<void>;
   error: string | null;
   setUser: (user: AppUser) => void;
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Função de login
-  const signIn = async (email: string, password: string): Promise<AuthError> => {
+  const signIn = async (email: string, password: string, options?: { redirect?: boolean }): Promise<AuthError> => {
     try {
       setLoading(true);
       setError(null);
@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       setUser(user);
-      router.push('/dashboard');
+      if (options?.redirect !== false) router.push('/dashboard');
       return null;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Falha ao fazer login';

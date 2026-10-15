@@ -1,5 +1,7 @@
 # Bússola Insights: MCP local de demonstração
 
+Atualização 15/10/2026: este pacote continua sendo o demo local isolado. A implementação remota com fonte real e OAuth foi preparada separadamente no Next.js (`src/lib/insights-mcp` e `/api/insights-mcp`), desabilitada por padrão. Não exponha este servidor demo. Ver [design real](../../docs/plans/2026-10-15-insights-mcp-live-design.md), [ativação Claude primeiro](../../docs/plans/2026-10-15-insights-mcp-release.md) e [validação local](../../docs/audits/2026-10-15-mcp-live-validation.md). A conexão real ainda depende de aplicação da migration específica, segredos e publicação autorizada.
+
 Servidor MCP somente leitura com os relatórios sintéticos compartilhados pelo painel. Não consulta Supabase, não lê `.env`, não importa autenticação/serviços de produção, não escreve em banco/arquivos e não chama OpenAI ou qualquer LLM. Não precisa de chave. Este pacote está separado das dependências do Next.js.
 
 ## Iniciar HTTP local

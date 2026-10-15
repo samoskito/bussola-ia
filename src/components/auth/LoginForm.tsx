@@ -3,6 +3,7 @@
 import React, { useState, useId, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { safeLoginRedirect, resumeOAuthLogin } from '@/lib/auth-redirect';
 
 interface LoginFormProps {
   className?: string;
@@ -26,12 +27,19 @@ export default function LoginForm({ className = '', redirectTo = '/dashboard' }:
   const getRedirectPath = () => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('redirectedFrom') || redirectTo;
+      return safeLoginRedirect(params.get('redirectedFrom'), safeLoginRedirect(redirectTo));
     }
-    return redirectTo;
+    return safeLoginRedirect(redirectTo);
   };
   
   const [redirectPath, setRedirectPath] = useState(redirectTo);
+  const [redirectReady, setRedirectReady] = useState(false);
+  const navigateAfterLogin = () => {
+    // OAuth authorization is a document navigation, so its redirects/cookies
+    // must run in the browser rather than being requested as a Next RSC page.
+    if (redirectPath.startsWith('/api/insights-mcp/oauth/authorize?')) resumeOAuthLogin(redirectPath, path => window.location.assign(path));
+    else router.push(redirectPath);
+  };
   
   // Refs for focus management
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -46,14 +54,15 @@ export default function LoginForm({ className = '', redirectTo = '/dashboard' }:
   // Update redirect path when component mounts
   useEffect(() => {
     setRedirectPath(getRedirectPath());
+    setRedirectReady(true);
   }, []);
   
   // Redirect if user is already authenticated
   useEffect(() => {
-    if (user && !authLoading) {
-      router.push(redirectPath);
+    if (user && !authLoading && redirectReady) {
+      navigateAfterLogin();
     }
-  }, [user, authLoading, router, redirectPath]);
+  }, [user, authLoading, router, redirectPath, redirectReady]);
   
   // Focus email input on mount
   useEffect(() => {
@@ -85,7 +94,7 @@ export default function LoginForm({ className = '', redirectTo = '/dashboard' }:
     setIsSubmitting(true);
     
     try {
-      const result = await signIn(email.trim().toLowerCase(), password);
+      const result = await signIn(email.trim().toLowerCase(), password, { redirect: false });
       
       // Se signIn retornar um objeto com propriedade error
       if (result !== null && result !== undefined && typeof result === 'object' && 'error' in result && result.error) {
@@ -133,7 +142,7 @@ export default function LoginForm({ className = '', redirectTo = '/dashboard' }:
           </div>
           <div>
             <button
-              onClick={() => router.push(redirectPath)}
+              onClick={navigateAfterLogin}
               className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
             >
               Ir para o Dashboard

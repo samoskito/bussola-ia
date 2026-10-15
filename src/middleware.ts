@@ -3,6 +3,23 @@ import { NextResponse, type NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   try {
     const path = request.nextUrl.pathname;
+    if (path === '/auth/insights-mcp') {
+      const response = NextResponse.next();
+      response.headers.set('Cache-Control', 'private, no-store, max-age=0');
+      response.headers.set('Referrer-Policy', 'no-referrer');
+      response.headers.set('X-Frame-Options', 'DENY');
+      // form-action 'self' can also block the authorized external OAuth 303.
+      // POST target is fixed in the page; Origin/nonce checks protect the handler.
+      response.headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+      return response;
+    }
+    // Public OAuth discovery contains metadata only. Resource/consent handlers
+    // enforce their own feature gate, identity and current administrator role.
+    if ([
+      '/.well-known/oauth-authorization-server',
+      '/.well-known/oauth-protected-resource',
+      '/.well-known/oauth-protected-resource/api/insights-mcp',
+    ].includes(path)) return NextResponse.next();
     
     // Public routes that don't require authentication
     const publicRoutes = [

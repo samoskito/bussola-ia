@@ -137,6 +137,11 @@ export function createOpenAIClassifier(options: OpenAIClassifierOptions = {}): I
       if (texts.length !== 1 || typeof texts[0].text !== 'string') throw new Error('invalid_openai_output');
       let parsed: unknown;
       try { parsed = JSON.parse(texts[0].text); } catch { throw new Error('invalid_openai_json'); }
+      // Enforce the conservative review policy independently of model adherence.
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const item = parsed as Record<string, unknown>;
+        if (typeof item.confidence === 'number' && item.confidence < 0.7 && item.needsReview === false) item.needsReview = true;
+      }
       const usageRaw = data.usage && typeof data.usage === 'object' ? data.usage as Record<string, unknown> : null;
       const details = usageRaw?.output_tokens_details && typeof usageRaw.output_tokens_details === 'object' ? usageRaw.output_tokens_details as Record<string, unknown> : null;
       const validCount = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : 0;

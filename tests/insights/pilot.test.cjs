@@ -25,6 +25,10 @@ test('provider diagnostics persist only bounded codes, never arbitrary exception
  const repo=createInMemoryInsightRepository([source()]);const classifier={provider:'mock',version:'pilot.v1',async classify(){throw failure;}};
  const result=await processInsightBatch({repository:repo,classifier,now});assert.equal(result.failed,1);const jobs=await repo.listJobs();assert.equal(jobs[0].errorCode,expected);assert.ok(!JSON.stringify(jobs).includes('private source'));}
 });
+test('provider cannot suppress mandatory review for a low-confidence classification',async()=>{
+ const {createOpenAIClassifier}=load('classifier'),{prepareInsightInput}=load('privacy');const old=process.env.INSIGHTS_OPENAI_ENABLED;process.env.INSIGHTS_OPENAI_ENABLED='true';
+ try{const classifier=createOpenAIClassifier({model:'gpt-5.4-nano',apiKey:'synthetic',fetchImpl:async()=>new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({kind:'question',topicIds:['feedback'],normalizedDemand:'Preparar feedback.',confidence:.5,needsReview:false})}]}]}),{status:200})});const result=await classifier.classify(prepareInsightInput(source(),[],'v1',classifier.version));assert.equal(result.classification.confidence,.5);assert.equal(result.classification.needsReview,true);}finally{if(old===undefined)delete process.env.INSIGHTS_OPENAI_ENABLED;else process.env.INSIGHTS_OPENAI_ENABLED=old;}
+});
 test('daily pilot rejects empty, duplicate, invalid or oversized manifests before database access',async()=>{
  const env={INSIGHTS_MODE:'live',INSIGHTS_PROCESSING_ENABLED:'true',INSIGHTS_OPENAI_ENABLED:'true',OPENAI_API_KEY:'synthetic',INSIGHTS_MAX_SPEND_USD:'1'};
  for(const ids of ['', '1,1','x','0',Array.from({length:201},(_,i)=>i+1).join(',')])await assert.rejects(runDailyInsights({env:{...env,INSIGHTS_PILOT_SOURCE_IDS:ids}}),/pilot_sources/);

@@ -141,6 +141,12 @@ export function createOpenAIClassifier(options: OpenAIClassifierOptions = {}): I
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         const item = parsed as Record<string, unknown>;
         if (typeof item.confidence === 'number' && item.confidence < 0.7 && item.needsReview === false) item.needsReview = true;
+        if (Array.isArray(item.topicIds)) {
+          item.topicIds = [...new Set(item.topicIds)];
+          if (item.kind === 'unclassifiable' || item.topicIds.length === 0) {
+            item.kind = 'unclassifiable'; item.topicIds = []; item.needsReview = true;
+          }
+        }
       }
       const usageRaw = data.usage && typeof data.usage === 'object' ? data.usage as Record<string, unknown> : null;
       const details = usageRaw?.output_tokens_details && typeof usageRaw.output_tokens_details === 'object' ? usageRaw.output_tokens_details as Record<string, unknown> : null;

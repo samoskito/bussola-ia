@@ -1,0 +1,25 @@
+{
+  "verifiedAt": "2026-10-15T19:09:22.276Z",
+  "sourceTimestamp": "2026-10-15T19:06:16.943626+00:00",
+  "project": "iszynegxctqdfrmizila",
+  "postgres": "15.8",
+  "scope": [
+    "users",
+    "password_reset_tokens",
+    "user_agent_access",
+    "email_templates"
+  ],
+  "counts": {
+    "users": 1694,
+    "password_reset_tokens": 437,
+    "user_agent_access": 4556,
+    "email_templates": 1
+  },
+  "countsAndValuesMatch": true,
+  "comparison": "Ordered JSONB equality for all records; text digests may differ due to numeric formatting after type restoration.",
+  "definitionsRestored": true,
+  "isolatedNetwork": true,
+  "tmpfsOnly": true,
+  "encryptedBackup": "admin-pre-migration-2026-10-15T19-05-48-324Z.dpapi",
+  "limitations": "Only four affected tables and definitions; excludes other tables, external history rows, Storage objects and full-project disaster recovery."
+}

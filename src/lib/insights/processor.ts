@@ -170,6 +170,12 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
   if (options.deadline && !Number.isFinite(options.deadline.getTime())) throw new Error('invalid_deadline');
   const clock = options.clock ?? (options.now ? () => new Date(options.now!.getTime()) : () => new Date());
   const allSources = (await repository.listSources()).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id);
+  // One current active-result snapshot avoids two RPC/REST round trips for
+  // every completed source on every resumed batch. Hash+versions must match;
+  // a historical completed job alone is never sufficient for this shortcut.
+  const activeResults = await repository.listCompleted();
+  const activeKeys = new Set(activeResults.filter(row => row.taxonomyVersion === TAXONOMY_VERSION && row.classifierVersion === classifier.version)
+    .map(row => `${row.sourceId}:${row.sourceHash}`));
   const windowSources = options.processingStart
     ? allSources.filter(row => Date.parse(row.createdAt) >= options.processingStart!.getTime())
     : allSources;
@@ -213,6 +219,7 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
       continue;
     }
     const key = `${source.id}:${prepared.sourceHash}`;
+    if (activeKeys.has(key)) { result.skipped++; continue; }
     if ((await repository.getJob(key))?.status === 'completed') { result.skipped++; continue; }
     let reserved = false;
     if (classifier.provider === 'openai') {

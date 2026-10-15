@@ -33,6 +33,12 @@ test('ambiguous or contradictory topic assignment is conservatively sent to revi
  const {createOpenAIClassifier}=load('classifier'),{prepareInsightInput}=load('privacy');const old=process.env.INSIGHTS_OPENAI_ENABLED;process.env.INSIGHTS_OPENAI_ENABLED='true';
  try{for(const [kind,topicIds] of [['unclassifiable',['feedback']],['question',[]]]){const classifier=createOpenAIClassifier({model:'gpt-5.4-nano',apiKey:'synthetic',fetchImpl:async()=>new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({kind,topicIds,normalizedDemand:'Demanda ambígua.',confidence:.8,needsReview:false})}]}]}),{status:200})});const result=await classifier.classify(prepareInsightInput(source(),[],'v1',classifier.version));assert.equal(result.classification.kind,'unclassifiable');assert.deepEqual(result.classification.topicIds,[]);assert.equal(result.classification.needsReview,true);}}finally{if(old===undefined)delete process.env.INSIGHTS_OPENAI_ENABLED;else process.env.INSIGHTS_OPENAI_ENABLED=old;}
 });
+test('resumed batches skip matching active results without per-source history lookups',async()=>{
+ const {createMockClassifier}=load('classifier');const repo=createInMemoryInsightRepository([source()]);const classifier=createMockClassifier();await processInsightBatch({repository:repo,classifier,now});
+ let reads=0;const original=repo.getJob;repo.getJob=async key=>{reads++;return original(key)};const again=await processInsightBatch({repository:repo,classifier,now});assert.equal(again.skipped,1);assert.equal(reads,0);
+ repo.upsertSource(source({input:'Como preparar uma apresentação diferente?'}));const changed=await processInsightBatch({repository:repo,classifier,now});assert.equal(changed.completed,1);assert.equal(reads,1);
+ repo.upsertSource(source());const reverted=await processInsightBatch({repository:repo,classifier,now});assert.equal(reverted.completed,1);assert.equal(reads,2);
+});
 test('daily pilot rejects empty, duplicate, invalid or oversized manifests before database access',async()=>{
  const env={INSIGHTS_MODE:'live',INSIGHTS_PROCESSING_ENABLED:'true',INSIGHTS_OPENAI_ENABLED:'true',OPENAI_API_KEY:'synthetic',INSIGHTS_MAX_SPEND_USD:'1'};
  for(const ids of ['', '1,1','x','0',Array.from({length:201},(_,i)=>i+1).join(',')])await assert.rejects(runDailyInsights({env:{...env,INSIGHTS_PILOT_SOURCE_IDS:ids}}),/pilot_sources/);

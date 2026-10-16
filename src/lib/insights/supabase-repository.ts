@@ -3,12 +3,13 @@ import type { createServerSupabaseClient } from '../supabase/server';
 import type { SourceMessage } from './types';
 import { CLASSIFIER_VERSION, getInsightsModel, validateClassification } from './classifier';
 import type { ClaimResult, InsightJob, InsightRepository, StoredInsight } from './processor';
-import { prepareInsightInput, groupInsightSourcesByChat } from './privacy';
+import { prepareInsightInput, groupInsightSourcesByChat, MAX_CONTEXT_AGE_MS } from './privacy';
 import { TAXONOMY_VERSION } from './taxonomy';
 
 type ServiceClient = ReturnType<typeof createServerSupabaseClient>;
 
 const PAGE_SIZE = 500;
+const SOURCE_COLUMNS = 'id,user_id,chatid,input,created_at,users!scripts_user_id_fkey(nivel),chats!scripts_chatid_fkey(agent_type,user_id)';
 const AGENTS = new Set(['comunicacao', 'apresentacao', 'conversas_dificeis', 'postagem']);
 
 type DbRow = Record<string, unknown>;
@@ -113,7 +114,7 @@ export function createSupabaseInsightRepository(
     let cursor: { createdAt: string; id: number } | undefined;
     while (true) {
       let query = client.from('scripts')
-        .select('id,user_id,chatid,input,created_at,users!scripts_user_id_fkey(nivel),chats!scripts_chatid_fkey(agent_type,user_id)')
+        .select(SOURCE_COLUMNS)
         .gte('created_at', windowStart).lt('created_at', windowEnd)
         .order('created_at', { ascending: true }).order('id', { ascending: true });
       if (cursor) query = query.or(`created_at.gt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.gt.${cursor.id})`);
@@ -197,14 +198,48 @@ export function createSupabaseInsightRepository(
       return { state: item.state, token: item.token } as ClaimResult;
     },
     async complete(key, token, insight) {
-      // Re-read current source/context immediately before the CAS completion.
-      // This catches edits/deletions/role changes since the model request.
-      const latest = await fetchSources();
-      const source = latest.find(row => row.id === insight.sourceId);
-      if (!source || source.userLevel !== 'user') return false;
+      // Fresh reads after classification, scoped to this source/conversation.
+      // Keep the canonical repository window and live ownership/role/agent joins.
+      const { data: sourceData, error: sourceError } = await client.from('scripts').select(SOURCE_COLUMNS)
+        .eq('id', insight.sourceId).gte('created_at', windowStart).lt('created_at', windowEnd).maybeSingle();
+      assertNoDbError(sourceError);
+      if (!sourceData) return false;
+      const source = parseSource(sourceData);
+      if (!source || source.userLevel !== 'user' || source.id !== insight.sourceId || source.userId !== insight.userId ||
+          source.chatId !== insight.chatId || source.agentType !== insight.agentType ||
+          Date.parse(source.createdAt) !== Date.parse(insight.createdAt)) return false;
+      const sourceTime = Date.parse(source.createdAt);
+      if (!Number.isFinite(sourceTime) || sourceTime < start.getTime() || sourceTime >= end.getTime()) return false;
+      const contextStart = new Date(Math.max(start.getTime(), sourceTime - MAX_CONTEXT_AGE_MS)).toISOString();
+      // prepareInsightInput compares millisecond timestamps, then IDs. Include
+      // the entire source millisecond so sub-ms DB precision cannot change its
+      // tie-breaking contract; the helper below selects exactly the last three.
+      const contextEnd = new Date(Math.min(end.getTime(), sourceTime + 1)).toISOString();
+      const context: SourceMessage[] = [];
+      let cursor: { createdAt: string; id: number } | undefined;
+      while (true) {
+        let query = client.from('scripts').select(SOURCE_COLUMNS).eq('user_id', source.userId).eq('chatid', source.chatId)
+          .gte('created_at', contextStart).lt('created_at', contextEnd)
+          .order('created_at', { ascending: true }).order('id', { ascending: true });
+        if (cursor) query = query.or(`created_at.gt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.gt.${cursor.id})`);
+        const { data, error } = await query.limit(PAGE_SIZE);
+        assertNoDbError(error);
+        if (!Array.isArray(data)) throw new Error('invalid_context_page');
+        for (const row of data) {
+          const item = parseSource(row);
+          if (!item || item.userId !== source.userId || item.chatId !== source.chatId || item.agentType !== source.agentType || item.userLevel !== 'user') return false;
+          context.push(item);
+        }
+        if (data.length < PAGE_SIZE) break;
+        const last = data[data.length - 1] as DbRow;
+        const next = { createdAt: last.created_at as string, id: last.id as number };
+        if (cursor && (Date.parse(next.createdAt) < Date.parse(cursor.createdAt) ||
+            (next.createdAt === cursor.createdAt && next.id <= cursor.id))) throw new Error('invalid_context_cursor');
+        cursor = next;
+      }
       let currentHash: string;
       try {
-        currentHash = prepareInsightInput(source, latest, insight.taxonomyVersion, insight.classifierVersion).sourceHash;
+        currentHash = prepareInsightInput(source, context, insight.taxonomyVersion, insight.classifierVersion).sourceHash;
       } catch { return false; }
       if (currentHash !== insight.sourceHash) return false;
       const { data, error } = await client.rpc('insights_complete_job', {

@@ -138,6 +138,8 @@ export interface ProcessInsightOptions {
   maxMessages?: number; maxSpendUsd?: number; reserveUsdPerCall?: number; budgetScope?: string;
   now?: Date; clock?: () => Date; processingStart?: Date; processingEnd?: Date;
   sourceIds?: readonly number[];
+  /** Fixed eight-way historical worker subset; context remains unpartitioned. */
+  partition?: number;
   deadline?: Date;
 }
 export interface ProcessInsightResult {
@@ -176,6 +178,7 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
       (options.processingStart && options.processingEnd <= options.processingStart))) throw new Error('invalid_processing_end');
   if (options.sourceIds && (!options.sourceIds.length || options.sourceIds.length > 200 || options.sourceIds.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(options.sourceIds).size !== options.sourceIds.length)) throw new Error('invalid_pilot_sources');
   if (options.deadline && !Number.isFinite(options.deadline.getTime())) throw new Error('invalid_deadline');
+  if (options.partition !== undefined && (!Number.isInteger(options.partition) || options.partition < 0 || options.partition > 7)) throw new Error('invalid_partition');
   const clock = options.clock ?? (options.now ? () => new Date(options.now!.getTime()) : () => new Date());
   const allSources = (await repository.listSources()).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id);
   const contextByChat = groupInsightSourcesByChat(allSources);
@@ -194,7 +197,10 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
     (!options.processingStart || Date.parse(row.createdAt) >= options.processingStart.getTime()) &&
     (!options.processingEnd || Date.parse(row.createdAt) < options.processingEnd.getTime()));
   const allowedSources = options.sourceIds ? new Set(options.sourceIds) : null;
-  const sources = allowedSources ? windowSources.filter(row => allowedSources.has(row.id)) : windowSources;
+  const manifestSources = allowedSources ? windowSources.filter(row => allowedSources.has(row.id)) : windowSources;
+  // Partition only work selection. Hashes must retain the complete chat context,
+  // including messages whose IDs belong to another worker.
+  const sources = options.partition === undefined ? manifestSources : manifestSources.filter(row => row.id % 8 === options.partition);
   const result: ProcessInsightResult = {
     inspected: 0, completed: 0, skipped: 0, excluded: 0, pending: 0, failed: 0,
     budgetStopped: false, hasMore: false, remainingUninspected: 0,

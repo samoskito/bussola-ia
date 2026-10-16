@@ -9,6 +9,8 @@ export interface DailyInsightsOptions {
   now?: Date;
   repository?: InsightRepository;
   classifier?: InsightClassifier;
+  /** Internal fixed historical subset. Never accepted from request bodies/queries. */
+  partition?: number;
 }
 
 /** Only server environment can authorize a bounded historical run. HTTP inputs never reach this configuration. */
@@ -48,6 +50,7 @@ export async function runDailyInsights(options: DailyInsightsOptions = {}): Prom
   const now = options.now ?? new Date();
   if (!Number.isFinite(now.getTime())) throw new Error('invalid_batch_time');
   const window = insightProcessingWindow(env, now);
+  if (options.partition !== undefined && (!window.historical || !Number.isInteger(options.partition) || options.partition < 0 || options.partition > 7)) throw new Error('invalid_backfill_partition');
   let repository = options.repository;
   if (!repository) {
     const { createServerSupabaseClient } = await import('../supabase/server');
@@ -60,7 +63,7 @@ export async function runDailyInsights(options: DailyInsightsOptions = {}): Prom
   if (classifier.provider !== 'openai') throw new Error('daily_requires_openai_classifier');
   return processInsightBatch({ repository, classifier, maxMessages: 10,
     maxSpendUsd, reserveUsdPerCall: getInsightsModel(env) === 'gpt-5.4-nano' ? 0.01 : 0.005, budgetScope, now,
-    sourceIds, deadline: new Date(Date.now() + 240_000),
+    sourceIds, partition: options.partition, deadline: new Date(Date.now() + 240_000),
     processingStart: window.start, processingEnd: window.end,
     clock: options.now ? () => new Date(options.now!.getTime()) : () => new Date() });
 }
@@ -71,5 +74,5 @@ export async function runRollingDailyInsights(options: DailyInsightsOptions = {}
   const env = { ...(options.env ?? process.env) };
   delete env.INSIGHTS_BACKFILL_START;
   delete env.INSIGHTS_BACKFILL_END;
-  return runDailyInsights({ ...options, env });
+  return runDailyInsights({ ...options, partition: undefined, env });
 }

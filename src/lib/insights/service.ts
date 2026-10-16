@@ -76,7 +76,9 @@ export async function buildLiveReport(filters: InsightFilters, now = new Date())
     return { ...base, status: job?.status === 'failed' ? 'failed' : 'pending' };
   });
   return buildInsightReport(filters, now, rows, { mode: 'live', processing: {
-    provider: 'openai', state: 'ready', scheduleLabel: 'Executor diário preparado; agendamento depende de ativação',
+    provider: 'openai', state: 'ready', scheduleLabel: process.env.INSIGHTS_DAILY_SCHEDULE_ENABLED === 'true'
+      ? 'Agendamento diário 03:17 BRT configurado; conferir o último processamento'
+      : 'Executor diário preparado; agendamento depende de ativação',
     lastProcessedAt: processedAt.sort().at(-1) ?? null,
   } });
 }

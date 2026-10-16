@@ -32,6 +32,8 @@ export interface InsightRepository {
   fail(key: string, token: string, now: Date, errorCode: string, maxAttempts: number): Promise<boolean>;
   listCompleted(): Promise<StoredInsight[]>;
   listJobs(): Promise<InsightJob[]>;
+  /** Read-only rejection snapshot, independent of source-window job creation dates. */
+  listRejectedSources?(): Promise<Array<{ sourceId: number; userId: string }>>;
 }
 
 export interface InMemoryInsightRepository extends InsightRepository {
@@ -124,6 +126,10 @@ export function createInMemoryInsightRepository(sources: readonly SourceMessage[
     },
     async listCompleted() { return Array.from(completed.values()); },
     async listJobs() { return Array.from(jobs.values()); },
+    async listRejectedSources() {
+      return Array.from(jobs.values()).filter(job => job.status === 'failed' && job.errorCode === 'input_rejected' && job.key === `rejected:${job.sourceId}`)
+        .map(job => ({ sourceId: job.sourceId, userId: job.userId }));
+    },
   };
 }
 
@@ -176,7 +182,10 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
   // One current active-result snapshot avoids two RPC/REST round trips for
   // every completed source on every resumed batch. Hash+versions must match;
   // a historical completed job alone is never sufficient for this shortcut.
-  const activeResults = await repository.listCompleted();
+  const [activeResults, rejectedSources] = await Promise.all([
+    repository.listCompleted(), repository.listRejectedSources?.() ?? Promise.resolve([]),
+  ]);
+  const rejectedPairs = new Set(rejectedSources.map(row => `${row.sourceId}:${row.userId}`));
   const activeKeys = new Set(activeResults.filter(row => row.taxonomyVersion === TAXONOMY_VERSION && row.classifierVersion === classifier.version)
     .map(row => `${row.sourceId}:${row.sourceHash}`));
   const activeSourceIds = new Set(activeResults.filter(row => row.taxonomyVersion === TAXONOMY_VERSION && row.classifierVersion === classifier.version)
@@ -230,7 +239,13 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
     try {
       prepared = prepareInsightInput(current, contextCandidates, TAXONOMY_VERSION, classifier.version);
     } catch {
-      await repository.recordRejected(source, 'input_rejected');
+      // The current role and input/context were checked again above. Existing
+      // rejection metadata never bypasses preparation or hides a corrected input.
+      const pair = `${source.id}:${source.userId}`;
+      if (!rejectedPairs.has(pair)) {
+        await repository.recordRejected(source, 'input_rejected');
+        rejectedPairs.add(pair);
+      }
       result.failed++; // Oversize/empty input is explicit, never silently truncated.
       continue;
     }

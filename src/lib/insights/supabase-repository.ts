@@ -274,5 +274,30 @@ export function createSupabaseInsightRepository(
         cursor = next;
       }
     },
+    async listRejectedSources() {
+      const all: Array<{ sourceId: number; userId: string }> = [];
+      let cursor: string | undefined;
+      while (true) {
+        // A rejection can be recorded after the historical source-window end.
+        // Filtering job creation time would miss it on every resumed backfill.
+        let query = client.from('insight_jobs').select('script_id,user_id,job_key')
+          .eq('status', 'failed').eq('error_code', 'input_rejected').like('job_key', 'rejected:%')
+          .order('job_key', { ascending: true });
+        if (cursor !== undefined) query = query.gt('job_key', cursor);
+        const { data, error } = await query.limit(PAGE_SIZE);
+        assertNoDbError(error);
+        if (!Array.isArray(data)) throw new Error('invalid_rejection_page');
+        for (const value of data) {
+          const row = record(value);
+          if (!row || !Number.isSafeInteger(row.script_id) || Number(row.script_id) <= 0 || typeof row.user_id !== 'string' ||
+              row.job_key !== `rejected:${row.script_id}`) throw new Error('invalid_rejection_row');
+          all.push({ sourceId: row.script_id as number, userId: row.user_id });
+        }
+        if (data.length < PAGE_SIZE) return all;
+        const next = record(data[data.length - 1])?.job_key;
+        if (typeof next !== 'string' || next === cursor) throw new Error('invalid_rejection_cursor');
+        cursor = next;
+      }
+    },
   };
 }

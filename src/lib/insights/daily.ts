@@ -31,7 +31,7 @@ export function insightProcessingWindow(env: Env, now: Date) {
   return { start, end, historical: true };
 }
 
-/** Invoke only from an authenticated scheduled worker route. No scheduler is installed here. */
+/** Invoke only from an authenticated machine worker route. */
 export async function runDailyInsights(options: DailyInsightsOptions = {}): Promise<ProcessInsightResult> {
   const env = options.env ?? process.env;
   if (env.INSIGHTS_MODE !== 'live' || env.INSIGHTS_PROCESSING_ENABLED !== 'true' ||
@@ -63,4 +63,13 @@ export async function runDailyInsights(options: DailyInsightsOptions = {}): Prom
     sourceIds, deadline: new Date(Date.now() + 240_000),
     processingStart: window.start, processingEnd: window.end,
     clock: options.now ? () => new Date(options.now!.getTime()) : () => new Date() });
+}
+
+/** Fixed rolling-30-day worker. Only the server selects this function/route;
+ * all gates, manifest restrictions and durable budget accounting remain shared. */
+export async function runRollingDailyInsights(options: DailyInsightsOptions = {}): Promise<ProcessInsightResult> {
+  const env = { ...(options.env ?? process.env) };
+  delete env.INSIGHTS_BACKFILL_START;
+  delete env.INSIGHTS_BACKFILL_END;
+  return runDailyInsights({ ...options, env });
 }

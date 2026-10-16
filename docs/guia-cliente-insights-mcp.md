@@ -40,9 +40,16 @@ Se a opção de MCP personalizado não estiver disponível na conta, informe ao 
 - “Qual é a cobertura da classificação e o que ainda está pendente?”
 - “Com base nesses temas, sugira oportunidades de conteúdo e produto, separando dados de hipóteses.”
 
-Nomes de ferramentas e parâmetros técnicos não são necessários. Peça a fonte, o período e as limitações. Os números representam mensagens e temas que podem se sobrepor, não uma contagem exata de dúvidas únicas. Enquanto houver pendências de classificação, o relatório deve ser tratado como parcial. A opção de todo o histórico depende da conclusão da ampliação em andamento; não a considere publicada apenas por constar neste guia.
+Nomes de ferramentas e parâmetros técnicos não são necessários. Peça a fonte, o período e as limitações. Os números representam mensagens e temas que podem se sobrepor, não uma contagem exata de dúvidas únicas. Enquanto houver pendências de classificação, o relatório deve ser tratado como parcial. No painel, escolha **Todo o histórico** para consultar desde o início. Na conversa, peça “considere todo o histórico”. Uma conexão instalada antes dessa opção pode precisar atualizar seu catálogo de ferramentas; o responsável ajudará se a IA ainda mencionar apenas 7, 30 ou 90 dias.
 
 ## Duração e encerramento do acesso
+
+Se a conexão antiga ainda oferecer somente 7, 30 ou 90 dias, atualize o catálogo sem desconectar:
+
+- **Claude:** Personalizar → Conectores → Bússola IA — Insights → Mais opções → Atualizar lista de ferramentas. Depois abra uma conversa nova.
+- **ChatGPT:** configurações do plugin Bússola IA — Insights → Atualizar ferramentas → Testar no chat.
+
+Peça novamente “consulte todo o histórico da Bússola”. O início do período e a cobertura devem aparecer; a cobertura muda enquanto o processamento avança.
 
 O acesso temporário dura dez minutos e é renovado automaticamente. A autorização pode exigir novo login após trinta dias ou se for revogada. Uma reconexão repetida fora dos testes deve ser informada ao responsável.
 

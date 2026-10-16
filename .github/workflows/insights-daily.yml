@@ -1,0 +1,50 @@
+name: Insights daily update
+
+on:
+  schedule:
+    # 03:17 America/Sao_Paulo (UTC-03); daily schedule is not an execution-time SLA.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Update pending messages or validate with at most two worker calls
+        type: choice
+        required: true
+        default: update
+        options:
+          - update
+          - validate
+
+permissions:
+  contents: read
+
+concurrency:
+  group: insights-daily-production
+  cancel-in-progress: false
+
+jobs:
+  update-insights:
+    if: github.repository == 'samoskito/bussola-ia' && github.ref == 'refs/heads/main' && vars.INSIGHTS_DAILY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 190
+    steps:
+      - name: Check out reviewed main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout: |
+            scripts/insights-daily-runner.cjs
+            tests/insights/daily-runner.test.cjs
+            .github/workflows/insights-daily.yml
+          sparse-checkout-cone-mode: false
+      - name: Verify dependency-free runner
+        run: |
+          node -e "if(Number(process.versions.node.split('.')[0]) < 20) process.exit(1)"
+          node --test tests/insights/daily-runner.test.cjs
+      - name: Process pending Insights messages
+        env:
+          INSIGHTS_WORKER_TOKEN: ${{ secrets.INSIGHTS_WORKER_TOKEN }}
+          INSIGHTS_DAILY_VALIDATE_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'validate' && 'true' || 'false' }}
+        run: node scripts/insights-daily-runner.cjs

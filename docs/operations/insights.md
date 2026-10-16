@@ -55,3 +55,11 @@ O painel informa que o agendamento foi configurado quando `INSIGHTS_DAILY_SCHEDU
 Preservar tabelas, resultados, reservas e o fluxo de senha administrativa durante rollback. Não executar `supabase db push` genérico: o histórico de migrations da CLI precisa ser reconciliado antes de operações abrangentes. Nenhuma migration é necessária para distribuir os lotes históricos.
 
 A integração comercial da Hotmart continua no n8n e não faz parte dessas operações.
+
+## Instalação autônoma do MCP
+
+O servidor anuncia registro dinâmico OAuth em `/api/insights-mcp/oauth/register`. Claude e ChatGPT cadastram automaticamente a identificação técnica de cada instalação; o administrador informa a URL, entra na Bússola e autoriza a consulta. Não distribuir Client ID ou segredo manual para novas instalações. O guia está em `docs/guia-cliente-insights-mcp.md`.
+
+O registro aceita somente callbacks HTTPS exatos das plataformas suportadas, não busca metadados externos nem grava cadastros no banco. Os identificadores compactos são assinados e vinculados ao emissor. A troca exige PKCE S256; consentimento, escopo somente leitura, audiência, renovação/revogação e perfil administrador atual continuam obrigatórios. Clientes estáticos anteriores são preservados.
+
+`INSIGHTS_MCP_CONSENT_SECRET` também assina os identificadores dos clientes dinâmicos. Sua rotação invalida essas instalações e exige nova conexão nas plataformas. Preservar o segredo durante publicações comuns. Não anunciar CIMD enquanto não houver implementação e validação específicas; no Claude, escolher **Registrar automaticamente**.

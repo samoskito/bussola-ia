@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { MCP_SCOPE, OAuthConfig, OAuthError } from './oauth-config';
+import { resolveOAuthClient } from './oauth-registration';
 
 export const ACCESS_SECONDS = 600;
 export const REFRESH_SECONDS = 30 * 86400;
@@ -14,7 +15,7 @@ export function uniqueParams(params: URLSearchParams) { params.forEach((_value,k
 export function validateAuthorizationRequest(params: URLSearchParams, config: OAuthConfig): AuthorizationRequest {
   uniqueParams(params);
   const clientId = params.get('client_id') || '';
-  const client = config.clients.find(row => row.clientId === clientId);
+  const client = resolveOAuthClient(clientId, config);
   const redirectUri = params.get('redirect_uri') || '';
   if (!client || !client.redirectUris.includes(redirectUri)) throw new OAuthError(400, 'invalid_request', 'Unregistered OAuth client or redirect URI.');
   if (params.get('response_type') !== 'code' || params.get('code_challenge_method') !== 'S256') throw new OAuthError(400, 'invalid_request', 'Authorization code and S256 PKCE are required.');
@@ -41,7 +42,7 @@ export function verifyConsent(ticket: string | undefined, userId: string, config
     if (consent.userId !== userId || !Number.isFinite(consent.expiresAt) || consent.expiresAt <= now || consent.expiresAt > now + CONSENT_SECONDS * 1000 || !/^[A-Za-z0-9_-]{43}$/.test(consent.nonce)) throw new Error();
     const r = consent.request;
     validateAuthorizationRequest(new URLSearchParams({client_id:r.clientId,redirect_uri:r.redirectUri,state:r.state,scope:r.scope,resource:r.resource,code_challenge:r.codeChallenge,code_challenge_method:'S256',response_type:'code'}),config);
-    return { ...consent, clientName: config.clients.find(c => c.clientId === r.clientId)!.name };
+    return { ...consent, clientName: resolveOAuthClient(r.clientId, config)!.name };
   } catch { throw new OAuthError(400, 'invalid_request', 'Consent expired or invalid. Restart the connection.'); }
 }
 export function verifyPkce(verifier: string, challenge: string) {
@@ -60,7 +61,11 @@ export function authenticateClient(params: URLSearchParams, authorization: strin
       id = basicId; secret = decodeURIComponent(raw.slice(colon + 1).replace(/\+/g, ' '));
     } catch { throw new OAuthError(401, 'invalid_client'); }
   }
-  const client = config.clients.find(c => c.clientId === id);
-  if (!secret || secret.length < 32 || secret.length > 1024 || !client || !equalSecret(tokenHash(secret), client.clientSecretHash)) throw new OAuthError(401, 'invalid_client');
+  const client = resolveOAuthClient(id, config);
+  if (client?.tokenEndpointAuthMethod === 'none') {
+    if (authorization || params.has('client_secret')) throw new OAuthError(401, 'invalid_client');
+    return id;
+  }
+  if (!secret || secret.length < 32 || secret.length > 1024 || !client?.clientSecretHash || !equalSecret(tokenHash(secret), client.clientSecretHash)) throw new OAuthError(401, 'invalid_client');
   return id;
 }

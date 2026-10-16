@@ -7,7 +7,7 @@ const config=cfg.getOAuthConfig(env),verifier='a'.repeat(64),challenge=crypto.cr
 const params=()=>new URLSearchParams({client_id:'claude',redirect_uri:'https://claude.ai/api/mcp/auth_callback',response_type:'code',code_challenge_method:'S256',code_challenge:challenge,resource:config.resource,scope:'insights:read',state:'opaque-client-state'});
 test('OAuth disabled by default; independent secret and HTTPS origin required',()=>{
  assert.equal(cfg.isMcpEnabled({}),false);assert.throws(()=>cfg.getOAuthConfig({}),/disabled/);
- for(const patch of [{INSIGHTS_MCP_BASE_URL:'http://example.invalid'},{INSIGHTS_MCP_BASE_URL:'https://example.invalid/path'},{INSIGHTS_MCP_CONSENT_SECRET:sessionSecret},{INSIGHTS_CRON_SECRET:consentSecret},{INSIGHTS_MCP_CLIENTS_JSON:'[]'}]) assert.throws(()=>cfg.getOAuthConfig({...env,...patch}));
+ for(const patch of [{INSIGHTS_MCP_BASE_URL:'http://example.invalid'},{INSIGHTS_MCP_BASE_URL:'https://example.invalid/path'},{INSIGHTS_MCP_CONSENT_SECRET:sessionSecret},{INSIGHTS_CRON_SECRET:consentSecret}]) assert.throws(()=>cfg.getOAuthConfig({...env,...patch}));
  const reused=JSON.parse(env.INSIGHTS_MCP_CLIENTS_JSON);reused[0].clientSecretHash=core.tokenHash(sessionSecret);assert.throws(()=>cfg.getOAuthConfig({...env,INSIGHTS_MCP_CLIENTS_JSON:JSON.stringify(reused)}));
 });
 test('Authorize requires registered exact HTTPS redirect, audience, state, S256, scope, unique parameters',()=>{
@@ -67,9 +67,9 @@ test('Token routes enforce URL form, client credentials, resource and PKCE; outp
  const error=server.mcpAuthErrorResponse(new cfg.OAuthError(401,'invalid_client'));assert.match(error.headers.get('www-authenticate'),/^Basic/);
  const bearerError=server.mcpAuthErrorResponse(new cfg.OAuthError(401,'invalid_token'));assert.match(bearerError.headers.get('www-authenticate'),/resource_metadata=/);
 });
-test('RFC metadata publishes fixed audience, code/S256 and static client auth without secrets or unimplemented DCR',async()=>{
+test('RFC metadata publishes fixed audience, code/S256 and public registration and existing static client auth without secrets',async()=>{
  const as=await metadata.authorizationServerMetadata().json(),rs=await metadata.protectedResourceMetadata().json();
- assert.equal(as.issuer,config.issuer);assert.deepEqual(as.code_challenge_methods_supported,['S256']);assert.equal(as.authorization_endpoint,config.issuer+'/api/insights-mcp/oauth/authorize');assert.equal(rs.resource,config.resource);assert.deepEqual(rs.scopes_supported,['insights:read']);assert.equal(as.registration_endpoint,undefined);assert.equal(as.client_id_metadata_document_supported,undefined);
+ assert.equal(as.issuer,config.issuer);assert.deepEqual(as.code_challenge_methods_supported,['S256']);assert.equal(as.authorization_endpoint,config.issuer+'/api/insights-mcp/oauth/authorize');assert.equal(rs.resource,config.resource);assert.deepEqual(rs.scopes_supported,['insights:read']);assert.equal(as.registration_endpoint,config.issuer+'/api/insights-mcp/oauth/register');assert.equal(as.client_id_metadata_document_supported,undefined);
  const serialized=JSON.stringify({as,rs});for(const sensitive of [secret,consentSecret,sessionSecret,core.tokenHash(secret)])assert.ok(!serialized.includes(sensitive));
  process.env.INSIGHTS_MCP_ENABLED='false';assert.equal(metadata.authorizationServerMetadata().status,503);assert.equal(metadata.protectedResourceMetadata().status,503);process.env.INSIGHTS_MCP_ENABLED='true';
 });

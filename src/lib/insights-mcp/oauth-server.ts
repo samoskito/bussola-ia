@@ -5,6 +5,8 @@ import { createServerSupabaseClient } from '../supabase/server';
 import { getOAuthConfig, OAuthError, MCP_SCOPE } from './oauth-config';
 import { ACCESS_SECONDS, CONSENT_SECONDS, AuthorizationConsent, authenticateClient, equalSecret, randomCredential, signConsent, tokenHash, uniqueParams, validateAuthorizationRequest, verifyConsent } from './oauth';
 
+import { registerOAuthClient, resolveOAuthClient } from './oauth-registration';
+
 export const CONSENT_COOKIE = 'insights_mcp_consent';
 const headers = { 'Cache-Control':'no-store', Pragma:'no-cache', 'Referrer-Policy':'no-referrer' };
 export function mcpAuthErrorResponse(error: unknown): Response {
@@ -52,7 +54,7 @@ export async function authorizeGet(request:Request):Promise<Response> {
       const login=new URL('/auth/login',config.issuer);login.searchParams.set('redirectedFrom',url.pathname+url.search);
       return Response.redirect(login,303);
     }
-    const consent:AuthorizationConsent={request:validated,userId,nonce:randomCredential(),expiresAt:Date.now()+CONSENT_SECONDS*1000,clientName:config.clients.find(c=>c.clientId===validated.clientId)!.name};
+    const consent:AuthorizationConsent={request:validated,userId,nonce:randomCredential(),expiresAt:Date.now()+CONSENT_SECONDS*1000,clientName:resolveOAuthClient(validated.clientId,config)!.name};
     if (await dbMutation('consent',{nonce_hash:tokenHash(consent.nonce),user_id:userId})===null) throw new OAuthError(403,'access_denied');
     const ticket=signConsent(consent,config.consentSecret);
     return new Response(null,{status:303,headers:{...headers,Location:`${config.issuer}/auth/insights-mcp`,'Set-Cookie':`${CONSENT_COOKIE}=${ticket}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${CONSENT_SECONDS}`}});
@@ -88,7 +90,7 @@ export async function tokenPost(request:Request):Promise<Response> {
     let result;
     if(form.get('grant_type')==='authorization_code') {
       const code=form.get('code')||'',verifier=form.get('code_verifier')||'',redirect=form.get('redirect_uri')||'';
-      if(!/^[A-Za-z0-9_-]{43}$/.test(code) || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || !config.clients.find(c=>c.clientId===clientId)!.redirectUris.includes(redirect))throw new OAuthError(400,'invalid_grant');
+      if(!/^[A-Za-z0-9_-]{43}$/.test(code) || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || !resolveOAuthClient(clientId,config)!.redirectUris.includes(redirect))throw new OAuthError(400,'invalid_grant');
       result=await dbMutation('exchange',{...common,code_hash:tokenHash(code),redirect_uri:redirect,challenge:createHash('sha256').update(verifier).digest('base64url')});
     }else if(form.get('grant_type')==='refresh_token'){
       const token=form.get('refresh_token')||'';if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new OAuthError(400,'invalid_grant');
@@ -113,6 +115,18 @@ export async function authenticateMcpRequest(request:Request):Promise<{userId:st
   if(!token || new Date(token.access_expires_at).getTime()<=Date.now())throw new OAuthError(401,'invalid_token');
   const {data:grant,error:grantError}=await createServerSupabaseClient().from('insights_mcp_oauth_grants').select('user_id,client_id,resource,scope,revoked_at').eq('id',token.grant_id).maybeSingle();
   if(grantError)throw new OAuthError(503,'temporarily_unavailable');
-  if(!grant || grant.revoked_at || grant.resource!==config.resource || grant.scope!==MCP_SCOPE || !config.clients.some(c=>c.clientId===grant.client_id))throw new OAuthError(401,'invalid_token');
+  if(!grant || grant.revoked_at || grant.resource!==config.resource || grant.scope!==MCP_SCOPE || !resolveOAuthClient(grant.client_id,config))throw new OAuthError(401,'invalid_token');
   await assertCurrentAdmin(grant.user_id);return{userId:grant.user_id,clientId:grant.client_id,scope:grant.scope};
+}
+
+export async function registerPost(request: Request): Promise<Response> {
+  try {
+    const config = getOAuthConfig();
+    if ((request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase() !== 'application/json') throw new OAuthError(415, 'invalid_request');
+    const reader = request.body?.getReader(); let size = 0; const chunks: Uint8Array[] = [];
+    if (reader) for (;;) { const next = await reader.read(); if (next.done) break; size += next.value.byteLength; if (size > 4096) { await reader.cancel(); throw new OAuthError(413, 'invalid_request'); } chunks.push(next.value); }
+    let metadata: unknown;
+    try { metadata = JSON.parse(Buffer.concat(chunks).toString()); } catch { throw new OAuthError(400, 'invalid_client_metadata'); }
+    return Response.json(registerOAuthClient(metadata, config), { status: 201, headers });
+  } catch (error) { return mcpAuthErrorResponse(error); }
 }

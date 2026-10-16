@@ -1,65 +1,68 @@
-# Bússola IA — consultar insights no Claude e ChatGPT
+# Bússola IA — conectar ao Claude e ao ChatGPT
 
-O conector permite conversar sobre volumes, temas, tendências e cobertura das quatro IAs. O acesso é somente de leitura e exige uma conta administradora da Bússola. Não permite mudar usuários/acessos, ler conversas completas ou iniciar classificação. Exemplos textuais permanecem bloqueados nesta entrega.
+Você conecta uma vez e depois conversa normalmente sobre os insights das quatro IAs. Cada administrador usa a própria conta Bússola. A conexão permite consultar indicadores, temas, tendências e cobertura; conversas completas, exemplos textuais, alterações e processamento ficam bloqueados.
 
-## Antes de conectar
+> Estado desta revisão: este guia descreve o novo cadastro automático por URL. A publicação e a homologação desse novo fluxo nas interfaces do Claude e do ChatGPT ainda precisam ser confirmadas pela equipe. Os testes anteriores com credenciais manuais não comprovam esse fluxo novo. Atualizar esta nota com o resultado efetivamente observado antes de entregar o guia ao cliente.
 
-Confirme com o responsável o e-mail da sua conta Bússola e em quais plataformas deseja usar a conexão. Você receberá um ID e um segredo OAuth exclusivos por um meio privado. Esses dados não são uma chave OpenAI nem uma chave Supabase. Não compartilhe sua senha, códigos de login ou credenciais no chat.
+## O que você precisa
 
-Endereço do servidor:
+- Sua conta administradora da Bússola e sua senha habitual.
+- Sua conta do Claude ou ChatGPT com permissão para adicionar conectores personalizados.
+- Este endereço, igual para todos os administradores:
 
-`https://ia.bussolaexecutiva.com.br/api/insights-mcp`
+```text
+https://ia.bussolaexecutiva.com.br/api/insights-mcp
+```
 
-## Claude
+Não é necessário solicitar cadastro individual do conector à equipe Bússola, gerar ID ou segredo, nem fornecer chaves da OpenAI ou do Supabase. A identificação técnica do conector é registrada automaticamente. Sua autorização é individual e depende do login na Bússola.
 
-1. Entre na sua conta do Claude pelo navegador.
-2. Abra **Personalizar / Conectores** e a opção de adicionar conector personalizado. Os nomes podem variar conforme a interface.
-3. Use o nome **Bússola IA — Insights** e o endereço do servidor acima.
-4. Nas opções OAuth avançadas, escolha cliente próprio/predefinido e preencha o ID e o segredo entregues para o Claude.
-5. Inicie a conexão. Na página da Bússola, entre com sua conta administradora e confira que o aplicativo e o destino são Claude.
-6. Clique em **Autorizar somente leitura** e aguarde retornar ao Claude.
-7. Em uma conversa nova, habilite o conector e pergunte normalmente.
+## Conectar no Claude
 
-## ChatGPT
+1. No navegador, entre no Claude e abra **Personalizar → Conectores**.
+2. Clique em **Adicionar → Adicionar conector personalizado**.
+3. Preencha o nome **Bússola IA — Insights**, cole o endereço acima e continue.
+4. Mantenha autenticação com login. Se aparecer **Cliente OAuth**, selecione **Registrar automaticamente / Register automatically**. Não escolha identidade publicada ou cliente próprio e não preencha ID ou segredo. O cadastro automático é a configuração usada por esta entrega.
+5. Termine de adicionar e clique em **Conectar**, caso seja solicitado.
+6. A Bússola será aberta. Confira o domínio `ia.bussolaexecutiva.com.br` e entre com sua conta administradora, se ainda não estiver conectado.
+7. Confira que a autorização é para o Claude e clique em **Autorizar somente leitura**. Aguarde voltar ao Claude.
+8. Abra uma conversa. No botão **+ → Conectores**, habilite **Bússola IA — Insights** e faça sua pergunta.
 
-1. Entre na sua conta do ChatGPT e abra **Plugins**.
-2. Clique em **Adicionar → Adicionar servidor MCP personalizado**.
-3. Preencha o nome **Bússola IA — Insights**, a URL do servidor e autenticação **OAuth**.
-4. Abra **Configurações avançadas de OAuth**, selecione **Cliente OAuth definido pelo usuário** e preencha o ID/segredo entregues para o ChatGPT. O método de autenticação é `client_secret_post`; o único escopo é `insights:read`.
-5. Confira os avisos, crie o plugin pessoal e inicie a conexão. Não publique o plugin para outras pessoas.
-6. Na Bússola, entre como administrador e clique em **Autorizar somente leitura**. Aguarde retornar ao ChatGPT.
-7. Use **Testar no chat**. Nos próximos chats, selecione ou mencione **Bússola IA — Insights** antes de perguntar.
+Em organizações Team/Enterprise, o responsável pelo workspace Claude pode precisar adicionar o conector uma vez para a organização. Depois cada administrador Bússola conecta sua própria conta. Isso é uma permissão da organização no Claude, independente do perfil administrador na Bússola. Os nomes dos menus podem variar. [Orientação oficial do Claude](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
 
-Se a opção de MCP personalizado não estiver disponível na conta, informe ao responsável o plano e a tela encontrada. Não é necessário comprar créditos da API OpenAI para conversar pelo seu plano do ChatGPT/Claude. As regras e limites da sua assinatura continuam aplicáveis.
+## Conectar no ChatGPT
 
-## Perguntas para começar
+1. No navegador, entre no ChatGPT e abra [Plugins](https://chatgpt.com/plugins).
+2. Clique em **+ → Adicionar servidor MCP personalizado**.
+3. Preencha **Bússola IA — Insights** e cole o endereço acima em **URL do servidor**.
+4. Escolha autenticação **OAuth**. Use cadastro automático/dinâmico (**DCR**) caso a interface ofereça a escolha. Deixe ID e segredo de cliente vazios; não selecione identidade publicada (**CIMD**) nem credenciais manuais.
+5. Confira o aviso e clique em **Criar como plugin**. Inicie a conexão e instale o plugin na sua conta, se essa etapa aparecer.
+6. Na página da Bússola, confira o domínio, entre com sua conta administradora e clique em **Autorizar somente leitura**. Aguarde voltar ao ChatGPT.
+7. Abra uma conversa, digite **@** e selecione **Bússola IA — Insights**. Você também pode usar **Testar no chat** quando essa opção aparecer.
 
-- “Consulte a Bússola: quais temas mais aparecem nos últimos 30 dias?”
-- “O que as pessoas estão pedindo à IA de LinkedIn?”
-- “Compare os últimos 7 dias com a semana anterior.”
-- “Qual é a cobertura da classificação e o que ainda está pendente?”
-- “Com base nesses temas, sugira oportunidades de conteúdo e produto, separando dados de hipóteses.”
+Se o workspace bloquear plugins personalizados, o responsável pelo workspace ChatGPT precisa permitir essa funcionalidade. Não compre créditos da API para instalar o conector; a conversa usa sua conta e segue os limites da plataforma. [Orientação oficial da OpenAI](https://developers.openai.com/api/docs/guides/custom-mcp-server).
 
-Nomes de ferramentas e parâmetros técnicos não são necessários. Peça a fonte, o período e as limitações. Os números representam mensagens e temas que podem se sobrepor, não uma contagem exata de dúvidas únicas. Enquanto houver pendências de classificação, o relatório deve ser tratado como parcial. No painel, escolha **Todo o histórico** para consultar desde o início. Na conversa, peça “considere todo o histórico”. Uma conexão instalada antes dessa opção pode precisar atualizar seu catálogo de ferramentas; o responsável ajudará se a IA ainda mencionar apenas 7, 30 ou 90 dias.
+## Primeira pergunta
 
-## Duração e encerramento do acesso
+> Consulte a Bússola e mostre os principais temas de todo o histórico das quatro IAs. Informe o período e a cobertura dos dados. Depois sugira oportunidades de conteúdo e produto, separando os dados das suas sugestões.
 
-Se a conexão antiga ainda oferecer somente 7, 30 ou 90 dias, atualize o catálogo sem desconectar:
+Continue naturalmente: “Detalhe a IA de LinkedIn”, “Compare com o último mês” ou “Que produtos poderíamos criar?”. Você não precisa conhecer nomes de ferramentas, parâmetros ou escrever um prompt técnico.
 
-- **Claude:** Personalizar → Conectores → Bússola IA — Insights → Mais opções → Atualizar lista de ferramentas. Depois abra uma conversa nova.
-- **ChatGPT:** configurações do plugin Bússola IA — Insights → Atualizar ferramentas → Testar no chat.
+Peça sempre período e cobertura. Mensagens podem abordar vários temas; os números não equivalem a dúvidas únicas. Pendências de classificação tornam o relatório parcial. O conector consulta insights já processados e não inicia novos gastos de classificação a cada pergunta.
 
-Peça novamente “consulte todo o histórico da Bússola”. O início do período e a cobertura devem aparecer; a cobertura muda enquanto o processamento avança.
+## Dúvidas comuns
 
-O acesso temporário dura dez minutos e é renovado automaticamente. A autorização pode exigir novo login após trinta dias ou se for revogada. Uma reconexão repetida fora dos testes deve ser informada ao responsável.
+**Apareceu um pedido de ID ou segredo.** Volte à escolha de cliente OAuth e selecione cadastro automático. No Claude, use **Registrar automaticamente**. No ChatGPT, deixe as credenciais manuais vazias e escolha **DCR** quando houver essa opção. Se os campos continuarem obrigatórios, informe à equipe a plataforma e o texto do erro; não procure chaves da OpenAI para preencher esses campos.
 
-Para parar de usar, desconecte nas configurações do Claude/ChatGPT. Para garantir invalidação imediata das credenciais, peça também ao administrador responsável para revogar a autorização no servidor da Bússola. Não presuma que desconectar na plataforma apaga resultados já presentes em conversas antigas.
+**A Bússola negou acesso.** Confira se entrou com a sua conta administradora. Uma conta comum não pode autorizar o MCP. Se o perfil está correto, informe o erro à equipe.
 
-## O que precisamos para configurar sua conta
+**A IA respondeu sem consultar a Bússola.** Habilite/selecione o conector na conversa e peça “Consulte a Bússola”. Confirme que a resposta mostra a consulta ao conector e o período utilizado.
 
-- E-mail exato da conta Bússola e confirmação de que deve ter perfil administrador.
-- Claude, ChatGPT ou ambos; plano/conta que será utilizado.
-- URL de callback exata apresentada pela plataforma, se diferente da já homologada.
-- Um meio privado para entregar a credencial exclusiva, ou uma sessão assistida em que você preenche suas próprias credenciais e autoriza a conexão.
+**Já tenho uma conexão antiga funcionando.** Ela continua com a autorização existente. Para validar o cadastro automático, use uma nova configuração sem credenciais manuais. Evite apagar uma conexão funcional antes de concluir a nova.
 
-Não precisamos da sua senha, código de autenticação, chave Supabase ou chave OpenAI para instalar o conector.
+**Preciso deixar a Bússola aberta?** Após a autorização, a conexão consulta o servidor sem depender de uma aba aberta ou do seu computador ligado.
+
+## Renovação e encerramento
+
+O acesso temporário dura dez minutos e a plataforma pode renová-lo automaticamente. A autorização pode exigir nova conexão após trinta dias, revogação ou perda do perfil administrador. Uma sequência repetida de pedidos de reconexão deve ser informada à equipe.
+
+Para parar de usar, desconecte nas configurações do Claude/ChatGPT. Para garantir invalidação imediata no servidor Bússola, solicite a revogação da autorização à equipe responsável. Essa operação de encerramento é diferente do cadastro inicial, que é automático. Desconectar não apaga respostas já presentes em conversas antigas.

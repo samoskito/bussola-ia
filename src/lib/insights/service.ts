@@ -33,12 +33,15 @@ export async function buildLiveReport(filters: InsightFilters, now = new Date())
   if (getInsightsMode() !== 'live' || process.env.INSIGHTS_PROCESSING_ENABLED !== 'true') {
     throw new InsightsError(503, 'live_unavailable', 'Insights reais aguardam ativação e validação.');
   }
-  const [{ createSupabaseInsightRepository }, { createServerSupabaseClient }, { prepareInsightInput }, { TAXONOMY_VERSION }, { CLASSIFIER_VERSION, getInsightsModel }] = await Promise.all([
+  const [{ createSupabaseInsightRepository, findInsightHistoryStart }, { createServerSupabaseClient }, { prepareInsightInput, groupInsightSourcesByChat }, { TAXONOMY_VERSION }, { CLASSIFIER_VERSION, getInsightsModel }] = await Promise.all([
     import('./supabase-repository'), import('../supabase/server'), import('./privacy'), import('./taxonomy'), import('./classifier'),
   ]);
-  const window = insightWindow(filters.days, now);
-  const repository = createSupabaseInsightRepository(createServerSupabaseClient({ useServiceRole: true }), {
-    now, windowStart: new Date(Date.parse(window.start) - (filters.days + 3) * 86400000), windowEnd: now,
+  const client = createServerSupabaseClient({ useServiceRole: true });
+  const historyStart = filters.days === 'all' ? await findInsightHistoryStart(client, now) : undefined;
+  const window = insightWindow(filters.days, now, historyStart);
+  const repository = createSupabaseInsightRepository(client, {
+    now, windowStart: new Date(Date.parse(window.start) - (filters.days === 'all' ? 3 : filters.days + 3) * 86400000), windowEnd: now,
+    allowHistoricalWindow: filters.days === 'all',
   });
   const [sources, jobs, completed] = await Promise.all([repository.listSources(), repository.listJobs(), repository.listCompleted()]);
   // Recheck current levels after the parallel snapshots. No role supplied by a
@@ -51,6 +54,7 @@ export async function buildLiveReport(filters: InsightFilters, now = new Date())
     chunk.forEach(([userId, level]) => levels.set(userId, level));
   }
   const currentSources = sources.map(source => ({ ...source, userLevel: levels.get(source.userId) ?? null }));
+  const contextByChat = groupInsightSourcesByChat(currentSources);
   const classifierVersion = `${getInsightsModel()}.${CLASSIFIER_VERSION}`;
   const active = new Map(completed.filter(insight => insight.taxonomyVersion === TAXONOMY_VERSION && insight.classifierVersion === classifierVersion)
     .map(insight => [insight.sourceId, insight]));
@@ -60,7 +64,7 @@ export async function buildLiveReport(filters: InsightFilters, now = new Date())
     const base: DemoMessage = { ...source, status: 'pending' };
     if (source.userLevel !== 'user') return base;
     let prepared;
-    try { prepared = prepareInsightInput(source, currentSources, TAXONOMY_VERSION, classifierVersion); }
+    try { prepared = prepareInsightInput(source, contextByChat.get(source.chatId) ?? [], TAXONOMY_VERSION, classifierVersion); }
     catch { return { ...base, status: jobByKey.get(`rejected:${source.id}`)?.status === 'failed' ? 'failed' : 'pending' }; }
     const insight = active.get(source.id);
     if (insight && insight.sourceHash === prepared.sourceHash && insight.userId === source.userId && insight.chatId === source.chatId &&

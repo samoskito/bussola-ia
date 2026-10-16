@@ -152,3 +152,27 @@ test('reader failures never expose errors, secrets or dependency paths', async (
     assert.match(JSON.stringify(result), /insights_unavailable/);
   }, { readReport: async () => { throw new Error('SECRET-PRIVATE /internal/path'); } });
 });
+
+test('all-history SDK reads preserve strict schemas, disabled examples and an undefined prior comparison', async () => {
+  await withClient(async (client, state) => {
+    const summary = payload(await client.callTool({ name: 'get_insight_summary', arguments: { days: 'all' } }));
+    assert.deepEqual(summary.filters, { days: 'all', agentType: 'all' });
+    assert.equal(summary.summary.eligibleMessages, 4);
+    assert.equal(summary.summary.classifiedMessages, 3);
+    assert.equal(summary.window.start, '2026-09-15T03:00:00.000Z');
+    assert.equal(summary.summary.excludedAdminMessages, 1);
+    const before = state.reads.length;
+    const comparison = payload(await client.callTool({ name: 'compare_insight_periods', arguments: { days: 'all' } }));
+    assert.equal(state.reads.length, before + 1, 'all history must never issue a fabricated previous-period read');
+    assert.equal(comparison.previous, null);
+    assert.deepEqual(comparison.changes, []);
+    assert.match(comparison.comparisonNotice, /não tem período anterior/);
+    assert.ok(comparison.current.topics.every(topic => topic.trendPercent === null));
+    const examples = payload(await client.callTool({ name: 'get_topic_examples', arguments: { days: 'all' } }));
+    assert.deepEqual(examples.examples, []);
+    assert.equal(examples.availability, 'disabled_pending_review');
+    const trend = payload(await client.callTool({ name: 'get_topic_trend', arguments: { days: 'all', topicId: 'feedback' } }));
+    assert.equal(trend.trend[0].date, '2026-09-15');
+    assert.equal(trend.trend.at(-1).date, '2026-10-15');
+  });
+});

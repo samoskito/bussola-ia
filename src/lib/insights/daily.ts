@@ -11,6 +11,26 @@ export interface DailyInsightsOptions {
   classifier?: InsightClassifier;
 }
 
+/** Only server environment can authorize a bounded historical run. HTTP inputs never reach this configuration. */
+export function insightProcessingWindow(env: Env, now: Date) {
+  const startValue = env.INSIGHTS_BACKFILL_START;
+  const endValue = env.INSIGHTS_BACKFILL_END;
+  if (startValue === undefined && endValue === undefined) {
+    return { start: new Date(now.getTime() - 30 * 86_400_000), end: now, historical: false };
+  }
+  const parse = (value: string | undefined) => {
+    const date = value ? new Date(value) : new Date(NaN);
+    if (!Number.isFinite(date.getTime()) || date.toISOString() !== value) throw new Error('invalid_backfill_window');
+    return date;
+  };
+  const start = parse(startValue);
+  const end = parse(endValue);
+  if (start >= end || end > now) throw new Error('invalid_backfill_window');
+  // Retain the existing durable scope to account for prior reservations and pilot spend.
+  if (!env.INSIGHTS_BUDGET_SCOPE) throw new Error('backfill_budget_scope_required');
+  return { start, end, historical: true };
+}
+
 /** Invoke only from an authenticated scheduled worker route. No scheduler is installed here. */
 export async function runDailyInsights(options: DailyInsightsOptions = {}): Promise<ProcessInsightResult> {
   const env = options.env ?? process.env;
@@ -26,11 +46,14 @@ export async function runDailyInsights(options: DailyInsightsOptions = {}): Prom
   const sourceIds = pilotIds === undefined ? undefined : pilotIds.split(',').map(id => /^\d+$/.test(id) ? Number(id) : NaN);
   if (sourceIds && (!sourceIds.length || sourceIds.length > 200 || sourceIds.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(sourceIds).size !== sourceIds.length)) throw new Error('invalid_pilot_sources');
   const now = options.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new Error('invalid_batch_time');
+  const window = insightProcessingWindow(env, now);
   let repository = options.repository;
   if (!repository) {
     const { createServerSupabaseClient } = await import('../supabase/server');
     repository = createSupabaseInsightRepository(createServerSupabaseClient({ useServiceRole: true }), {
-      env, now, windowStart: new Date(now.getTime() - 33 * 86_400_000),
+      env, now, windowStart: new Date(window.start.getTime() - 3 * 86_400_000), windowEnd: window.end,
+      allowHistoricalWindow: window.historical,
     });
   }
   const classifier = options.classifier ?? createOpenAIClassifier({ apiKey: env.OPENAI_API_KEY, model: getInsightsModel(env) });
@@ -38,6 +61,6 @@ export async function runDailyInsights(options: DailyInsightsOptions = {}): Prom
   return processInsightBatch({ repository, classifier, maxMessages: 10,
     maxSpendUsd, reserveUsdPerCall: getInsightsModel(env) === 'gpt-5.4-nano' ? 0.01 : 0.005, budgetScope, now,
     sourceIds, deadline: new Date(Date.now() + 240_000),
-    processingStart: new Date(now.getTime() - 30 * 86_400_000),
+    processingStart: window.start, processingEnd: window.end,
     clock: options.now ? () => new Date(options.now!.getTime()) : () => new Date() });
 }

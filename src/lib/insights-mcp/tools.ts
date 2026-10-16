@@ -10,8 +10,9 @@ export type LiveReportReader = (filters: InsightFilters, now: Date) => Promise<I
 const DAY = 86_400_000;
 const agent = z.enum(AGENTS.map(item => item.type) as [string, ...string[]]);
 const topicId = z.enum(INSIGHT_TOPICS.map(item => item.id) as [string, ...string[]]);
+const period = z.union([z.literal(7), z.literal(30), z.literal(90), z.literal('all')]);
 const filters = {
-  days: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30),
+  days: period.default(30).describe('7, 30 ou 90 dias; "all" consulta todo o histórico desde a primeira mensagem.'),
   agentType: z.enum(['all', ...AGENTS.map(item => item.type)] as [string, ...string[]]).default('all'),
   topicId: topicId.optional(),
 };
@@ -23,7 +24,7 @@ const topicSchema = z.object({ id: topicId, label: z.string(), description: z.st
   distinctUsers: count, distinctChats: count, sharePercent: z.number(), trendPercent: z.number().nullable() }).strict();
 const windowSchema = z.object({ start: z.string(), end: z.string(), timezone: z.literal('America/Sao_Paulo') }).strict();
 const baseShape = { mode: z.literal('live'), generatedAt: z.string(), window: windowSchema,
-  filters: z.object({ days: z.number(), agentType: z.string(), topicId: z.string().optional() }).strict(),
+  filters: z.object({ days: period, agentType: z.string(), topicId: z.string().optional() }).strict(),
   taxonomyVersion: z.literal(TAXONOMY_VERSION), dataNotice: z.string(), countsNotice: z.string(), qualityNotice: z.string(),
   lastProcessedAt: z.string().nullable(), coverage: z.object({ eligibleMessages: count, classifiedMessages: count,
     pendingMessages: count, failedMessages: count, coveragePercent: z.number().min(0).max(100) }).strict() };
@@ -55,8 +56,8 @@ function metadata(report: InsightReport) {
 
 /** Only this derived projection crosses the MCP boundary; no source/query tool is registered. */
 export function createLiveMcpServer(readReport: LiveReportReader, now = () => new Date(), examplesEnabled = () => false) {
-  const server = new McpServer({ name: 'bussola-insights', version: '1.0.0' }, { capabilities: { tools: {} } });
-  async function read(input: { days: number; agentType: string; topicId?: string }, clock: Date) {
+  const server = new McpServer({ name: 'bussola-insights', version: '1.1.0' }, { capabilities: { tools: {} } });
+  async function read(input: { days: InsightFilters['days']; agentType: string; topicId?: string }, clock: Date) {
     if (!(clock instanceof Date) || !Number.isFinite(clock.getTime())) throw new Error('invalid_clock');
     return readReport({ days: input.days, agentType: input.agentType as InsightFilters['agentType'], ...(input.topicId ? { topicId: input.topicId } : {}) }, clock);
   }
@@ -97,14 +98,16 @@ export function createLiveMcpServer(readReport: LiveReportReader, now = () => ne
       })) };
     });
   const snapshot = z.object({ mode: z.literal('live'), generatedAt: z.string(), window: windowSchema, summary: summarySchema, topics: z.array(topicSchema) }).strict();
-  register('compare_insight_periods', 'Compare o período atual com o anterior de igual duração usando classificações reais existentes. A cobertura pode ser parcial; variação percentual é null quando o período anterior não tem mensagens.', z.object(filters).strict(),
-    output({ current: snapshot, previous: snapshot, changes: z.array(z.object({ id: topicId, label: z.string(), currentMessages: count, previousMessages: count,
+  register('compare_insight_periods', 'Compare o período atual com o anterior de igual duração usando classificações reais existentes. A cobertura pode ser parcial; variação percentual é null quando o período anterior não tem mensagens. Para days="all", não existe período anterior: previous=null e changes=[].', z.object(filters).strict(),
+    output({ current: snapshot, previous: snapshot.nullable(), comparisonNotice: z.string(), changes: z.array(z.object({ id: topicId, label: z.string(), currentMessages: count, previousMessages: count,
       messageDelta: z.number().int(), messagePercent: z.number().nullable(), currentDistinctUsers: count, previousDistinctUsers: count, distinctUsersDelta: z.number().int() }).strict()) }), async (input, clock) => {
       const report = await read(input, clock);
+      const project = (r: InsightReport) => ({ mode: 'live', generatedAt: report.generatedAt, window: { start: r.window.start, end: r.window.end, timezone: r.window.timezone }, summary: summary(r), topics: topics(r) });
+      if (input.days === 'all') return { ...metadata(report), current: project(report), previous: null, changes: [],
+        comparisonNotice: 'Todo o histórico não tem período anterior comparável; nenhuma variação foi calculada.' };
       const previous = await read(input, new Date(clock.getTime() - input.days * DAY));
       metadata(previous);
-      const project = (r: InsightReport) => ({ mode: 'live', generatedAt: report.generatedAt, window: { start: r.window.start, end: r.window.end, timezone: r.window.timezone }, summary: summary(r), topics: topics(r) });
-      return { ...metadata(report), current: project(report), previous: project(previous), changes: report.topics.map(t => {
+      return { ...metadata(report), current: project(report), previous: project(previous), comparisonNotice: 'Comparação com o período anterior de igual duração.', changes: report.topics.map(t => {
         const p = previous.topics.find(item => item.id === t.id);
         if (!p) throw new Error('missing_previous_topic');
         return { id: t.id, label: t.label, currentMessages: t.messages, previousMessages: p.messages, messageDelta: t.messages - p.messages,

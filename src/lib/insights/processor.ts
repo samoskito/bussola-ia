@@ -2,7 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { Classification, SourceMessage } from './types';
 import { validateClassification, type InsightClassifier, type TokenUsage } from './classifier';
-import { prepareInsightInput } from './privacy';
+import { prepareInsightInput, groupInsightSourcesByChat } from './privacy';
 import { TAXONOMY_VERSION } from './taxonomy';
 
 export interface StoredInsight {
@@ -60,7 +60,7 @@ export function createInMemoryInsightRepository(sources: readonly SourceMessage[
       completed.delete(sourceId);
       jobs.forEach((item, key) => { if (item.sourceId === sourceId) jobs.delete(key); });
     },
-    async listSources() { return [...sourceRows]; },
+    async listSources() { return sourceRows.map(row => ({ ...row, userLevel: levels.get(row.userId) ?? null })); },
     async currentUserLevel(userId) { return levels.get(userId) ?? null; },
     async removeDerivedByUser(userId) {
       completed.forEach((item, id) => { if (item.userId === userId) completed.delete(id); });
@@ -130,7 +130,7 @@ export function createInMemoryInsightRepository(sources: readonly SourceMessage[
 export interface ProcessInsightOptions {
   repository: InsightRepository; classifier: InsightClassifier;
   maxMessages?: number; maxSpendUsd?: number; reserveUsdPerCall?: number; budgetScope?: string;
-  now?: Date; clock?: () => Date; processingStart?: Date;
+  now?: Date; clock?: () => Date; processingStart?: Date; processingEnd?: Date;
   sourceIds?: readonly number[];
   deadline?: Date;
 }
@@ -166,19 +166,24 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
   const now = options.now ?? new Date();
   if (!Number.isFinite(now.getTime())) throw new Error('invalid_batch_time');
   if (options.processingStart && (!Number.isFinite(options.processingStart.getTime()) || options.processingStart > now)) throw new Error('invalid_processing_start');
+  if (options.processingEnd && (!Number.isFinite(options.processingEnd.getTime()) || options.processingEnd > now ||
+      (options.processingStart && options.processingEnd <= options.processingStart))) throw new Error('invalid_processing_end');
   if (options.sourceIds && (!options.sourceIds.length || options.sourceIds.length > 200 || options.sourceIds.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(options.sourceIds).size !== options.sourceIds.length)) throw new Error('invalid_pilot_sources');
   if (options.deadline && !Number.isFinite(options.deadline.getTime())) throw new Error('invalid_deadline');
   const clock = options.clock ?? (options.now ? () => new Date(options.now!.getTime()) : () => new Date());
   const allSources = (await repository.listSources()).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id);
+  const contextByChat = groupInsightSourcesByChat(allSources);
   // One current active-result snapshot avoids two RPC/REST round trips for
   // every completed source on every resumed batch. Hash+versions must match;
   // a historical completed job alone is never sufficient for this shortcut.
   const activeResults = await repository.listCompleted();
   const activeKeys = new Set(activeResults.filter(row => row.taxonomyVersion === TAXONOMY_VERSION && row.classifierVersion === classifier.version)
     .map(row => `${row.sourceId}:${row.sourceHash}`));
-  const windowSources = options.processingStart
-    ? allSources.filter(row => Date.parse(row.createdAt) >= options.processingStart!.getTime())
-    : allSources;
+  const activeSourceIds = new Set(activeResults.filter(row => row.taxonomyVersion === TAXONOMY_VERSION && row.classifierVersion === classifier.version)
+    .map(row => row.sourceId));
+  const windowSources = allSources.filter(row =>
+    (!options.processingStart || Date.parse(row.createdAt) >= options.processingStart.getTime()) &&
+    (!options.processingEnd || Date.parse(row.createdAt) < options.processingEnd.getTime()));
   const allowedSources = options.sourceIds ? new Set(options.sourceIds) : null;
   const sources = allowedSources ? windowSources.filter(row => allowedSources.has(row.id)) : windowSources;
   const result: ProcessInsightResult = {
@@ -195,6 +200,17 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
     // Leave time for the provider's 25s timeout and durable settlement.
     if (claimedCount >= maxMessages || (options.deadline && clock().getTime() + 35_000 >= options.deadline.getTime())) break;
     result.inspected++;
+    // An exact active snapshot can be skipped without a role GET: this branch
+    // performs no mutation, provider call or returned content. A role change
+    // after this snapshot cannot authorize fresh processing or publication;
+    // live reports independently recheck current roles before metrics/examples.
+    // Known admin/unknown snapshots still take the live role/cleanup path below.
+    if (source.userLevel === 'user' && activeSourceIds.has(source.id)) {
+      try {
+        const snapshot = prepareInsightInput(source, contextByChat.get(source.chatId) ?? [], TAXONOMY_VERSION, classifier.version);
+        if (activeKeys.has(`${source.id}:${snapshot.sourceHash}`)) { result.skipped++; continue; }
+      } catch { /* Invalid or changed input must take the normal current-role path. */ }
+    }
     let level = levelCache.get(source.userId);
     if (level === undefined) {
       level = await repository.currentUserLevel(source.userId);
@@ -209,7 +225,7 @@ export async function processInsightBatch(options: ProcessInsightOptions): Promi
       continue;
     }
     const current = { ...source, userLevel: level };
-    const contextCandidates = allSources.filter(row => row.userId === source.userId).map(row => ({ ...row, userLevel: level }));
+    const contextCandidates = (contextByChat.get(source.chatId) ?? []).filter(row => row.userId === source.userId).map(row => ({ ...row, userLevel: level }));
     let prepared;
     try {
       prepared = prepareInsightInput(current, contextCandidates, TAXONOMY_VERSION, classifier.version);

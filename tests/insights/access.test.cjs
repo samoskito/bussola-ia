@@ -29,7 +29,7 @@ test('feature is off by default; a key does not enable it; demo cannot run in pr
   assert.throws(()=>getInsightsMode({INSIGHTS_MODE:'demo',NODE_ENV:'production'}),e=>e.status===503);
   assert.throws(()=>requireDemoMode({INSIGHTS_MODE:'live'}),e=>e.status===503);
 });
-test('filters reject arbitrary scope, duplicate values, SQL and unlimited periods', () => {
+test('filters reject arbitrary scope, duplicate values, SQL and arbitrary day counts', () => {
   assert.deepEqual(parseInsightFilters(new URLSearchParams()),{days:30,agentType:'all'});
   for(const invalid of ['days=365','agentType=unknown','userId=123','days=30&days=7','topicId=select%20*%20from%20users'])
     assert.throws(()=>parseInsightFilters(new URLSearchParams(invalid)),e=>e.status===400);

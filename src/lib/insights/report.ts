@@ -13,11 +13,15 @@ export interface ReportMetadata {
 }
 
 export function buildInsightReport(filters: InsightFilters, now: Date, fixtures: DemoMessage[], metadata: ReportMetadata): InsightReport {
-  const window = insightWindow(filters.days, now);
+  const oldest = filters.days === 'all' ? fixtures.reduce((time, row) => {
+    const candidate = Date.parse(row.createdAt);
+    return Number.isFinite(candidate) && candidate <= time ? candidate : time;
+  }, now.getTime()) : undefined;
+  const window = insightWindow(filters.days, now, oldest === undefined ? undefined : new Date(oldest));
   const start = Date.parse(window.start);
   const end = Date.parse(window.end);
-  const previousStart = start - filters.days * 86400000;
-  const previousEnd = end - filters.days * 86400000;
+  const previousStart = filters.days === 'all' ? NaN : start - filters.days * 86400000;
+  const previousEnd = filters.days === 'all' ? NaN : end - filters.days * 86400000;
   const inAgent = (row: DemoMessage) => filters.agentType === 'all' || row.agentType === filters.agentType;
   const inTopic = (row: DemoMessage) => !filters.topicId || Boolean(row.classification?.topicIds.includes(filters.topicId));
   const current = fixtures.filter(row => inAgent(row) && Date.parse(row.createdAt) >= start && Date.parse(row.createdAt) <= end);
@@ -35,10 +39,18 @@ export function buildInsightReport(filters: InsightFilters, now: Date, fixtures:
       sharePercent: visibleClassified.length ? round(rows.length / visibleClassified.length * 100) : 0,
       trendPercent: previousCount ? round((rows.length - previousCount) / previousCount * 100) : null };
   }).sort((a, b) => b.messages - a.messages || a.id.localeCompare(b.id));
-  const trend = Array.from({ length: filters.days }, (_, index) => {
+  const trendDays = filters.days === 'all' ? Math.floor((Date.parse(`${saoPauloDate(now)}T00:00:00-03:00`) - start) / 86400000) + 1 : filters.days;
+  const byDate = new Map<string, { messages: number; classifiedMessages: number }>();
+  for (const row of visibleEligible) {
+    const date = saoPauloDate(new Date(row.createdAt));
+    const counts = byDate.get(date) ?? { messages: 0, classifiedMessages: 0 };
+    counts.messages++;
+    if (row.status === 'classified') counts.classifiedMessages++;
+    byDate.set(date, counts);
+  }
+  const trend = Array.from({ length: trendDays }, (_, index) => {
     const date = saoPauloDate(new Date(start + index * 86400000));
-    const rows = visibleEligible.filter(row => saoPauloDate(new Date(row.createdAt)) === date);
-    return { date, messages: rows.length, classifiedMessages: rows.filter(row => row.status === 'classified').length };
+    return { date, ...(byDate.get(date) ?? { messages: 0, classifiedMessages: 0 }) };
   });
   return {
     mode: metadata.mode, generatedAt: now.toISOString(), window, filters,

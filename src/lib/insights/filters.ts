@@ -1,7 +1,7 @@
 import { getAgentByType } from '../agents';
 import { InsightsError } from './config';
 import { INSIGHT_TOPICS } from './taxonomy';
-import type { InsightFilters, InsightWindow } from './types';
+import type { InsightFilters, InsightPeriod, InsightWindow } from './types';
 
 export function parseInsightFilters(params: URLSearchParams, allowExportFormat = false): InsightFilters {
   const allowed = ['days', 'agentType', 'topicId', ...(allowExportFormat ? ['format'] : [])];
@@ -13,11 +13,11 @@ export function parseInsightFilters(params: URLSearchParams, allowExportFormat =
   const days = params.get('days') ?? '30';
   const agentType = params.get('agentType') ?? 'all';
   const topicId = params.get('topicId') ?? undefined;
-  if (!['7', '30', '90'].includes(days) || (agentType !== 'all' && !getAgentByType(agentType)) ||
+  if (!['7', '30', '90', 'all'].includes(days) || (agentType !== 'all' && !getAgentByType(agentType)) ||
       (topicId !== undefined && !INSIGHT_TOPICS.some(topic => topic.id === topicId))) {
     throw new InsightsError(400, 'invalid_filter', 'Período, agente ou tema inválido.');
   }
-  return { days: Number(days), agentType: agentType as InsightFilters['agentType'], ...(topicId ? { topicId } : {}) };
+  return { days: days === 'all' ? 'all' : Number(days), agentType: agentType as InsightFilters['agentType'], ...(topicId ? { topicId } : {}) };
 }
 
 export function saoPauloDate(date: Date): string {
@@ -27,7 +27,13 @@ export function saoPauloDate(date: Date): string {
 }
 
 /** São Paulo uses UTC-03 throughout the synthetic demo's contemporary range. */
-export function insightWindow(days: number, now: Date): InsightWindow {
+export function insightWindow(days: InsightPeriod, now: Date, historyStart?: Date): InsightWindow {
+  if (!Number.isFinite(now.getTime()) || (days !== 'all' && ![7, 30, 90].includes(days))) throw new Error('invalid_insight_window');
   const today = new Date(`${saoPauloDate(now)}T00:00:00-03:00`);
+  if (days === 'all') {
+    if (historyStart && (!Number.isFinite(historyStart.getTime()) || historyStart > now)) throw new Error('invalid_history_start');
+    const start = historyStart ? new Date(`${saoPauloDate(historyStart)}T00:00:00-03:00`) : today;
+    return { start: start.toISOString(), end: now.toISOString(), timezone: 'America/Sao_Paulo' };
+  }
   return { start: new Date(today.getTime() - (days - 1) * 86400000).toISOString(), end: now.toISOString(), timezone: 'America/Sao_Paulo' };
 }

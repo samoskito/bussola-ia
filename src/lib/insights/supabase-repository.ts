@@ -3,13 +3,12 @@ import type { createServerSupabaseClient } from '../supabase/server';
 import type { SourceMessage } from './types';
 import { CLASSIFIER_VERSION, getInsightsModel, validateClassification } from './classifier';
 import type { ClaimResult, InsightJob, InsightRepository, StoredInsight } from './processor';
-import { prepareInsightInput } from './privacy';
+import { prepareInsightInput, groupInsightSourcesByChat } from './privacy';
 import { TAXONOMY_VERSION } from './taxonomy';
 
 type ServiceClient = ReturnType<typeof createServerSupabaseClient>;
 
 const PAGE_SIZE = 500;
-const MAX_ROWS = 20_000;
 const AGENTS = new Set(['comunicacao', 'apresentacao', 'conversas_dificeis', 'postagem']);
 
 type DbRow = Record<string, unknown>;
@@ -27,16 +26,19 @@ function related(value: unknown): DbRow | null {
 function assertNoDbError(error: unknown): void {
   if (error) throw new Error('insights_repository_error'); // Never include SQL, row or secret in logs.
 }
-function parseSource(row: unknown): SourceMessage {
+function parseSource(row: unknown): SourceMessage | null {
   const item = record(row);
   const user = related(item?.users);
   const chat = related(item?.chats);
   if (!item || !Number.isInteger(item.id) || typeof item.user_id !== 'string' || typeof item.chatid !== 'string' ||
       typeof item.input !== 'string' || typeof item.created_at !== 'string' ||
-      !chat || chat.user_id !== item.user_id || !AGENTS.has(String(chat.agent_type)) || !user) {
+      !chat || chat.user_id !== item.user_id || !user) {
     throw new Error('invalid_source_relationship');
   }
   if (!['user', 'admin', null].includes(user.nivel as string | null)) throw new Error('invalid_user_level');
+  // Historical records outside the four known IAs are not classifiable. Never
+  // infer an agent for null/unknown values, or hide a broken ownership relation.
+  if (!AGENTS.has(String(chat.agent_type))) return null;
   return {
     id: item.id as number, userId: item.user_id, chatId: item.chatid,
     agentType: chat.agent_type as SourceMessage['agentType'], input: item.input,
@@ -80,10 +82,21 @@ function parseInsight(row: unknown): StoredInsight | null {
   };
 }
 
+/** Earliest source timestamp only; never reads conversation text or invokes a provider. */
+export async function findInsightHistoryStart(client: ServiceClient, now: Date): Promise<Date | undefined> {
+  const { data, error } = await client.from('scripts').select('created_at')
+    .lt('created_at', now.toISOString()).order('created_at', { ascending: true }).limit(1).maybeSingle();
+  assertNoDbError(error);
+  if (data === null) return undefined;
+  const value = record(data)?.created_at;
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) throw new Error('invalid_history_start');
+  return new Date(value);
+}
+
 /** No query runs during construction. Requires a server-only service-role client. */
 export function createSupabaseInsightRepository(
   client: ServiceClient,
-  options: { env?: Env; now?: Date; windowStart?: Date; windowEnd?: Date } = {},
+  options: { env?: Env; now?: Date; windowStart?: Date; windowEnd?: Date; allowHistoricalWindow?: boolean } = {},
 ): InsightRepository {
   assertLive(options.env ?? process.env);
   const model = getInsightsModel(options.env ?? process.env);
@@ -92,23 +105,32 @@ export function createSupabaseInsightRepository(
   const end = options.windowEnd ?? now;
   const start = options.windowStart ?? new Date(end.getTime() - 30 * 86_400_000);
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end > now ||
-      start >= end || end.getTime() - start.getTime() > 190 * 86_400_000) throw new Error('invalid_repository_window');
+      start >= end || (!options.allowHistoricalWindow && end.getTime() - start.getTime() > 190 * 86_400_000)) throw new Error('invalid_repository_window');
   const windowStart = start.toISOString();
   const windowEnd = end.toISOString();
   const fetchSources = async (): Promise<SourceMessage[]> => {
     const all: SourceMessage[] = [];
-    for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
-      const { data, error } = await client.from('scripts')
+    let cursor: { createdAt: string; id: number } | undefined;
+    while (true) {
+      let query = client.from('scripts')
         .select('id,user_id,chatid,input,created_at,users!scripts_user_id_fkey(nivel),chats!scripts_chatid_fkey(agent_type,user_id)')
         .gte('created_at', windowStart).lt('created_at', windowEnd)
-        .order('created_at', { ascending: true }).order('id', { ascending: true })
-        .range(offset, offset + PAGE_SIZE - 1);
+        .order('created_at', { ascending: true }).order('id', { ascending: true });
+      if (cursor) query = query.or(`created_at.gt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.gt.${cursor.id})`);
+      const { data, error } = await query.limit(PAGE_SIZE);
       assertNoDbError(error);
       if (!Array.isArray(data)) throw new Error('invalid_source_page');
-      all.push(...data.map(parseSource));
+      const page = data.map(parseSource).filter((source): source is SourceMessage => source !== null);
+      all.push(...page);
       if (data.length < PAGE_SIZE) return all;
+      // A full page can contain only excluded legacy agents. Advance by the
+      // last validated raw row so the next supported source is still reached.
+      const last = data[data.length - 1] as DbRow;
+      const next = { createdAt: last.created_at as string, id: last.id as number };
+      if (cursor && (Date.parse(next.createdAt) < Date.parse(cursor.createdAt) ||
+          (next.createdAt === cursor.createdAt && next.id <= cursor.id))) throw new Error('invalid_source_cursor');
+      cursor = next;
     }
-    throw new Error('source_cap_reached');
   };
   return {
     listSources: fetchSources,
@@ -205,42 +227,52 @@ export function createSupabaseInsightRepository(
     },
     async listCompleted() {
       const all: StoredInsight[] = [];
-      let reachedEnd = false;
-      for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
-        const { data, error } = await client.from('script_insights')
+      let cursor: number | undefined;
+      while (true) {
+        let query = client.from('script_insights')
           .select('script_id,user_id,chat_id,agent_type,source_created_at,source_hash,taxonomy_version,classifier_version,message_kind,topic_ids,normalized_demand,confidence,needs_review,processed_at,users!script_insights_user_id_fkey(nivel)')
           .eq('status', 'classified').gte('source_created_at', windowStart).lt('source_created_at', windowEnd)
           .eq('taxonomy_version', TAXONOMY_VERSION).eq('classifier_version', `${model}.${CLASSIFIER_VERSION}`)
-          .order('script_id', { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
+          .order('script_id', { ascending: true });
+        if (cursor !== undefined) query = query.gt('script_id', cursor);
+        const { data, error } = await query.limit(PAGE_SIZE);
         assertNoDbError(error);
         if (!Array.isArray(data)) throw new Error('invalid_insight_page');
         for (const row of data) { const insight = parseInsight(row); if (insight) all.push(insight); }
-        if (data.length < PAGE_SIZE) { reachedEnd = true; break; }
+        if (data.length < PAGE_SIZE) break;
+        const next = record(data[data.length - 1])?.script_id;
+        if (typeof next !== 'number' || !Number.isSafeInteger(next) || (cursor !== undefined && next <= cursor)) throw new Error('invalid_insight_cursor');
+        cursor = next;
       }
-      if (!reachedEnd) throw new Error('insight_cap_reached');
       const latest = await fetchSources();
       const byId = new Map(latest.map(row => [row.id, row]));
+      const contextByChat = groupInsightSourcesByChat(latest);
       return all.filter(insight => {
         const source = byId.get(insight.sourceId);
         if (!source || source.userLevel !== 'user') return false;
         try {
-          return prepareInsightInput(source, latest, insight.taxonomyVersion, insight.classifierVersion).sourceHash === insight.sourceHash;
+          return prepareInsightInput(source, contextByChat.get(source.chatId) ?? [], insight.taxonomyVersion, insight.classifierVersion).sourceHash === insight.sourceHash;
         } catch { return false; }
       });
     },
     async listJobs() {
       const all: InsightJob[] = [];
-      for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
-        const { data, error } = await client.from('insight_jobs')
+      let cursor: string | undefined;
+      while (true) {
+        let query = client.from('insight_jobs')
           .select('job_key,script_id,user_id,source_hash,status,attempts,next_attempt_at,locked_until,lock_token,error_code')
           .gte('created_at', windowStart).lt('created_at', windowEnd)
-          .order('created_at', { ascending: false }).range(offset, offset + PAGE_SIZE - 1);
+          .order('job_key', { ascending: true });
+        if (cursor !== undefined) query = query.gt('job_key', cursor);
+        const { data, error } = await query.limit(PAGE_SIZE);
         assertNoDbError(error);
         if (!Array.isArray(data)) throw new Error('invalid_job_page');
         all.push(...data.map(parseJob));
         if (data.length < PAGE_SIZE) return all;
+        const next = record(data[data.length - 1])?.job_key;
+        if (typeof next !== 'string' || next === cursor) throw new Error('invalid_job_cursor');
+        cursor = next;
       }
-      throw new Error('job_cap_reached');
     },
   };
 }

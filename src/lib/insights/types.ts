@@ -2,7 +2,8 @@ import type { AgentType } from '../agents';
 
 export type MessageKind = 'initial_request' | 'question' | 'context' | 'refinement' | 'confirmation' | 'unclassifiable';
 export type InsightAgentFilter = AgentType | 'all';
-export interface InsightFilters { days: number; agentType: InsightAgentFilter; topicId?: string; }
+export type InsightPeriod = number | 'all';
+export interface InsightFilters { days: InsightPeriod; agentType: InsightAgentFilter; topicId?: string; }
 export interface InsightWindow { start: string; end: string; timezone: 'America/Sao_Paulo'; }
 export interface SourceMessage {
   id: number; userId: string; chatId: string; agentType: AgentType;

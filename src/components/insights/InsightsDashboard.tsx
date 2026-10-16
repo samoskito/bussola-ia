@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AGENTS, getAgentLabel } from '@/lib/agents';
-import type { InsightAgentFilter, InsightReport, MessageKind } from '@/lib/insights/types';
+import type { InsightAgentFilter, InsightPeriod, InsightReport, MessageKind } from '@/lib/insights/types';
 
 const number = (value: number) => value.toLocaleString('pt-BR');
 const date = (value: string) => new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00-03:00` : value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -15,7 +15,7 @@ const control = 'rounded-md border border-gray-700 bg-gray-900 px-3 py-2.5 text-
 type ReportState = 'loading' | 'ready' | 'disabled' | 'denied' | 'error';
 
 export default function InsightsDashboard() {
-  const [days, setDays] = useState(30);
+  const [days, setDays] = useState<InsightPeriod>(30);
   const [agentType, setAgentType] = useState<InsightAgentFilter>('all');
   const [topicId, setTopicId] = useState('');
   const [retry, setRetry] = useState(0);
@@ -74,7 +74,7 @@ export default function InsightsDashboard() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `insights-${report?.mode === 'demo' ? 'demonstracao-' : ''}${days}dias.${format}`;
+      link.download = `insights-${report?.mode === 'demo' ? 'demonstracao-' : ''}${days === 'all' ? 'todo-historico' : `${days}dias`}.${format}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -108,8 +108,9 @@ export default function InsightsDashboard() {
 
       <div className="grid grid-cols-1 items-end gap-4 border-y border-gray-800 py-5 sm:grid-cols-2 xl:flex xl:flex-wrap">
         <label className="flex min-w-0 flex-col gap-2 text-xs text-gray-400">Período
-          <select value={days} onChange={event => { setDays(Number(event.target.value)); setTopicId(''); }} className={`${control} w-full xl:w-auto`}>
+          <select value={days} onChange={event => { setDays(event.target.value === 'all' ? 'all' : Number(event.target.value)); setTopicId(''); }} className={`${control} w-full xl:w-auto`}>
             <option value={7}>Últimos 7 dias</option><option value={30}>Últimos 30 dias</option><option value={90}>Últimos 90 dias</option>
+            <option value="all">Todo o histórico</option>
           </select>
         </label>
         <label className="flex min-w-0 flex-col gap-2 text-xs text-gray-400">Agente de IA

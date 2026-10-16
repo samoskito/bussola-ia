@@ -23,6 +23,17 @@ export interface PreparedInput {
   sourceHash: string;
 }
 
+/** Limit repeated historical hash checks to each conversation, preserving the exact hash contract. */
+export function groupInsightSourcesByChat(sources: readonly SourceMessage[]): Map<string, SourceMessage[]> {
+  const chats = new Map<string, SourceMessage[]>();
+  for (const source of sources) {
+    const rows = chats.get(source.chatId) ?? [];
+    rows.push(source);
+    chats.set(source.chatId, rows);
+  }
+  return chats;
+}
+
 /** Caller must supply current user levels; stale role information is unsafe. */
 export function prepareInsightInput(
   source: SourceMessage,

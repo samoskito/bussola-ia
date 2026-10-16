@@ -1,0 +1,38 @@
+name: Insights historical backfill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize with the daily worker as both use the same durable server budget.
+concurrency:
+  group: insights-daily-production
+  cancel-in-progress: false
+
+jobs:
+  process-history:
+    if: github.repository == 'samoskito/bussola-ia' && github.ref == 'refs/heads/main' && vars.INSIGHTS_DAILY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Check out reviewed main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout: |
+            scripts/insights-history-runner.cjs
+            tests/insights/history-runner.test.cjs
+            .github/workflows/insights-history.yml
+          sparse-checkout-cone-mode: false
+      - name: Verify dependency-free runner
+        run: |
+          node -e "if(Number(process.versions.node.split('.')[0]) < 20) process.exit(1)"
+          node --test tests/insights/history-runner.test.cjs
+      - name: Process fixed historical window
+        env:
+          INSIGHTS_WORKER_TOKEN: ${{ secrets.INSIGHTS_WORKER_TOKEN }}
+        run: node scripts/insights-history-runner.cjs

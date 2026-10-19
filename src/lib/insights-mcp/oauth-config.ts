@@ -2,7 +2,7 @@ export class OAuthError extends Error {
   constructor(public status: number, public code: string, message = 'OAuth request rejected.') { super(message); }
 }
 export const MCP_SCOPE = 'insights:read';
-export interface OAuthClient { clientId: string; name: string; clientSecretHash?: string; redirectUris: string[]; tokenEndpointAuthMethod?: 'none' }
+export interface OAuthClient { clientId: string; name: string; clientSecretHash?: string; redirectUris: string[]; tokenEndpointAuthMethod?: 'none' | 'client_secret_basic' | 'client_secret_post' }
 export interface OAuthConfig { issuer: string; resource: string; protectedResourceMetadataUrl: string; consentSecret: string; clients: OAuthClient[] }
 export function isMcpEnabled(env: NodeJS.ProcessEnv = process.env) { return env.INSIGHTS_MCP_ENABLED === 'true'; }
 export function getOAuthConfig(env: NodeJS.ProcessEnv = process.env): OAuthConfig {

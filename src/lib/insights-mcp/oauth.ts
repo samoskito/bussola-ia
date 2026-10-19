@@ -66,6 +66,8 @@ export function authenticateClient(params: URLSearchParams, authorization: strin
     if (authorization || params.has('client_secret')) throw new OAuthError(401, 'invalid_client');
     return id;
   }
+  if ((client?.tokenEndpointAuthMethod === 'client_secret_basic' && !authorization) ||
+      (client?.tokenEndpointAuthMethod === 'client_secret_post' && authorization)) throw new OAuthError(401, 'invalid_client');
   if (!secret || secret.length < 32 || secret.length > 1024 || !client?.clientSecretHash || !equalSecret(tokenHash(secret), client.clientSecretHash)) throw new OAuthError(401, 'invalid_client');
   return id;
 }

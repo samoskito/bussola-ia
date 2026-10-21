@@ -203,24 +203,93 @@ test('SDK: question tools are read-only, strict, validated before reading and sc
   }));
 });
 
-test('SDK: disabled gate and reader failures return safe errors without data', async () => {
+async function rejectedCall(client, name, args) {
+  try { const r = await client.callTool({ name, arguments: args }); assert.equal(r.isError, true); return JSON.stringify(r); }
+  catch (e) { return String(e); }
+}
+test('SDK: gate off hides question tools from tools/list and refuses calls; gate is re-read per request', async () => {
+  let enabled = false;
   await withClient(async (client, reads) => {
-    const r = await client.callTool({ name: 'list_student_questions', arguments: {} });
-    assert.equal(r.isError, true);
-    assert.match(JSON.stringify(r), /student_questions_disabled/);
+    const names = (await client.listTools()).tools.map(t => t.name);
+    assert.ok(!names.includes('list_student_questions') && !names.includes('get_student_question'));
+    assert.equal(names.length, 5);
+    assert.match(await rejectedCall(client, 'list_student_questions', {}), /not found|unknown|32602|disabled/i);
+    enabled = true;
+    assert.ok((await client.listTools()).tools.some(t => t.name === 'list_student_questions'));
+    enabled = false;
+    assert.match(await rejectedCall(client, 'get_student_question', { questionId: 1 }), /not found|unknown|32602|disabled/i);
     assert.equal(reads.length, 0);
-  }, { questionsEnabled: () => false });
+  }, { questionsEnabled: () => enabled });
+  await withClient(async client => {
+    assert.ok(!(await client.listTools()).tools.some(t => t.name.includes('student_question')));
+  }, { questions: undefined });
+});
+
+test('SDK: reader failures return safe errors without data', async () => {
   await withClient(async client => {
     const r = await client.callTool({ name: 'get_student_question', arguments: { questionId: 5 } });
     assert.equal(r.isError, true);
     assert.ok(!JSON.stringify(r).includes('SECRET-PATH'));
     assert.match(JSON.stringify(r), /insights_unavailable/);
   }, { questions: { list: async () => { throw new Error('SECRET-PATH'); }, get: async () => { throw new Error('SECRET-PATH'); } } });
-  await withClient(async client => {
-    const r = await client.callTool({ name: 'list_student_questions', arguments: {} });
-    assert.equal(r.isError, true);
-    assert.match(JSON.stringify(r), /student_questions_disabled/);
-  }, { questions: undefined });
+});
+
+test('cursor pins the first page window: later pages ignore clock movement and reject tampered windows', async () => {
+  const rows = Array.from({ length: 5 }, (_, i) => row(i + 1));
+  const later = new Date(now.getTime() + 2 * 86400000);
+  // A message that only exists in the later clock's window, and the oldest one that would slide out.
+  const lateRows = [...rows, row(0, { createdAt: new Date(later.getTime() - 3600_000).toISOString(), input: 'NOVA' })];
+  let current = rows;
+  const fake = fakeSource({ users: () => ({ data: [{ id: 'USER-UUID-1', nivel: 'user', cargo: null }], error: null }), scripts: () => ({ data: [], error: null }) }, []);
+  fake.source.load = async () => ({ rows: current, lastProcessedAt: null });
+  await withSource(fake, async () => {
+    const first = await questions.listLiveStudentQuestions(query({ limit: 2, days: 7 }), now, SECRET);
+    assert.deepEqual(first.questions.map(q => q.questionId), [1, 2]);
+    current = lateRows;
+    const second = await questions.listLiveStudentQuestions(query({ limit: 2, days: 7, cursor: first.nextCursor }), later, SECRET);
+    assert.deepEqual(second.questions.map(q => q.questionId), [3, 4]);
+    assert.deepEqual(second.window, first.window, 'window of page 1 is reused');
+    assert.ok(!JSON.stringify(second).includes('NOVA'));
+    const third = await questions.listLiveStudentQuestions(query({ limit: 2, days: 7, cursor: second.nextCursor }), later, SECRET);
+    assert.deepEqual(third.questions.map(q => q.questionId), [5]);
+    assert.equal(third.nextCursor, null);
+    const value = JSON.parse(Buffer.from(first.nextCursor, 'base64url').toString());
+    for (const patch of [{ e: later.getTime() + 1 }, { s: value.e + 1 }, { v: 1 }]) {
+      const forged = Buffer.from(JSON.stringify({ ...value, ...patch })).toString('base64url');
+      await assert.rejects(questions.listLiveStudentQuestions(query({ limit: 2, days: 7, cursor: forged }), later, SECRET), e => e.code === 'invalid_cursor');
+    }
+    await assert.rejects(questions.listLiveStudentQuestions(query({ limit: 2, days: 30, cursor: first.nextCursor }), later, SECRET), e => e.code === 'invalid_cursor');
+  });
+});
+
+test('single read pages chats over 500 messages by integer id only, never interpolating database values', async () => {
+  const userId = 'USER-UUID-1', chatId = 'CHAT-LONG';
+  const make = id => ({ id, user_id: userId, chatid: chatId, input: `m${id}`, created_at: new Date(Date.parse('2026-10-01T00:00:00Z') + (1300 - id) * 60000).toISOString(),
+    users: { nivel: 'user' }, chats: { agent_type: 'comunicacao', user_id: userId } });
+  // Ids ascend while timestamps descend: chronological order must be rebuilt locally.
+  const all = Array.from({ length: 1201 }, (_, i) => make(i + 1));
+  const calls = [];
+  const fake = fakeSource({
+    scripts: state => {
+      if (state.single) return { data: make(600), error: null };
+      calls.push(state.filters);
+      assert.ok(!state.filters.some(([op]) => op === 'or'), 'no interpolated or() filter');
+      const gt = state.filters.find(([op]) => op === 'gt');
+      if (gt) assert.deepEqual(gt.slice(1, 2), ['id']);
+      const after = gt ? gt[2] : 0;
+      return { data: all.filter(r => r.id > after).slice(0, 500), error: null };
+    },
+    users: () => ({ data: [{ id: userId, nivel: 'user', cargo: null }], error: null }),
+    script_insights: () => ({ data: null, error: null }),
+    insight_jobs: () => ({ data: [], error: null }),
+  });
+  await withSource(fake, async () => {
+    const one = await questions.getLiveStudentQuestion({ questionId: 600, offset: 0 }, now, SECRET);
+    assert.equal(calls.length, 3, '500 + 500 + 201');
+    assert.deepEqual(calls.map(f => f.find(([op]) => op === 'gt')?.[2]), [undefined, 500, 1000]);
+    assert.equal(one.question.position, 'follow_up', 'the earliest message (highest id here) is the initial one');
+    assert.equal(one.question.text, 'm600');
+  });
 });
 
 test('live single read reports a stored classification only when its source hash still matches', async () => {

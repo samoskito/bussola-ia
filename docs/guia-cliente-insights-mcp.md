@@ -71,7 +71,7 @@ Continue naturalmente: “Detalhe a IA de LinkedIn”, “Compare os últimos 7 
 
 Peça, por exemplo: “Liste as perguntas iniciais dos alunos sobre feedback entre 01/09 e 30/09” ou “Agrupe as dores mais citadas na IA de LinkedIn nos últimos 90 dias e cite as perguntas originais”.
 
-Cada pergunta traz data e hora (horário de Brasília), a IA usada, o tema e a situação da classificação (classificada, pendente ou rejeitada), se é a primeira mensagem da conversa ou uma continuação, o cargo cadastrado do aluno quando existir e códigos estáveis da pessoa e da conversa (por exemplo `p_…` e `c_…`). Esses códigos permitem saber que duas perguntas vieram da mesma pessoa sem revelar quem ela é.
+Cada pergunta traz data e hora (horário de Brasília), a IA usada, o tema e a situação da classificação (classificada, pendente ou rejeitada), se é a primeira mensagem da conversa ou uma continuação, o cargo cadastrado do aluno quando existir e códigos estáveis da pessoa e da conversa (por exemplo `p_…` e `c_…`). Esses códigos permitem saber que duas perguntas vieram da mesma pessoa sem revelar quem ela é. Eles são estáveis enquanto a chave de segurança do conector (`INSIGHTS_MCP_CONSENT_SECRET`) não for trocada; se a equipe rotacionar essa chave, todos os códigos mudam (acervos antigos deixam de casar com os novos) e todas as conexões precisam ser refeitas.
 
 - O texto não é anonimizado: pode conter informações que o próprio aluno digitou. Use somente para fins internos da Bússola Executiva.
 - Nome, e-mail e telefone do cadastro nunca são enviados. Mensagens de administradores ficam de fora.
@@ -104,7 +104,7 @@ As contagens representam mensagens, não dúvidas únicas. Uma mensagem pode ter
 - **ChatGPT:** abra **Plugins → Pessoais → Bússola IA — Insights** e use **Atualizar** (Refresh), se disponível; caso contrário, desconecte e conecte de novo. Inicie um chat novo.
 - **Claude Code:** digite `/mcp`, selecione **bussola-insights** e escolha **Reconnect**; uma sessão nova do Claude Code também lê a lista atual.
 
-**A IA diz que a leitura das perguntas está desativada:** a função ainda não foi liberada no servidor. Avise a equipe responsável.
+**As ferramentas de perguntas não aparecem mesmo após atualizar, ou a IA diz que a leitura está desativada:** a função ainda não foi liberada no servidor. Avise a equipe responsável.
 
 ## Reconexão e encerramento
 

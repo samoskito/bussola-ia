@@ -78,15 +78,23 @@ function filterKey(query: StudentQuestionQuery): string {
   const { limit: _limit, cursor: _cursor, ...rest } = query;
   return createHash('sha256').update(JSON.stringify(rest)).digest('base64url').slice(0, 16);
 }
-function encodeCursor(row: DemoMessage, key: string) {
-  return Buffer.from(JSON.stringify({ v: 1, t: Date.parse(row.createdAt), i: row.id, k: key })).toString('base64url');
+// The cursor pins the first page's window (s/e), so later pages never shift with the clock.
+function encodeCursor(row: DemoMessage, key: string, range: QuestionRange) {
+  return Buffer.from(JSON.stringify({ v: 2, t: Date.parse(row.createdAt), i: row.id, k: key, s: range.start.getTime(), e: range.end.getTime() })).toString('base64url');
 }
-function decodeCursor(cursor: string, key: string): { t: number; i: number } {
+export function decodeQuestionCursor(cursor: string, query: StudentQuestionQuery, now?: Date): { t: number; i: number; s: number; e: number } {
   try {
     const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    if (value.v === 1 && value.k === key && Number.isSafeInteger(value.t) && Number.isSafeInteger(value.i)) return { t: value.t, i: value.i };
+    if (value.v === 2 && value.k === filterKey(query) && [value.t, value.i, value.s, value.e].every(Number.isSafeInteger) &&
+        value.s <= value.e && (!now || value.e <= now.getTime())) return { t: value.t, i: value.i, s: value.s, e: value.e };
   } catch { /* fall through */ }
   throw new InsightsError(400, 'invalid_cursor', 'Cursor inválido para estes filtros. Recomece sem cursor.');
+}
+/** Range of a continued listing: exactly the window pinned by its first page. */
+export function questionRangeFromCursor(query: StudentQuestionQuery, now: Date): QuestionRange | undefined {
+  if (!query.cursor) return undefined;
+  const { s, e } = decodeQuestionCursor(query.cursor, query, now);
+  return { start: new Date(s), end: new Date(e), loadStart: new Date(s - CONTEXT_MARGIN_MS), explicit: Boolean(query.startDate || query.endDate) };
 }
 
 const statusOf = (row: DemoMessage): QuestionStatus => row.status === 'classified' && row.classification ? 'classified' : row.status === 'failed' ? 'rejected' : 'pending';
@@ -120,7 +128,8 @@ export function selectStudentQuestions(rows: readonly DemoMessage[], query: Stud
   const key = filterKey(query);
   let remaining = matches;
   if (query.cursor) {
-    const cursor = decodeCursor(query.cursor, key);
+    const cursor = decodeQuestionCursor(query.cursor, query);
+    if (cursor.s !== start || cursor.e !== end) throw new InsightsError(400, 'invalid_cursor', 'Cursor inválido para estes filtros. Recomece sem cursor.');
     remaining = matches.filter(row => Date.parse(row.createdAt) < cursor.t || (Date.parse(row.createdAt) === cursor.t && row.id < cursor.i));
   }
   const page: DemoMessage[] = [];
@@ -130,7 +139,7 @@ export function selectStudentQuestions(rows: readonly DemoMessage[], query: Stud
     if (page.length >= query.limit || (page.length && used + size > QUESTION_PAGE_CHAR_BUDGET)) break;
     page.push(row); used += size;
   }
-  return { page, nextCursor: page.length < remaining.length ? encodeCursor(page[page.length - 1], key) : null, matching: matches.length,
+  return { page, nextCursor: page.length < remaining.length ? encodeCursor(page[page.length - 1], key, range) : null, matching: matches.length,
     distinctPeople: new Set(matches.map(row => row.userId)).size, distinctConversations: new Set(matches.map(row => row.chatId)).size,
     excludedAdminMessages: inScope.filter(row => row.userLevel === 'admin').length };
 }
@@ -195,7 +204,7 @@ export async function listLiveStudentQuestions(query: StudentQuestionQuery, now:
   const { openLiveInsightSource } = await import('./service');
   const source = await openLiveInsightSource(now);
   const historyStart = await source.historyStart();
-  const range = resolveQuestionRange(query, now, historyStart);
+  const range = questionRangeFromCursor(query, now) ?? resolveQuestionRange(query, now, historyStart);
   const { rows } = await source.load(range.loadStart, true);
   const firstLoaded = firstLoadedByChat(rows);
   // The loaded window starts before the oldest message: every first loaded row is initial.
@@ -244,18 +253,22 @@ export async function getLiveStudentQuestion(input: { questionId: number; offset
   const student = students.get(row.userId);
   if (!student) throw notFound(); // Admin or unknown level: indistinguishable from absence.
   const chat: SourceMessage[] = [];
-  let cursor: { createdAt: string; id: number } | undefined;
-  for (let pageIndex = 0; pageIndex < 20; pageIndex++) {
+  // Keyset on the integer primary key only: no database value is ever interpolated
+  // into a PostgREST filter string. Chronological order is rebuilt locally below.
+  let lastId: number | undefined;
+  for (let pageIndex = 0; ; pageIndex++) {
+    if (pageIndex >= 20) throw new Error('chat_too_long');
     let query = source.client.from('scripts').select(SOURCE_COLUMNS).eq('chatid', row.chatId).lte('created_at', now.toISOString())
-      .order('created_at', { ascending: true }).order('id', { ascending: true });
-    if (cursor) query = query.or(`created_at.gt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.gt.${cursor.id})`);
+      .order('id', { ascending: true });
+    if (lastId !== undefined) query = query.gt('id', lastId);
     const page = await query.limit(500);
     fail(page.error);
     if (!Array.isArray(page.data)) throw new Error('invalid_source_page');
     for (const item of page.data) { const parsed = parseSource(item); if (parsed) chat.push({ ...parsed, userLevel: parsed.userId === row.userId ? 'user' : null }); }
     if (page.data.length < 500) break;
-    const last = page.data[page.data.length - 1] as Record<string, unknown>;
-    cursor = { createdAt: String(last.created_at), id: Number(last.id) };
+    const next = (page.data[page.data.length - 1] as Record<string, unknown>).id;
+    if (typeof next !== 'number' || !Number.isSafeInteger(next) || (lastId !== undefined && next <= lastId)) throw new Error('invalid_chat_cursor');
+    lastId = next;
   }
   const current: SourceMessage = { ...row, userLevel: 'user' };
   const [insight, jobs] = await Promise.all([

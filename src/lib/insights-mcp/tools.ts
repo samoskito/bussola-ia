@@ -132,6 +132,9 @@ export function createLiveMcpServer(readReport: LiveReportReader, now = () => ne
       }) };
     });
 
+  // Catalog exposure follows the gate; each call re-checks it (requireQuestions) as well.
+  if (questions && questionsEnabled()) registerQuestionTools();
+  function registerQuestionTools() {
   const questionStatus = z.enum(['classified', 'pending', 'rejected']);
   const questionSchema = z.object({
     questionId: z.number().int().positive(), createdAt: z.string(), createdAtLocal: z.string(), timezone: z.literal('America/Sao_Paulo'),
@@ -167,5 +170,6 @@ export function createLiveMcpServer(readReport: LiveReportReader, now = () => ne
     z.object({ questionId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), offset: z.number().int().min(0).max(10_000_000).default(0) }).strict(),
     z.object({ mode: z.literal('live'), generatedAt: z.string(), dataNotice: z.string(), question: questionSchema, offset: count, nextOffset: count.nullable() }).strict(),
     async (input, clock) => requireQuestions().get(input, clock));
+  }
   return server;
 }

@@ -48,10 +48,10 @@ function payload(result) {
   assert.equal(data.generatedAt, clock().toISOString());
   return data;
 }
-test('live stateless SDK handshake, five strict read-only tools, real reader projections and coverage', async () => {
+test('live stateless SDK handshake, seven strict read-only tools, real reader projections and coverage', async () => {
   await withClient(async (client, state) => {
     const tools = (await client.listTools()).tools;
-    assert.deepEqual(tools.map(t => t.name).sort(), ['compare_insight_periods', 'get_insight_summary', 'get_topic_examples', 'get_topic_trend', 'list_demand_topics']);
+    assert.deepEqual(tools.map(t => t.name).sort(), ['compare_insight_periods', 'get_insight_summary', 'get_student_question', 'get_topic_examples', 'get_topic_trend', 'list_demand_topics', 'list_student_questions']);
     for (const tool of tools) {
       assert.equal(tool.annotations.readOnlyHint, true);
       assert.equal(tool.annotations.destructiveHint, false);

@@ -2,7 +2,7 @@ export class OAuthError extends Error {
   constructor(public status: number, public code: string, message = 'OAuth request rejected.') { super(message); }
 }
 export const MCP_SCOPE = 'insights:read';
-export interface OAuthClient { clientId: string; name: string; clientSecretHash?: string; redirectUris: string[]; tokenEndpointAuthMethod?: 'none' | 'client_secret_basic' | 'client_secret_post' }
+export interface OAuthClient { clientId: string; name: string; clientSecretHash?: string; redirectUris: string[]; tokenEndpointAuthMethod?: 'none' | 'client_secret_basic' | 'client_secret_post'; loopback?: boolean }
 export interface OAuthConfig { issuer: string; resource: string; protectedResourceMetadataUrl: string; consentSecret: string; clients: OAuthClient[] }
 export function isMcpEnabled(env: NodeJS.ProcessEnv = process.env) { return env.INSIGHTS_MCP_ENABLED === 'true'; }
 export function getOAuthConfig(env: NodeJS.ProcessEnv = process.env): OAuthConfig {
@@ -19,7 +19,7 @@ export function getOAuthConfig(env: NodeJS.ProcessEnv = process.env): OAuthConfi
     const ids = new Set<string>();
     for (const client of clients) {
       if (!client || typeof client.clientId !== 'string' || !/^[\w.-]{3,100}$/.test(client.clientId) || ids.has(client.clientId) ||
-          typeof client.name !== 'string' || !client.name.trim() || client.name.length > 100 || typeof client.clientSecretHash !== 'string' || !/^[a-f0-9]{64}$/.test(client.clientSecretHash) || client.tokenEndpointAuthMethod !== undefined ||
+          typeof client.name !== 'string' || !client.name.trim() || client.name.length > 100 || typeof client.clientSecretHash !== 'string' || !/^[a-f0-9]{64}$/.test(client.clientSecretHash) || client.tokenEndpointAuthMethod !== undefined || client.loopback !== undefined ||
           !Array.isArray(client.redirectUris) || !client.redirectUris.length || client.redirectUris.length > 10) throw new Error();
       if (reservedHashes.includes(client.clientSecretHash) || clients.some(other=>other!==client && other.clientSecretHash===client.clientSecretHash)) throw new Error();
       ids.add(client.clientId);

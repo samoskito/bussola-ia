@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from '../supabase/server';
 import { getOAuthConfig, OAuthError, MCP_SCOPE } from './oauth-config';
 import { ACCESS_SECONDS, CONSENT_SECONDS, AuthorizationConsent, authenticateClient, equalSecret, randomCredential, signConsent, tokenHash, uniqueParams, validateAuthorizationRequest, verifyConsent } from './oauth';
 
-import { registerOAuthClient, resolveOAuthClient } from './oauth-registration';
+import { redirectMatches, registerOAuthClient, resolveOAuthClient } from './oauth-registration';
 
 export const CONSENT_COOKIE = 'insights_mcp_consent';
 const headers = { 'Cache-Control':'no-store', Pragma:'no-cache', 'Referrer-Policy':'no-referrer' };
@@ -90,7 +90,7 @@ export async function tokenPost(request:Request):Promise<Response> {
     let result;
     if(form.get('grant_type')==='authorization_code') {
       const code=form.get('code')||'',verifier=form.get('code_verifier')||'',redirect=form.get('redirect_uri')||'';
-      if(!/^[A-Za-z0-9_-]{43}$/.test(code) || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || !resolveOAuthClient(clientId,config)!.redirectUris.includes(redirect))throw new OAuthError(400,'invalid_grant');
+      if(!/^[A-Za-z0-9_-]{43}$/.test(code) || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || !redirectMatches(resolveOAuthClient(clientId,config)!,redirect))throw new OAuthError(400,'invalid_grant');
       result=await dbMutation('exchange',{...common,code_hash:tokenHash(code),redirect_uri:redirect,challenge:createHash('sha256').update(verifier).digest('base64url')});
     }else if(form.get('grant_type')==='refresh_token'){
       const token=form.get('refresh_token')||'';if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new OAuthError(400,'invalid_grant');

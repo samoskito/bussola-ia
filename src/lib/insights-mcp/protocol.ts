@@ -1,6 +1,6 @@
 import 'server-only';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { createLiveMcpServer, type LiveReportReader } from './tools';
+import { createLiveMcpServer, type LiveReportReader, type StudentQuestionReader } from './tools';
 
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store, max-age=0', Pragma: 'no-cache', Vary: 'Authorization, Origin', 'X-Content-Type-Options': 'nosniff' };
 type Dependencies = {
@@ -11,6 +11,8 @@ type Dependencies = {
   readReport: LiveReportReader;
   now?: () => Date;
   examplesEnabled?: () => boolean;
+  questions?: StudentQuestionReader;
+  questionsEnabled?: () => boolean;
 };
 function response(status: number, code: string) {
   return Response.json({ error: code }, { status, headers: PRIVATE_HEADERS });
@@ -39,7 +41,7 @@ export function createInsightsMcpHandler(deps: Dependencies) {
       return result;
     }
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true, maxRequestBodySize: 64 * 1024 });
-    const server = createLiveMcpServer(deps.readReport, deps.now, deps.examplesEnabled);
+    const server = createLiveMcpServer(deps.readReport, deps.now, deps.examplesEnabled, deps.questions, deps.questionsEnabled);
     try {
       await server.connect(transport);
       return privateResponse(await transport.handleRequest(request));

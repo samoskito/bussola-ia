@@ -4,7 +4,8 @@ import { InsightsError, getInsightsMode, requireDemoMode } from './config';
 import { insightWindow, parseInsightFilters } from './filters';
 import { buildDemoReport, buildInsightReport } from './report';
 import type { DemoMessage } from './fixtures';
-import type { InsightFilters, InsightReport } from './types';
+import type { InsightFilters, InsightReport, SourceMessage } from './types';
+import type { StoredInsight } from './processor';
 
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store, max-age=0', Pragma: 'no-cache', Vary: 'Cookie', 'X-Content-Type-Options': 'nosniff' };
 export type InsightSection = 'report' | 'summary' | 'topics' | 'trends' | 'examples' | 'export';
@@ -27,9 +28,37 @@ export function reportToCsv(report: InsightReport): string {
   return '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-/** Read-only live adapter. Flags and migrations must be activated separately;
+/** Status derivation shared by aggregate reports and per-message reads. The caller
+ * supplies current user levels; anything other than a current 'user' stays pending
+ * here and is excluded by every consumer. */
+export function deriveSourceStatus(
+  source: SourceMessage, context: readonly SourceMessage[], active: StoredInsight | undefined,
+  jobStatus: (key: string) => string | undefined, versions: { taxonomyVersion: string; classifierVersion: string },
+  prepare: typeof import('./privacy').prepareInsightInput,
+): Pick<DemoMessage, 'status' | 'classification'> & { processedAt?: string } {
+  if (source.userLevel !== 'user') return { status: 'pending' };
+  let prepared;
+  try { prepared = prepare(source, context, versions.taxonomyVersion, versions.classifierVersion); }
+  catch { return { status: jobStatus(`rejected:${source.id}`) === 'failed' ? 'failed' : 'pending' }; }
+  if (active && active.taxonomyVersion === versions.taxonomyVersion && active.classifierVersion === versions.classifierVersion &&
+      active.sourceHash === prepared.sourceHash && active.userId === source.userId && active.chatId === source.chatId &&
+      active.agentType === source.agentType && Date.parse(active.createdAt) === Date.parse(source.createdAt)) {
+    return { status: 'classified', classification: active.classification, processedAt: active.processedAt };
+  }
+  return { status: jobStatus(`${source.id}:${prepared.sourceHash}`) === 'failed' ? 'failed' : 'pending' };
+}
+
+export interface LiveInsightSource {
+  client: ReturnType<typeof import('../supabase/server').createServerSupabaseClient>;
+  versions: { taxonomyVersion: string; classifierVersion: string };
+  historyStart(): Promise<Date | undefined>;
+  /** Rows from windowStart to now with current levels and derived status. */
+  load(windowStart: Date, allowHistoricalWindow: boolean): Promise<{ rows: DemoMessage[]; lastProcessedAt: string | null }>;
+}
+
+/** Read-only live source. Flags and migrations must be activated separately;
  * nothing here starts processing or invokes a classification provider. */
-export async function buildLiveReport(filters: InsightFilters, now = new Date()): Promise<InsightReport> {
+export async function openLiveInsightSource(now: Date): Promise<LiveInsightSource> {
   if (getInsightsMode() !== 'live' || process.env.INSIGHTS_PROCESSING_ENABLED !== 'true') {
     throw new InsightsError(503, 'live_unavailable', 'Insights reais aguardam ativação e validação.');
   }
@@ -37,49 +66,49 @@ export async function buildLiveReport(filters: InsightFilters, now = new Date())
     import('./supabase-repository'), import('../supabase/server'), import('./privacy'), import('./taxonomy'), import('./classifier'),
   ]);
   const client = createServerSupabaseClient({ useServiceRole: true });
-  const historyStart = filters.days === 'all' ? await findInsightHistoryStart(client, now) : undefined;
+  const versions = { taxonomyVersion: TAXONOMY_VERSION, classifierVersion: `${getInsightsModel()}.${CLASSIFIER_VERSION}` };
+  return {
+    client, versions,
+    historyStart: () => findInsightHistoryStart(client, now),
+    async load(windowStart, allowHistoricalWindow) {
+      const repository = createSupabaseInsightRepository(client, { now, windowStart, windowEnd: now, allowHistoricalWindow });
+      const [sources, jobs, completed] = await Promise.all([repository.listSources(), repository.listJobs(), repository.listCompleted()]);
+      // Recheck current levels after the parallel snapshots. No role supplied by a
+      // client, stored classification or old job authorizes a metric/example.
+      const userIds = Array.from(new Set(sources.map(source => source.userId)));
+      const levels = new Map<string, 'user' | 'admin' | null>();
+      for (let offset = 0; offset < userIds.length; offset += 20) {
+        const chunk = await Promise.all(userIds.slice(offset, offset + 20).map(async userId =>
+          [userId, await repository.currentUserLevel(userId)] as const));
+        chunk.forEach(([userId, level]) => levels.set(userId, level));
+      }
+      const currentSources = sources.map(source => ({ ...source, userLevel: levels.get(source.userId) ?? null }));
+      const contextByChat = groupInsightSourcesByChat(currentSources);
+      const active = new Map(completed.map(insight => [insight.sourceId, insight]));
+      const jobByKey = new Map(jobs.map(job => [job.key, job.status as string]));
+      const processedAt: string[] = [];
+      const rows: DemoMessage[] = currentSources.map(source => {
+        const { processedAt: at, ...derived } = deriveSourceStatus(source, contextByChat.get(source.chatId) ?? [], active.get(source.id),
+          key => jobByKey.get(key), versions, prepareInsightInput);
+        if (at) processedAt.push(at);
+        return { ...source, ...derived };
+      });
+      return { rows, lastProcessedAt: processedAt.sort().at(-1) ?? null };
+    },
+  };
+}
+
+export async function buildLiveReport(filters: InsightFilters, now = new Date()): Promise<InsightReport> {
+  const source = await openLiveInsightSource(now);
+  const historyStart = filters.days === 'all' ? await source.historyStart() : undefined;
   const window = insightWindow(filters.days, now, historyStart);
-  const repository = createSupabaseInsightRepository(client, {
-    now, windowStart: new Date(Date.parse(window.start) - (filters.days === 'all' ? 3 : filters.days + 3) * 86400000), windowEnd: now,
-    allowHistoricalWindow: filters.days === 'all',
-  });
-  const [sources, jobs, completed] = await Promise.all([repository.listSources(), repository.listJobs(), repository.listCompleted()]);
-  // Recheck current levels after the parallel snapshots. No role supplied by a
-  // client, stored classification or old job authorizes a metric/example.
-  const userIds = Array.from(new Set(sources.map(source => source.userId)));
-  const levels = new Map<string, 'user' | 'admin' | null>();
-  for (let offset = 0; offset < userIds.length; offset += 20) {
-    const chunk = await Promise.all(userIds.slice(offset, offset + 20).map(async userId =>
-      [userId, await repository.currentUserLevel(userId)] as const));
-    chunk.forEach(([userId, level]) => levels.set(userId, level));
-  }
-  const currentSources = sources.map(source => ({ ...source, userLevel: levels.get(source.userId) ?? null }));
-  const contextByChat = groupInsightSourcesByChat(currentSources);
-  const classifierVersion = `${getInsightsModel()}.${CLASSIFIER_VERSION}`;
-  const active = new Map(completed.filter(insight => insight.taxonomyVersion === TAXONOMY_VERSION && insight.classifierVersion === classifierVersion)
-    .map(insight => [insight.sourceId, insight]));
-  const jobByKey = new Map(jobs.map(job => [job.key, job]));
-  const processedAt: string[] = [];
-  const rows: DemoMessage[] = currentSources.map(source => {
-    const base: DemoMessage = { ...source, status: 'pending' };
-    if (source.userLevel !== 'user') return base;
-    let prepared;
-    try { prepared = prepareInsightInput(source, contextByChat.get(source.chatId) ?? [], TAXONOMY_VERSION, classifierVersion); }
-    catch { return { ...base, status: jobByKey.get(`rejected:${source.id}`)?.status === 'failed' ? 'failed' : 'pending' }; }
-    const insight = active.get(source.id);
-    if (insight && insight.sourceHash === prepared.sourceHash && insight.userId === source.userId && insight.chatId === source.chatId &&
-        insight.agentType === source.agentType && Date.parse(insight.createdAt) === Date.parse(source.createdAt)) {
-      processedAt.push(insight.processedAt);
-      return { ...base, status: 'classified', classification: insight.classification };
-    }
-    const job = jobByKey.get(`${source.id}:${prepared.sourceHash}`);
-    return { ...base, status: job?.status === 'failed' ? 'failed' : 'pending' };
-  });
+  const { rows, lastProcessedAt } = await source.load(
+    new Date(Date.parse(window.start) - (filters.days === 'all' ? 3 : filters.days + 3) * 86400000), filters.days === 'all');
   return buildInsightReport(filters, now, rows, { mode: 'live', processing: {
     provider: 'openai', state: 'ready', scheduleLabel: process.env.INSIGHTS_DAILY_SCHEDULE_ENABLED === 'true'
       ? 'Agendamento diário 03:17 BRT configurado; conferir o último processamento'
       : 'Executor diário preparado; agendamento depende de ativação',
-    lastProcessedAt: processedAt.sort().at(-1) ?? null,
+    lastProcessedAt,
   } });
 }
 

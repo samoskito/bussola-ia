@@ -8,22 +8,67 @@ const redirects = [
   'https://claude.com/api/mcp/auth_callback',
   'https://chatgpt.com/connector_platform_oauth_redirect',
 ] as const;
+// RFC 8252 sections 7.3/8.3: native apps (e.g. Claude Code) listen on a loopback
+// interface with an ephemeral port. Only these literal hosts are accepted; DNS
+// names that merely start with them (localhost.evil.com, 127.0.0.1.nip.io) never are.
+export const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'] as const;
+// Any path is accepted for robustness across native clients, restricted to a safe
+// unreserved charset (no query, fragment, percent-encoding or dot-segment rewriting).
+const LOOPBACK_PATH = /^\/[A-Za-z0-9._~\/-]{0,128}$/;
+export const LOOPBACK_CLIENT_NAME = 'Claude Code ou outro aplicativo local';
+const domains: Record<string, string> = {
+  dcr1: 'insights-mcp-public-client-v1',
+  dcr2: 'insights-mcp-confidential-client-v2',
+  dcr3: 'insights-mcp-loopback-public-client-v3',
+};
 const signature = (payload: string, config: OAuthConfig, version = 'dcr1') => createHmac('sha256', config.consentSecret)
-  .update(`${version === 'dcr1' ? 'insights-mcp-public-client-v1' : 'insights-mcp-confidential-client-v2'}\n${config.issuer}\n${payload}`).digest('base64url');
+  .update(`${domains[version]}\n${config.issuer}\n${payload}`).digest('base64url');
 // A client ID cannot reveal its credential: separate HMAC domains bind it to this issuer.
 const clientSecret = (clientId: string, config: OAuthConfig) => createHmac('sha256', config.consentSecret)
   .update(`insights-mcp-client-secret-v2\n${config.issuer}\n${clientId}`).digest('base64url');
+
+/** Parses a loopback redirect. Returns its port-less registered form, or undefined. */
+export function parseLoopbackRedirect(uri: unknown): { host: number; path: string; registered: string } | undefined {
+  if (typeof uri !== 'string' || uri.length > 256 || uri.includes('?') || uri.includes('#') || uri.includes('@')) return undefined;
+  let url: URL;
+  try { url = new URL(uri); } catch { return undefined; }
+  const host = LOOPBACK_HOSTS.indexOf(url.hostname as typeof LOOPBACK_HOSTS[number]);
+  if (url.protocol !== 'http:' || host < 0 || url.username || url.password || url.search || url.hash ||
+      !LOOPBACK_PATH.test(url.pathname) || url.port === '0') return undefined;
+  // Canonical exact spelling only: rejects uppercase hosts, explicit default ports and path rewriting.
+  if (uri !== `http://${url.hostname}${url.port ? `:${url.port}` : ''}${url.pathname}`) return undefined;
+  return { host, path: url.pathname, registered: `http://${url.hostname}${url.pathname}` };
+}
+
+/** Exact match for HTTPS callbacks; loopback clients ignore only the port (RFC 8252 section 7.3). */
+export function redirectMatches(client: OAuthClient, uri: string): boolean {
+  if (!client.loopback) return client.redirectUris.includes(uri);
+  const parsed = parseLoopbackRedirect(uri);
+  return Boolean(parsed && client.redirectUris.includes(parsed.registered));
+}
+
 export function resolveOAuthClient(clientId: string, config: OAuthConfig): OAuthClient | undefined {
   const existing = config.clients.find(client => client.clientId === clientId);
   if (existing) return existing;
-  if (clientId.length > 512 || !/^dcr[12]\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(clientId)) return undefined;
+  if (clientId.length > 512 || !/^dcr[123]\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(clientId)) return undefined;
   try {
     const [version, payload, signed] = clientId.split('.');
     const expected = signature(payload, config, version);
     if (!timingSafeEqual(Buffer.from(signed), Buffer.from(expected))) return undefined;
     const metadata = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (!/^[A-Za-z0-9_-]{22}$/.test(metadata.n)) return undefined;
+    if (version === 'dcr3') {
+      if (!Array.isArray(metadata.l) || !metadata.l.length || metadata.l.length > 2 || metadata.r !== undefined || metadata.a !== undefined) return undefined;
+      const uris: string[] = metadata.l.map((entry: unknown) => {
+        if (!Array.isArray(entry) || entry.length !== 2 || !Number.isInteger(entry[0]) || !LOOPBACK_HOSTS[entry[0]] ||
+            typeof entry[1] !== 'string' || !LOOPBACK_PATH.test(entry[1])) throw new Error();
+        return `http://${LOOPBACK_HOSTS[entry[0]]}${entry[1]}`;
+      });
+      if (new Set(uris).size !== uris.length) return undefined;
+      return { clientId, name: LOOPBACK_CLIENT_NAME, redirectUris: uris, tokenEndpointAuthMethod: 'none', loopback: true };
+    }
     if (!Array.isArray(metadata.r) || !metadata.r.length || metadata.r.length > 2 ||
-        !/^[A-Za-z0-9_-]{22}$/.test(metadata.n) || metadata.r.some((index: unknown) => !Number.isInteger(index) || !redirects[index as number]) ||
+        metadata.r.some((index: unknown) => !Number.isInteger(index) || !redirects[index as number]) ||
         new Set(metadata.r).size !== metadata.r.length || (metadata.r.includes(2) && metadata.r.length !== 1)) return undefined;
     if (version === 'dcr2' && metadata.a !== 'client_secret_basic' && metadata.a !== 'client_secret_post') return undefined;
     const method = version === 'dcr1' ? 'none' : metadata.a;
@@ -31,22 +76,44 @@ export function resolveOAuthClient(clientId: string, config: OAuthConfig): OAuth
       ...(method === 'none' ? {} : { clientSecretHash: createHash('sha256').update(clientSecret(clientId, config)).digest('hex') }) };
   } catch { return undefined; }
 }
+
+function validateCommonMetadata(value: Record<string, unknown>, applicationTypes: unknown[]) {
+  if ((value.scope !== undefined && value.scope !== MCP_SCOPE) ||
+      (value.grant_types !== undefined && (!Array.isArray(value.grant_types) || !value.grant_types.includes('authorization_code') || value.grant_types.some(grant => grant !== 'authorization_code' && grant !== 'refresh_token'))) ||
+      (value.response_types !== undefined && (!Array.isArray(value.response_types) || value.response_types.length !== 1 || value.response_types[0] !== 'code')) ||
+      !applicationTypes.includes(value.application_type) ||
+      ['jwks', 'jwks_uri', 'request_uris', 'software_statement', 'client_secret'].some(key => value[key] !== undefined)) throw new OAuthError(400, 'invalid_client_metadata');
+}
+
+function registerLoopbackClient(value: Record<string, unknown>, uris: unknown[], config: OAuthConfig) {
+  const parsed = uris.map(parseLoopbackRedirect);
+  if (parsed.some(item => !item) || new Set(parsed.map(item => item!.registered)).size !== parsed.length) throw new OAuthError(400, 'invalid_redirect_uri');
+  validateCommonMetadata(value, [undefined, 'native', 'web']);
+  // A native app cannot keep a secret (RFC 8252 section 8.5). RFC 7591 section 3.2.1
+  // lets the server replace requested metadata: loopback installations are always
+  // public; PKCE S256 stays mandatory and any later client secret is rejected.
+  if (![undefined, 'none', 'client_secret_basic', 'client_secret_post'].includes(value.token_endpoint_auth_method as string | undefined)) throw new OAuthError(400, 'invalid_client_metadata');
+  const payload = Buffer.from(JSON.stringify({ l: parsed.map(item => [item!.host, item!.path]), n: randomBytes(16).toString('base64url') })).toString('base64url');
+  const clientId = `dcr3.${payload}.${signature(payload, config, 'dcr3')}`;
+  return { client_id: clientId, client_id_issued_at: Math.floor(Date.now() / 1000), client_name: LOOPBACK_CLIENT_NAME,
+    redirect_uris: uris, token_endpoint_auth_method: 'none', application_type: 'native',
+    grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], scope: MCP_SCOPE };
+}
+
 export function registerOAuthClient(metadata: unknown, config: OAuthConfig) {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new OAuthError(400, 'invalid_client_metadata');
   const value = metadata as Record<string, unknown>;
   const uris = value.redirect_uris;
-  if (!Array.isArray(uris) || !uris.length || uris.length > 2 || new Set(uris).size !== uris.length ||
-      uris.some(uri => typeof uri !== 'string' || !redirects.includes(uri as typeof redirects[number]))) throw new OAuthError(400, 'invalid_redirect_uri');
+  if (!Array.isArray(uris) || !uris.length || uris.length > 2 || new Set(uris).size !== uris.length) throw new OAuthError(400, 'invalid_redirect_uri');
+  // Loopback and hosted callbacks are never mixed in one installation.
+  if (uris.some(uri => parseLoopbackRedirect(uri))) return registerLoopbackClient(value, uris, config);
+  if (uris.some(uri => typeof uri !== 'string' || !redirects.includes(uri as typeof redirects[number]))) throw new OAuthError(400, 'invalid_redirect_uri');
   const indexes = uris.map(uri => redirects.indexOf(uri));
   if (indexes.includes(2) && indexes.length !== 1) throw new OAuthError(400, 'invalid_redirect_uri');
   // RFC 7591 section 2: an omitted method defaults to client_secret_basic.
   const method = value.token_endpoint_auth_method === undefined ? 'client_secret_basic' : value.token_endpoint_auth_method;
-  if (!['none', 'client_secret_basic', 'client_secret_post'].includes(method as string) ||
-      (value.scope !== undefined && value.scope !== MCP_SCOPE) ||
-      (value.grant_types !== undefined && (!Array.isArray(value.grant_types) || !value.grant_types.includes('authorization_code') || value.grant_types.some(grant => grant !== 'authorization_code' && grant !== 'refresh_token'))) ||
-      (value.response_types !== undefined && (!Array.isArray(value.response_types) || value.response_types.length !== 1 || value.response_types[0] !== 'code')) ||
-      (value.application_type !== undefined && value.application_type !== 'web') ||
-      ['jwks', 'jwks_uri', 'request_uris', 'software_statement', 'client_secret'].some(key => value[key] !== undefined)) throw new OAuthError(400, 'invalid_client_metadata');
+  if (!['none', 'client_secret_basic', 'client_secret_post'].includes(method as string)) throw new OAuthError(400, 'invalid_client_metadata');
+  validateCommonMetadata(value, [undefined, 'web']);
   const version = method === 'none' ? 'dcr1' : 'dcr2';
   const payload = Buffer.from(JSON.stringify({ r: indexes, n: randomBytes(16).toString('base64url'), ...(method === 'none' ? {} : { a: method }) })).toString('base64url');
   const clientId = `${version}.${payload}.${signature(payload, config, version)}`;

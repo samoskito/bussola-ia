@@ -9,7 +9,8 @@ import { TAXONOMY_VERSION } from './taxonomy';
 type ServiceClient = ReturnType<typeof createServerSupabaseClient>;
 
 const PAGE_SIZE = 500;
-const SOURCE_COLUMNS = 'id,user_id,chatid,input,created_at,users!scripts_user_id_fkey(nivel),chats!scripts_chatid_fkey(agent_type,user_id)';
+export const SOURCE_COLUMNS = 'id,user_id,chatid,input,created_at,users!scripts_user_id_fkey(nivel),chats!scripts_chatid_fkey(agent_type,user_id)';
+export const INSIGHT_COLUMNS = 'script_id,user_id,chat_id,agent_type,source_created_at,source_hash,taxonomy_version,classifier_version,message_kind,topic_ids,normalized_demand,confidence,needs_review,processed_at,users!script_insights_user_id_fkey(nivel)';
 const AGENTS = new Set(['comunicacao', 'apresentacao', 'conversas_dificeis', 'postagem']);
 
 type DbRow = Record<string, unknown>;
@@ -27,7 +28,7 @@ function related(value: unknown): DbRow | null {
 function assertNoDbError(error: unknown): void {
   if (error) throw new Error('insights_repository_error'); // Never include SQL, row or secret in logs.
 }
-function parseSource(row: unknown): SourceMessage | null {
+export function parseSource(row: unknown): SourceMessage | null {
   const item = record(row);
   const user = related(item?.users);
   const chat = related(item?.chats);
@@ -62,7 +63,7 @@ function parseJob(row: unknown): InsightJob {
     errorCode: typeof item.error_code === 'string' ? item.error_code : null,
   };
 }
-function parseInsight(row: unknown): StoredInsight | null {
+export function parseInsight(row: unknown): StoredInsight | null {
   const item = record(row);
   const user = related(item?.users);
   if (!item || user?.nivel !== 'user') return null;
@@ -265,7 +266,7 @@ export function createSupabaseInsightRepository(
       let cursor: number | undefined;
       while (true) {
         let query = client.from('script_insights')
-          .select('script_id,user_id,chat_id,agent_type,source_created_at,source_hash,taxonomy_version,classifier_version,message_kind,topic_ids,normalized_demand,confidence,needs_review,processed_at,users!script_insights_user_id_fkey(nivel)')
+          .select(INSIGHT_COLUMNS)
           .eq('status', 'classified').gte('source_created_at', windowStart).lt('source_created_at', windowEnd)
           .eq('taxonomy_version', TAXONOMY_VERSION).eq('classifier_version', `${model}.${CLASSIFIER_VERSION}`)
           .order('script_id', { ascending: true });

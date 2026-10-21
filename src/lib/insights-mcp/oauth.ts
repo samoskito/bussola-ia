@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { MCP_SCOPE, OAuthConfig, OAuthError } from './oauth-config';
-import { resolveOAuthClient } from './oauth-registration';
+import { redirectMatches, resolveOAuthClient } from './oauth-registration';
 
 export const ACCESS_SECONDS = 600;
 export const REFRESH_SECONDS = 30 * 86400;
@@ -17,7 +17,7 @@ export function validateAuthorizationRequest(params: URLSearchParams, config: OA
   const clientId = params.get('client_id') || '';
   const client = resolveOAuthClient(clientId, config);
   const redirectUri = params.get('redirect_uri') || '';
-  if (!client || !client.redirectUris.includes(redirectUri)) throw new OAuthError(400, 'invalid_request', 'Unregistered OAuth client or redirect URI.');
+  if (!client || !redirectMatches(client, redirectUri)) throw new OAuthError(400, 'invalid_request', 'Unregistered OAuth client or redirect URI.');
   if (params.get('response_type') !== 'code' || params.get('code_challenge_method') !== 'S256') throw new OAuthError(400, 'invalid_request', 'Authorization code and S256 PKCE are required.');
   if (params.get('resource') !== config.resource) throw new OAuthError(400, 'invalid_target');
   const scope = params.get('scope') || MCP_SCOPE;

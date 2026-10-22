@@ -6,7 +6,7 @@
   "framework": "nextjs",
   "outputDirectory": ".next",
   "crons": [
-    { "path": "/api/hotmart/reprocess", "schedule": "0 10 * * *" }
+    { "path": "/api/hotmart/reprocess", "schedule": "*/15 * * * *" }
   ],
   "env": {
     "NEXT_PUBLIC_APP_URL": "https://bussola-ia.vercel.app"

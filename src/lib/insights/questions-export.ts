@@ -46,7 +46,7 @@ export async function handleQuestionsExport(request: Request, deps: QuestionsExp
     if (Buffer.byteLength(body) > QUESTION_EXPORT_MAX_BYTES) {
       throw new InsightsError(413, 'export_too_large', 'O arquivo excede o limite de exportação. Escolha um período menor ou uma IA específica.');
     }
-    const name = exportFileName({ kind: 'perguntas', mode: 'live', days: filters.days, agentType: filters.agentType, format });
+    const name = exportFileName({ kind: 'perguntas', mode: 'live', days: filters.days, agentType: filters.agentType, topicId: filters.topicId, format });
     return new NextResponse(body, { headers: { ...PRIVATE_HEADERS, 'Content-Type': EXPORT_CONTENT_TYPES[format], 'Content-Disposition': attachmentHeader(name) } });
   } catch (error) {
     const known = error instanceof InsightsError;

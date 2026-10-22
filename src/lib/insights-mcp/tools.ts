@@ -121,6 +121,8 @@ export function createLiveMcpServer(readReport: LiveReportReader, now = () => ne
     output({ current: snapshot, previous: snapshot.nullable(), comparisonNotice: z.string(), changes: z.array(z.object({ id: topicId, label: z.string(), currentMessages: count, previousMessages: count,
       messageDelta: z.number().int(), messagePercent: z.number().nullable(), currentDistinctUsers: count, previousDistinctUsers: count, distinctUsersDelta: z.number().int() }).strict()) }), async (input, clock) => {
       // Both periods are read concurrently (independent snapshots under the same rules).
+      // Total REST concurrency stays bounded by the shared limiter in supabase-repository
+      // (READ_CONCURRENCY per instance); a failing read cancels its own pending pages.
       const previousPromise = input.days === 'all' ? undefined : read(input, new Date(clock.getTime() - input.days * DAY));
       previousPromise?.catch(() => undefined);
       const report = await read(input, clock);

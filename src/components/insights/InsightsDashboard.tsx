@@ -67,8 +67,16 @@ export default function InsightsDashboard() {
   // allows the first such download per page but silently holds later ones behind its
   // "multiple downloads" permission (the JSON-after-CSV case of 19/10). Clicking the
   // link is a fresh gesture and always works.
-  const releasePrepared = () => setPrepared(current => { if (current) URL.revokeObjectURL(current.url); return null; });
+  // The blob URL lives in a ref so it is revoked outside any setState callback:
+  // when a new file replaces it, when filters change and on unmount.
+  const preparedUrl = useRef<string | null>(null);
+  const releasePrepared = () => {
+    if (preparedUrl.current) URL.revokeObjectURL(preparedUrl.current);
+    preparedUrl.current = null;
+    setPrepared(null);
+  };
   useEffect(() => releasePrepared, [days, agentType, topicId]);
+  useEffect(() => () => { if (preparedUrl.current) URL.revokeObjectURL(preparedUrl.current); preparedUrl.current = null; }, []);
 
   async function download(kind: ExportKind, format: ExportFormat) {
     exportRequest.current?.abort();
@@ -88,8 +96,10 @@ export default function InsightsDashboard() {
       }
       const blob = await response.blob();
       if (controller.signal.aborted) return;
-      const name = exportFileName({ kind, mode: report?.mode ?? 'live', days, agentType, format });
+      const name = exportFileName({ kind, mode: report?.mode ?? 'live', days, agentType, ...(topicId ? { topicId } : {}), format });
+      if (preparedUrl.current) URL.revokeObjectURL(preparedUrl.current);
       const url = URL.createObjectURL(new Blob([blob], { type: blob.type || EXPORT_CONTENT_TYPES[format] }));
+      preparedUrl.current = url;
       setPrepared({ url, name });
       const link = document.createElement('a');
       link.href = url;

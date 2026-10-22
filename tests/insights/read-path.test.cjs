@@ -15,8 +15,25 @@ const env = { INSIGHTS_MODE: 'live', INSIGHTS_MODEL: 'gpt-5.4-nano' };
 const classification = { kind: 'question', topicIds: ['feedback'], normalizedDemand: 'Resumo.', confidence: .9, needsReview: false };
 
 /** Minimal PostgREST-like fake that really evaluates the filters used by the repository. */
-function fakeClient(tables) {
-  const stats = { requests: 0, byTable: {} };
+function fakeClient(tables, hooks = {}) {
+  const stats = { requests: 0, byTable: {}, inFlight: 0, maxInFlight: 0 };
+  if (hooks.delayMs !== undefined) {
+    const inner = fakeClient(tables);
+    // Async variant: each request takes delayMs, tracks concurrency, optional failure.
+    const wrap = (table, builder) => new Proxy(builder, { get(target, prop) {
+      const exec = async single => {
+        stats.requests++; stats.inFlight++; stats.maxInFlight = Math.max(stats.maxInFlight, stats.inFlight);
+        await new Promise(resolve => setTimeout(resolve, hooks.delayMs));
+        stats.inFlight--;
+        if (hooks.failTable === table) return { data: null, error: { message: 'synthetic' } };
+        return single ? target.maybeSingle() : Promise.resolve(target);
+      };
+      if (prop === 'then') return (ok, ko) => exec(false).then(ok, ko);
+      if (prop === 'maybeSingle') return () => exec(true);
+      return (...args) => { target[prop](...args); return wrap(table, target); };
+    } });
+    return { client: { from: table => wrap(table, inner.client.from(table)) }, stats };
+  }
   const value = (row, column) => column.split('.').reduce((item, key) => item?.[key], row);
   const cmp = (a, b) => typeof a === 'number' && typeof b === 'number' ? a - b
     : String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
@@ -175,4 +192,28 @@ test('live load is identical with and without the accelerators, with far fewer r
     repositoryModule.createSupabaseInsightRepository = originals.repo;
     for (const key of flags) { if (prior[key] === undefined) delete process.env[key]; else process.env[key] = prior[key]; }
   }
+});
+
+test('accelerated reads share a global concurrency limit and cancel remaining pages after a failure', async () => {
+  const tables = withInsights(dataset(6000));
+  const options = { env, now, windowStart: new Date('2025-06-01T00:00:00.000Z'), windowEnd: now, allowHistoricalWindow: true };
+  const { client, stats } = fakeClient(tables, { delayMs: 5 });
+  // Two repositories at once, like both periods of compare_insight_periods.
+  const repos = [repositoryModule.createSupabaseInsightRepository(client, options), repositoryModule.createSupabaseInsightRepository(client, options)];
+  const results = await Promise.all(repos.flatMap(repo => [repo.listSourcesForRead(), repo.listActiveInsightsForRead(), repo.listFailedJobsForRead()]));
+  assert.ok(results[0].length > 5000);
+  assert.ok(stats.maxInFlight <= repositoryModule.READ_CONCURRENCY, `max in flight ${stats.maxInFlight}`);
+  assert.ok(stats.maxInFlight >= 8, 'still parallel');
+  assert.deepEqual(repositoryModule.readSlotStats(), { active: 0, queued: 0 });
+
+  const failing = fakeClient(tables, { delayMs: 5, failTable: 'script_insights' });
+  const repo = repositoryModule.createSupabaseInsightRepository(failing.client, options);
+  const outcome = await Promise.allSettled([repo.listSourcesForRead(), repo.listActiveInsightsForRead()]);
+  assert.ok(outcome.every(item => item.status === 'rejected'), 'a failure cancels the sibling read');
+  await assert.rejects(repo.currentUserLevels(['user-1']), /insights_read_cancelled/);
+  // Requests already sent cannot be aborted; they finish and release their slots, and
+  // queued/later pages are cancelled without being sent.
+  for (let i = 0; i < 200 && repositoryModule.readSlotStats().active; i++) await new Promise(resolve => setTimeout(resolve, 10));
+  assert.deepEqual(repositoryModule.readSlotStats(), { active: 0, queued: 0 });
+  assert.ok(failing.stats.requests < stats.requests / 2, `${failing.stats.requests} requests after failure vs ${stats.requests}`);
 });

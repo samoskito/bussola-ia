@@ -89,6 +89,19 @@ const LEVEL_BATCH = 100;
 /** Read path: target rows per parallel id slice (two pages) and maximum concurrent slices. */
 const ROWS_PER_SLICE = 2 * PAGE_SIZE;
 const MAX_SLICES = 12;
+/** Read path: maximum concurrent REST requests per server instance, shared by every
+ * accelerated read (e.g. both periods of compare_insight_periods, concurrent calls). */
+export const READ_CONCURRENCY = 12;
+let activeReads = 0;
+const readQueue: Array<() => void> = [];
+/** FIFO semaphore; a released slot is handed directly to the next waiter. */
+export async function withReadSlot<T>(task: () => PromiseLike<T>): Promise<T> {
+  if (activeReads >= READ_CONCURRENCY) await new Promise<void>(resolve => readQueue.push(resolve));
+  else activeReads++;
+  try { return await task(); }
+  finally { const next = readQueue.shift(); if (next) next(); else activeReads--; }
+}
+export function readSlotStats() { return { active: activeReads, queued: readQueue.length }; }
 export interface IdSlice { from?: number; to?: number }
 /** Disjoint half-open id ranges covering every integer; the first and last are open-ended. */
 export function idSlices(min: number, max: number, rowsPerSlice = ROWS_PER_SLICE, maxSlices = MAX_SLICES): IdSlice[] {
@@ -155,14 +168,27 @@ export function createSupabaseInsightRepository(
   // ---- Read-path accelerators (live report and student questions only) ----
   // One bounded id snapshot shared by sources and stored insights. The outer slices
   // are open-ended, so rows inserted after the bounds query are still reached.
+  // Every accelerated request goes through the shared slot limiter; after the first
+  // failure in this repository, queued and later pages are cancelled instead of sent.
+  let readFailed = false;
+  const checked = async (request: () => PromiseLike<{ data?: unknown; error: unknown }>): Promise<{ data: unknown }> => {
+    if (readFailed) throw new Error('insights_read_cancelled');
+    try {
+      return await withReadSlot(async () => {
+        if (readFailed) throw new Error('insights_read_cancelled');
+        const result = await request();
+        assertNoDbError(result.error);
+        return { data: result.data };
+      });
+    } catch (error) { readFailed = true; throw error; }
+  };
   let boundsPromise: Promise<{ min: number; max: number } | null> | undefined;
   const sourceIdBounds = () => boundsPromise ??= (async () => {
     const base = () => client.from('scripts').select('id').gte('created_at', windowStart).lt('created_at', windowEnd);
     const [low, high] = await Promise.all([
-      base().order('id', { ascending: true }).limit(1).maybeSingle(),
-      base().order('id', { ascending: false }).limit(1).maybeSingle(),
+      checked(() => base().order('id', { ascending: true }).limit(1).maybeSingle()),
+      checked(() => base().order('id', { ascending: false }).limit(1).maybeSingle()),
     ]);
-    assertNoDbError(low.error); assertNoDbError(high.error);
     const min = record(low.data)?.id, max = record(high.data)?.id;
     if (low.data === null || high.data === null) return null;
     if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || (min as number) > (max as number)) throw new Error('invalid_source_bounds');
@@ -181,8 +207,8 @@ export function createSupabaseInsightRepository(
       if (slice.from !== undefined) query = query.gte(idColumn, slice.from);
       if (slice.to !== undefined) query = query.lt(idColumn, slice.to);
       if (last !== undefined) query = query.gt(idColumn, last);
-      const { data, error } = await query.order(idColumn, { ascending: true }).limit(PAGE_SIZE);
-      assertNoDbError(error);
+      const page = query.order(idColumn, { ascending: true }).limit(PAGE_SIZE);
+      const { data } = await checked(() => page);
       if (!Array.isArray(data)) throw new Error(`invalid_${label}_page`);
       for (const row of data) { const parsed = parse(row); if (parsed !== null) rows.push(parsed); }
       if (data.length < PAGE_SIZE) return rows;
@@ -215,8 +241,8 @@ export function createSupabaseInsightRepository(
           .eq('status', 'failed').gte('created_at', windowStart).lt('created_at', windowEnd)
           .order('job_key', { ascending: true });
         if (cursor !== undefined) query = query.gt('job_key', cursor);
-        const { data, error } = await query.limit(PAGE_SIZE);
-        assertNoDbError(error);
+        const page = query.limit(PAGE_SIZE);
+        const { data } = await checked(() => page);
         if (!Array.isArray(data)) throw new Error('invalid_job_page');
         all.push(...data.map(parseJob));
         if (data.length < PAGE_SIZE) return all;
@@ -232,8 +258,7 @@ export function createSupabaseInsightRepository(
       for (let offset = 0; offset < unique.length; offset += LEVEL_BATCH) chunks.push(unique.slice(offset, offset + LEVEL_BATCH));
       await Promise.all(chunks.map(async chunk => {
         // Only id and level: never name, e-mail or phone.
-        const { data, error } = await client.from('users').select('id,nivel').in('id', chunk);
-        assertNoDbError(error);
+        const { data } = await checked(() => client.from('users').select('id,nivel').in('id', chunk));
         if (!Array.isArray(data)) throw new Error('invalid_level_page');
         for (const row of data) {
           const item = record(row);

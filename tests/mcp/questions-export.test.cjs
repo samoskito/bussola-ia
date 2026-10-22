@@ -17,6 +17,10 @@ test('export file names are deterministic, ASCII and shared by header and client
   assert.equal(files.exportFileName({ kind: 'insights', mode: 'live', days: 30, agentType: 'all', format: 'json' }), 'insights-30dias.json');
   assert.equal(files.exportFileName({ kind: 'perguntas', mode: 'live', days: 'all', agentType: 'postagem', format: 'csv' }), 'perguntas-todo-historico-postagem.csv');
   assert.equal(files.exportFileName({ kind: 'insights', mode: 'demo', days: 7, agentType: 'all', format: 'csv' }), 'insights-demonstracao-7dias.csv');
+  assert.equal(files.exportFileName({ kind: 'insights', mode: 'live', days: 90, agentType: 'all', topicId: 'feedback', format: 'json' }), 'insights-90dias-tema-feedback.json');
+  assert.equal(files.exportFileName({ kind: 'perguntas', mode: 'live', days: 30, agentType: 'comunicacao', topicId: 'Gestão de Équipe/../x"', format: 'csv' }),
+    'perguntas-30dias-comunicacao-tema-gestao-de-equipe-x.csv');
+  assert.match(files.exportFileName({ kind: 'perguntas', mode: 'live', days: 7, agentType: 'all', topicId: 'ç'.repeat(200), format: 'csv' }), /^[A-Za-z0-9._-]+$/);
   assert.equal(files.attachmentHeader('insights-30dias.json'), 'attachment; filename="insights-30dias.json"');
   assert.equal(files.attachmentHeader('a"b\r\n.json'), 'attachment; filename="a_b__.json"');
   assert.match(files.EXPORT_CONTENT_TYPES.json, /^application\/json/);
@@ -96,6 +100,9 @@ test('export handler: admin check first, gate, format, size limit and download h
   assert.equal(csv.headers.get('content-disposition'), 'attachment; filename="perguntas-todo-historico-postagem.csv"');
   assert.match(csv.headers.get('cache-control'), /no-store/);
   assert.deepEqual(calls.at(-1), ['export', { days: 'all', agentType: 'postagem' }]);
+  const themed = await handleQuestionsExport(request('days=30&topicId=feedback&format=csv'), deps());
+  assert.equal(themed.headers.get('content-disposition'), 'attachment; filename="perguntas-30dias-tema-feedback.csv"');
+  assert.deepEqual(calls.at(-1), ['export', { days: 30, agentType: 'all', topicId: 'feedback' }]);
   const json = await handleQuestionsExport(request('days=30&format=json'), deps());
   assert.equal(json.headers.get('content-type'), 'application/json; charset=utf-8');
   assert.equal(json.headers.get('content-disposition'), 'attachment; filename="perguntas-30dias.json"');

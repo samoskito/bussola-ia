@@ -133,7 +133,7 @@ export async function handleInsightGet(request: Request, section: InsightSection
     const report = mode === 'live' ? await buildLiveReport(filters) : buildDemoReport(filters);
     if (section === 'export') {
       const exportFormat = format as ExportFormat;
-      const name = exportFileName({ kind: 'insights', mode: report.mode, days: filters.days, agentType: filters.agentType, format: exportFormat });
+      const name = exportFileName({ kind: 'insights', mode: report.mode, days: filters.days, agentType: filters.agentType, topicId: filters.topicId, format: exportFormat });
       return new NextResponse(exportFormat === 'csv' ? reportToCsv(report) : JSON.stringify(report, null, 2), {
         headers: { ...PRIVATE_HEADERS, 'Content-Type': EXPORT_CONTENT_TYPES[exportFormat], 'Content-Disposition': attachmentHeader(name) },
       });

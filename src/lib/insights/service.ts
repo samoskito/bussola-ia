@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { requireInsightsAdmin } from './auth';
 import { InsightsError, getInsightsMode, requireDemoMode } from './config';
 import { insightWindow, parseInsightFilters } from './filters';
-import { buildDemoReport, buildInsightReport } from './report';
+import { buildDemoReport, buildInsightReport, type ExampleOptions } from './report';
 import type { DemoMessage } from './fixtures';
+import { attachmentHeader, EXPORT_CONTENT_TYPES, exportFileName, type ExportFormat } from './export-files';
 import type { InsightFilters, InsightReport, SourceMessage } from './types';
 import type { StoredInsight } from './processor';
 
@@ -72,12 +73,19 @@ export async function openLiveInsightSource(now: Date): Promise<LiveInsightSourc
     historyStart: () => findInsightHistoryStart(client, now),
     async load(windowStart, allowHistoricalWindow) {
       const repository = createSupabaseInsightRepository(client, { now, windowStart, windowEnd: now, allowHistoricalWindow });
-      const [sources, jobs, completed] = await Promise.all([repository.listSources(), repository.listJobs(), repository.listCompleted()]);
+      // Read-path accelerators when available: parallel id slices, stored insights
+      // without a second full source scan (deriveSourceStatus below re-verifies every
+      // hash against the fresh sources), and only the failed jobs it inspects.
+      const [sources, jobs, completed] = await Promise.all([
+        repository.listSourcesForRead ? repository.listSourcesForRead() : repository.listSources(),
+        repository.listFailedJobsForRead ? repository.listFailedJobsForRead() : repository.listJobs(),
+        repository.listActiveInsightsForRead ? repository.listActiveInsightsForRead() : repository.listCompleted()]);
       // Recheck current levels after the parallel snapshots. No role supplied by a
       // client, stored classification or old job authorizes a metric/example.
       const userIds = Array.from(new Set(sources.map(source => source.userId)));
-      const levels = new Map<string, 'user' | 'admin' | null>();
-      for (let offset = 0; offset < userIds.length; offset += 20) {
+      let levels = new Map<string, 'user' | 'admin' | null>();
+      if (repository.currentUserLevels) levels = await repository.currentUserLevels(userIds);
+      else for (let offset = 0; offset < userIds.length; offset += 20) {
         const chunk = await Promise.all(userIds.slice(offset, offset + 20).map(async userId =>
           [userId, await repository.currentUserLevel(userId)] as const));
         chunk.forEach(([userId, level]) => levels.set(userId, level));
@@ -98,13 +106,13 @@ export async function openLiveInsightSource(now: Date): Promise<LiveInsightSourc
   };
 }
 
-export async function buildLiveReport(filters: InsightFilters, now = new Date()): Promise<InsightReport> {
+export async function buildLiveReport(filters: InsightFilters, now = new Date(), examples?: ExampleOptions): Promise<InsightReport> {
   const source = await openLiveInsightSource(now);
   const historyStart = filters.days === 'all' ? await source.historyStart() : undefined;
   const window = insightWindow(filters.days, now, historyStart);
   const { rows, lastProcessedAt } = await source.load(
     new Date(Date.parse(window.start) - (filters.days === 'all' ? 3 : filters.days + 3) * 86400000), filters.days === 'all');
-  return buildInsightReport(filters, now, rows, { mode: 'live', processing: {
+  return buildInsightReport(filters, now, rows, { mode: 'live', examples, processing: {
     provider: 'openai', state: 'ready', scheduleLabel: process.env.INSIGHTS_DAILY_SCHEDULE_ENABLED === 'true'
       ? 'Agendamento diário 03:17 BRT configurado; conferir o último processamento'
       : 'Executor diário preparado; agendamento depende de ativação',
@@ -123,15 +131,18 @@ export async function handleInsightGet(request: Request, section: InsightSection
     const mode = getInsightsMode();
     if (mode !== 'live') requireDemoMode();
     const report = mode === 'live' ? await buildLiveReport(filters) : buildDemoReport(filters);
-    if (section === 'export' && format === 'csv') return new NextResponse(reportToCsv(report), {
-      headers: { ...PRIVATE_HEADERS, 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="insights-${report.mode}.csv"` },
-    });
+    if (section === 'export') {
+      const exportFormat = format as ExportFormat;
+      const name = exportFileName({ kind: 'insights', mode: report.mode, days: filters.days, agentType: filters.agentType, format: exportFormat });
+      return new NextResponse(exportFormat === 'csv' ? reportToCsv(report) : JSON.stringify(report, null, 2), {
+        headers: { ...PRIVATE_HEADERS, 'Content-Type': EXPORT_CONTENT_TYPES[exportFormat], 'Content-Disposition': attachmentHeader(name) },
+      });
+    }
     const metadata = { mode: report.mode, generatedAt: report.generatedAt, window: report.window, filters: report.filters, processing: report.processing };
-    const payload = section === 'report' || section === 'export' ? report : section === 'summary' ? { ...metadata, summary: report.summary, agents: report.agents } :
+    const payload = section === 'report' ? report : section === 'summary' ? { ...metadata, summary: report.summary, agents: report.agents } :
       section === 'topics' ? { ...metadata, summary: report.summary, topics: report.topics } :
       section === 'trends' ? { ...metadata, trend: report.trend } : { ...metadata, examples: report.examples };
-    return NextResponse.json(payload, { headers: { ...PRIVATE_HEADERS,
-      ...(section === 'export' ? { 'Content-Disposition': `attachment; filename="insights-${report.mode}.json"` } : {}) } });
+    return NextResponse.json(payload, { headers: PRIVATE_HEADERS });
   } catch (error) {
     const known = error instanceof InsightsError;
     return NextResponse.json({ error: known ? error.message : 'Não foi possível consultar os insights.', code: known ? error.code : 'insights_unavailable' },

@@ -84,6 +84,24 @@ export function parseInsight(row: unknown): StoredInsight | null {
   };
 }
 
+/** Read path: user ids per `in(...)` request (36-char UUIDs keep the URL well under limits). */
+const LEVEL_BATCH = 100;
+/** Read path: target rows per parallel id slice (two pages) and maximum concurrent slices. */
+const ROWS_PER_SLICE = 2 * PAGE_SIZE;
+const MAX_SLICES = 12;
+export interface IdSlice { from?: number; to?: number }
+/** Disjoint half-open id ranges covering every integer; the first and last are open-ended. */
+export function idSlices(min: number, max: number, rowsPerSlice = ROWS_PER_SLICE, maxSlices = MAX_SLICES): IdSlice[] {
+  if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || min > max) throw new Error('invalid_id_bounds');
+  const count = Math.min(maxSlices, Math.max(1, Math.ceil((max - min + 1) / rowsPerSlice)));
+  if (count === 1) return [{}];
+  const width = Math.ceil((max - min + 1) / count);
+  return Array.from({ length: count }, (_, index) => ({
+    ...(index > 0 ? { from: min + index * width } : {}),
+    ...(index < count - 1 ? { to: min + (index + 1) * width } : {}),
+  }));
+}
+
 /** Earliest source timestamp only; never reads conversation text or invokes a provider. */
 export async function findInsightHistoryStart(client: ServiceClient, now: Date): Promise<Date | undefined> {
   const { data, error } = await client.from('scripts').select('created_at')
@@ -134,7 +152,99 @@ export function createSupabaseInsightRepository(
       cursor = next;
     }
   };
+  // ---- Read-path accelerators (live report and student questions only) ----
+  // One bounded id snapshot shared by sources and stored insights. The outer slices
+  // are open-ended, so rows inserted after the bounds query are still reached.
+  let boundsPromise: Promise<{ min: number; max: number } | null> | undefined;
+  const sourceIdBounds = () => boundsPromise ??= (async () => {
+    const base = () => client.from('scripts').select('id').gte('created_at', windowStart).lt('created_at', windowEnd);
+    const [low, high] = await Promise.all([
+      base().order('id', { ascending: true }).limit(1).maybeSingle(),
+      base().order('id', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    assertNoDbError(low.error); assertNoDbError(high.error);
+    const min = record(low.data)?.id, max = record(high.data)?.id;
+    if (low.data === null || high.data === null) return null;
+    if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || (min as number) > (max as number)) throw new Error('invalid_source_bounds');
+    return { min: min as number, max: max as number };
+  })();
+  const readSlices = async () => {
+    const bounds = await sourceIdBounds();
+    return bounds ? idSlices(bounds.min, bounds.max) : [{}];
+  };
+  /** Keyset by integer id inside one slice; no database value is interpolated into filter strings. */
+  async function readSlice<T>(slice: IdSlice, idColumn: string, build: () => any, parse: (row: unknown) => T | null, label: string): Promise<T[]> {
+    const rows: T[] = [];
+    let last: number | undefined;
+    while (true) {
+      let query = build();
+      if (slice.from !== undefined) query = query.gte(idColumn, slice.from);
+      if (slice.to !== undefined) query = query.lt(idColumn, slice.to);
+      if (last !== undefined) query = query.gt(idColumn, last);
+      const { data, error } = await query.order(idColumn, { ascending: true }).limit(PAGE_SIZE);
+      assertNoDbError(error);
+      if (!Array.isArray(data)) throw new Error(`invalid_${label}_page`);
+      for (const row of data) { const parsed = parse(row); if (parsed !== null) rows.push(parsed); }
+      if (data.length < PAGE_SIZE) return rows;
+      const next = record(data[data.length - 1])?.[idColumn];
+      if (typeof next !== 'number' || !Number.isSafeInteger(next) || (last !== undefined && next <= last)) throw new Error(`invalid_${label}_cursor`);
+      last = next;
+    }
+  }
+  const readExtensions = {
+    async listSourcesForRead(): Promise<SourceMessage[]> {
+      const slices = await readSlices();
+      const parts = await Promise.all(slices.map(slice => readSlice(slice, 'id',
+        () => client.from('scripts').select(SOURCE_COLUMNS).gte('created_at', windowStart).lt('created_at', windowEnd), parseSource, 'source')));
+      return parts.flat().sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id);
+    },
+    async listActiveInsightsForRead(): Promise<StoredInsight[]> {
+      const slices = await readSlices();
+      const parts = await Promise.all(slices.map(slice => readSlice(slice, 'script_id',
+        () => client.from('script_insights').select(INSIGHT_COLUMNS)
+          .eq('status', 'classified').gte('source_created_at', windowStart).lt('source_created_at', windowEnd)
+          .eq('taxonomy_version', TAXONOMY_VERSION).eq('classifier_version', `${model}.${CLASSIFIER_VERSION}`), parseInsight, 'insight')));
+      return parts.flat();
+    },
+    async listFailedJobsForRead(): Promise<InsightJob[]> {
+      const all: InsightJob[] = [];
+      let cursor: string | undefined;
+      while (true) {
+        let query = client.from('insight_jobs')
+          .select('job_key,script_id,user_id,source_hash,status,attempts,next_attempt_at,locked_until,lock_token,error_code')
+          .eq('status', 'failed').gte('created_at', windowStart).lt('created_at', windowEnd)
+          .order('job_key', { ascending: true });
+        if (cursor !== undefined) query = query.gt('job_key', cursor);
+        const { data, error } = await query.limit(PAGE_SIZE);
+        assertNoDbError(error);
+        if (!Array.isArray(data)) throw new Error('invalid_job_page');
+        all.push(...data.map(parseJob));
+        if (data.length < PAGE_SIZE) return all;
+        const next = record(data[data.length - 1])?.job_key;
+        if (typeof next !== 'string' || next === cursor) throw new Error('invalid_job_cursor');
+        cursor = next;
+      }
+    },
+    async currentUserLevels(userIds: readonly string[]): Promise<Map<string, SourceMessage['userLevel']>> {
+      const unique = Array.from(new Set(userIds));
+      const levels = new Map<string, SourceMessage['userLevel']>(unique.map(id => [id, null]));
+      const chunks: string[][] = [];
+      for (let offset = 0; offset < unique.length; offset += LEVEL_BATCH) chunks.push(unique.slice(offset, offset + LEVEL_BATCH));
+      await Promise.all(chunks.map(async chunk => {
+        // Only id and level: never name, e-mail or phone.
+        const { data, error } = await client.from('users').select('id,nivel').in('id', chunk);
+        assertNoDbError(error);
+        if (!Array.isArray(data)) throw new Error('invalid_level_page');
+        for (const row of data) {
+          const item = record(row);
+          if (item && typeof item.id === 'string' && levels.has(item.id)) levels.set(item.id, item.nivel === 'user' || item.nivel === 'admin' ? item.nivel : null);
+        }
+      }));
+      return levels;
+    },
+  };
   return {
+    ...readExtensions,
     listSources: fetchSources,
     async currentUserLevel(userId) {
       const { data, error } = await client.from('users').select('nivel').eq('id', userId).maybeSingle();

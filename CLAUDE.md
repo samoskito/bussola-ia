@@ -464,3 +464,11 @@ Branch `feat/mcp-claude-code-perguntas` (base origin/main 334fe2f). Sem push, de
 - `buildLiveReport` refatorado em `openLiveInsightSource` + `deriveSourceStatus` (mesma regra de status).
 - Escopo mantido `insights:read` (CHECK no banco; grants existentes seguem válidos). Consentimento e guia atualizados.
 - Publicar: deploy + `INSIGHTS_MCP_QUESTIONS_ENABLED=true` + atualizar catálogo de ferramentas nas plataformas. Homologação real pendente.
+
+## Velocidade MCP/Insights e exportações — 21/10/2026 (branch perf/mcp-insights-velocidade, sem deploy)
+
+- Leitura ao vivo (`openLiveInsightSource.load`) usa aceleradores opcionais do repositório Supabase: fontes e classificações em fatias paralelas por id (`idSlices`, até 12), sem segunda varredura de fontes (hash revalidado em `deriveSourceStatus`), só jobs `failed`, níveis de usuário em lotes `in(id)` de 100. Processor/backfill continuam no caminho sequencial original. Sem migration.
+- Medição local somente leitura (mesmos totais): resumo 30d 272→22 requisições; todo histórico 561→49; list_student_questions all 562→50.
+- `get_topic_examples`: filtra needsReview antes do limite (preenche até `limit`), inclui `questionId`/`createdAt`, resumos sem máscara (decisão do dono; admins). Gate `INSIGHTS_MCP_EXAMPLES_ENABLED` mantido.
+- Exportação do painel: link de download persistente (Chrome bloqueia o 2º download automático pós-fetch); nomes/headers via `src/lib/insights/export-files.ts`. Nova `GET /api/insights/questions-export` (admin atual, live, `INSIGHTS_MCP_QUESTIONS_ENABLED`, pseudônimos do MCP, sem nome/e-mail/telefone, limite 4 MB → 413).
+- `users.cargo`: 0 de 1.686 usuários comuns preenchidos (21/10/2026).

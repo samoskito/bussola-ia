@@ -26,7 +26,8 @@ export interface InsightTopic extends TopicDefinition {
   messages: number; distinctUsers: number; distinctChats: number; sharePercent: number; trendPercent: number | null;
 }
 export interface InsightExample {
-  id: string; topicId: string; agentType: AgentType; demand: string;
+  /** questionId is the source script id, readable in full via get_student_question (admins only). */
+  id: string; questionId: number; topicId: string; agentType: AgentType; demand: string;
   kind: MessageKind; confidence: number; needsReview: boolean; createdAt: string;
 }
 export interface InsightReport {

@@ -24,9 +24,9 @@ function setup(overrides = {}) {
       if (!state.authenticated || request.headers.get('authorization') !== 'Bearer synthetic-test-token' || state.role !== 'admin' || state.revoked) throw new Error('denied');
     },
     authError: () => Response.json({ error: 'invalid_token' }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer resource_metadata="https://insights.example/.well-known/oauth-protected-resource/api/insights-mcp"' } }),
-    readReport: async (filters, now) => {
-      state.reads.push({ filters, now });
-      return buildInsightReport(filters, now, fixtures, { mode: 'live', processing: { provider: 'openai', state: 'ready', scheduleLabel: 'prepared', lastProcessedAt: clock().toISOString() } });
+    readReport: async (filters, now, examples) => {
+      state.reads.push({ filters, now, ...(examples ? { examples } : {}) });
+      return buildInsightReport(filters, now, overrides.fixtures ?? fixtures, { mode: 'live', examples, processing: { provider: 'openai', state: 'ready', scheduleLabel: 'prepared', lastProcessedAt: clock().toISOString() } });
     }, ...overrides };
   return { state, handler: createInsightsMcpHandler(deps) };
 }
@@ -86,16 +86,36 @@ test('live stateless SDK handshake, five strict read-only tools (question tools 
     }
   });
 });
-test('separate opt-in examples project only minimized derived fields and exclude review cases', async () => {
-  await withClient(async client => {
+test('separate opt-in examples project derived fields with questionId, unmasked for admins, and exclude review cases', async () => {
+  await withClient(async (client, state) => {
     const data = payload(await client.callTool({ name: 'get_topic_examples', arguments: { topicId: 'feedback' } }));
     assert.equal(data.examples.length, 1);
-    assert.deepEqual(Object.keys(data.examples[0]).sort(), ['agentType', 'confidence', 'demand', 'kind', 'needsReview', 'topicId']);
-    assert.equal(data.examples[0].demand, 'Preparar feedback para [EMAIL].');
+    assert.deepEqual(Object.keys(data.examples[0]).sort(), ['agentType', 'confidence', 'createdAt', 'demand', 'kind', 'needsReview', 'questionId', 'topicId']);
+    assert.equal(data.examples[0].questionId, base.id, 'questionId leads to get_student_question');
+    assert.equal(data.examples[0].demand, 'Preparar feedback para person@example.com.', 'admin-only summaries are no longer masked (product decision)');
+    assert.ok(!JSON.stringify(data).includes('RAW-INPUT-PRIVATE') && !JSON.stringify(data).includes('REVIEW-PRIVATE'));
+    assert.ok(!JSON.stringify(data).includes('ADMIN-PRIVATE') && !JSON.stringify(data).includes('UNKNOWN-PRIVATE'));
+    assert.ok(!JSON.stringify(data).includes('CUSTOMER-ID-PRIVATE') && !JSON.stringify(data).includes('CHAT-ID-PRIVATE'));
     assert.equal(data.availability, 'automated_summaries');
     assert.match(data.examplesNotice, /sem confirmação de revisão humana/);
-    assert.match(data.dataNotice, /não garante anonimato/);
+    assert.match(data.dataNotice, /questionId/);
+    assert.deepEqual(state.reads.at(-1).examples, { limit: 5, excludeNeedsReview: true });
   }, { examplesEnabled: () => true });
+});
+test('examples fill the requested limit even when the newest rows need review', async () => {
+  const many = [
+    ...Array.from({ length: 15 }, (_, i) => ({ ...base, id: 100 + i, createdAt: `2026-10-15T1${String(i % 10)}:${String(10 + i)}:00Z`,
+      classification: { ...base.classification, normalizedDemand: `REVIEW-${i}`, needsReview: true } })),
+    ...Array.from({ length: 10 }, (_, i) => ({ ...base, id: 200 + i, createdAt: `2026-10-1${i % 5}T08:00:0${i % 10}Z`,
+      classification: { ...base.classification, normalizedDemand: `OK-${i}` } })),
+  ];
+  await withClient(async client => {
+    const data = payload(await client.callTool({ name: 'get_topic_examples', arguments: { topicId: 'feedback', limit: 8 } }));
+    assert.equal(data.examples.length, 8);
+    assert.ok(data.examples.every(example => example.needsReview === false && example.demand.startsWith('OK-')));
+    const all = payload(await client.callTool({ name: 'get_topic_examples', arguments: { topicId: 'feedback', limit: 12 } }));
+    assert.equal(all.examples.length, 10, 'every non-review example available, not 12 minus review rows');
+  }, { examplesEnabled: () => true, fixtures: many });
 });
 test('SDK rejects invalid filters, arbitrary queries, URLs and unregistered tools before reading', async () => {
   await withClient(async (client, state) => {

@@ -7,9 +7,17 @@ import type { InsightFilters, InsightReport } from './types';
 const round = (value: number) => Math.round(value * 10) / 10;
 const distinct = (rows: DemoMessage[], key: 'userId' | 'chatId') => new Set(rows.map(row => row[key])).size;
 
+export const REPORT_EXAMPLE_LIMIT = 12;
+export interface ExampleOptions {
+  /** Maximum examples returned (default 12). */
+  limit?: number;
+  /** Drop rows flagged for human review BEFORE applying the limit, so callers get up to `limit`. */
+  excludeNeedsReview?: boolean;
+}
 export interface ReportMetadata {
   mode: 'demo' | 'live';
   processing: InsightReport['processing'];
+  examples?: ExampleOptions;
 }
 
 export function buildInsightReport(filters: InsightFilters, now: Date, fixtures: DemoMessage[], metadata: ReportMetadata): InsightReport {
@@ -66,9 +74,10 @@ export function buildInsightReport(filters: InsightFilters, now: Date, fixtures:
       const rows = visibleEligible.filter(row => row.agentType === agent.type);
       return { agentType: agent.type, messages: rows.length, distinctUsers: distinct(rows, 'userId'), distinctChats: distinct(rows, 'chatId') };
     }),
-    examples: visibleClassified.filter(row => row.classification!.topicIds.length > 0)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id - b.id).slice(0, 12).map((row, index) => ({
-        id: `example-${index + 1}`, topicId: filters.topicId || row.classification!.topicIds[0], agentType: row.agentType,
+    examples: visibleClassified.filter(row => row.classification!.topicIds.length > 0 &&
+        !(metadata.examples?.excludeNeedsReview && row.classification!.needsReview))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id - b.id).slice(0, metadata.examples?.limit ?? REPORT_EXAMPLE_LIMIT).map((row, index) => ({
+        id: `example-${index + 1}`, questionId: row.id, topicId: filters.topicId || row.classification!.topicIds[0], agentType: row.agentType,
         demand: row.classification!.normalizedDemand, kind: row.classification!.kind,
         confidence: row.classification!.confidence, needsReview: row.classification!.needsReview, createdAt: row.createdAt,
       })),

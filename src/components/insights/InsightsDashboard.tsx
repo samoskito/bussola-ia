@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { AGENTS, getAgentLabel } from '@/lib/agents';
 import type { InsightAgentFilter, InsightPeriod, InsightReport, MessageKind } from '@/lib/insights/types';
+import { EXPORT_CONTENT_TYPES, exportFileName, type ExportFormat, type ExportKind } from '@/lib/insights/export-files';
+
+class ExportFailure extends Error {}
 
 const number = (value: number) => value.toLocaleString('pt-BR');
 const date = (value: string) => new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00-03:00` : value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -24,6 +27,7 @@ export default function InsightsDashboard() {
   const [knownMode, setKnownMode] = useState<InsightReport['mode'] | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [prepared, setPrepared] = useState<{ url: string; name: string } | null>(null);
   const exportRequest = useRef<AbortController | null>(null);
 
   useEffect(() => () => exportRequest.current?.abort(), []);
@@ -58,29 +62,44 @@ export default function InsightsDashboard() {
     return () => controller.abort();
   }, [days, agentType, topicId, retry]);
 
-  async function download(format: 'csv' | 'json') {
+  // A prepared file stays available as a real link until the filters change. The
+  // automatic click happens after an async fetch, outside the user's gesture: Chrome
+  // allows the first such download per page but silently holds later ones behind its
+  // "multiple downloads" permission (the JSON-after-CSV case of 19/10). Clicking the
+  // link is a fresh gesture and always works.
+  const releasePrepared = () => setPrepared(current => { if (current) URL.revokeObjectURL(current.url); return null; });
+  useEffect(() => releasePrepared, [days, agentType, topicId]);
+
+  async function download(kind: ExportKind, format: ExportFormat) {
     exportRequest.current?.abort();
     const controller = new AbortController();
     exportRequest.current = controller;
     setExporting(true);
     setExportError('');
+    releasePrepared();
     const query = new URLSearchParams({ days: String(days), agentType, format });
     if (topicId) query.set('topicId', topicId);
     try {
-      const response = await fetch(`/api/insights/export?${query}`, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
-      if (!response.ok) throw new Error('export_unavailable');
+      const endpoint = kind === 'perguntas' ? '/api/insights/questions-export' : '/api/insights/export';
+      const response = await fetch(`${endpoint}?${query}`, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+      if (!response.ok) {
+        const message = await response.json().then(body => typeof body?.error === 'string' ? body.error : '', () => '');
+        throw new ExportFailure(message);
+      }
       const blob = await response.blob();
       if (controller.signal.aborted) return;
-      const url = URL.createObjectURL(blob);
+      const name = exportFileName({ kind, mode: report?.mode ?? 'live', days, agentType, format });
+      const url = URL.createObjectURL(new Blob([blob], { type: blob.type || EXPORT_CONTENT_TYPES[format] }));
+      setPrepared({ url, name });
       const link = document.createElement('a');
       link.href = url;
-      link.download = `insights-${report?.mode === 'demo' ? 'demonstracao-' : ''}${days === 'all' ? 'todo-historico' : `${days}dias`}.${format}`;
+      link.download = name;
+      link.rel = 'noopener';
       document.body.appendChild(link);
       link.click();
       link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      if (!controller.signal.aborted) setExportError('A exportação não foi concluída. Tente novamente.');
+    } catch (error) {
+      if (!controller.signal.aborted) setExportError(error instanceof ExportFailure && error.message ? error.message : 'A exportação não foi concluída. Tente novamente.');
     } finally {
       if (!controller.signal.aborted) setExporting(false);
     }
@@ -119,11 +138,17 @@ export default function InsightsDashboard() {
           </select>
         </label>
         <div className="flex gap-2 sm:col-span-2 xl:ml-auto">
-          <button onClick={() => void download('csv')} disabled={state !== 'ready' || exporting} className={`${control} flex-1 hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40 xl:flex-none`}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>
-          <button onClick={() => void download('json')} disabled={state !== 'ready' || exporting} className={`${control} flex-1 hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40 xl:flex-none`}>JSON</button>
+          <button onClick={() => void download('insights', 'csv')} disabled={state !== 'ready' || exporting} className={`${control} flex-1 hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40 xl:flex-none`}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>
+          <button onClick={() => void download('insights', 'json')} disabled={state !== 'ready' || exporting} className={`${control} flex-1 hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40 xl:flex-none`}>JSON</button>
         </div>
+        {report?.mode === 'live' && <div className="flex flex-wrap items-center gap-2 sm:col-span-2 xl:basis-full xl:justify-end">
+          <span className="text-xs text-gray-400">Perguntas completas dos alunos (sem nome, e-mail ou telefone):</span>
+          <button onClick={() => void download('perguntas', 'csv')} disabled={state !== 'ready' || exporting} className={`${control} hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40`}>Perguntas CSV</button>
+          <button onClick={() => void download('perguntas', 'json')} disabled={state !== 'ready' || exporting} className={`${control} hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40`}>Perguntas JSON</button>
+        </div>}
       </div>
       {exportError && <p role="alert" className="text-sm text-red-300">{exportError}</p>}
+      {prepared && <p role="status" className="text-sm text-gray-300">Arquivo pronto: <a href={prepared.url} download={prepared.name} className="text-orange-300 underline hover:text-orange-200">baixar {prepared.name}</a>. Se o download não começou automaticamente, clique no link.</p>}
 
       {state !== 'ready' && <StatePanel state={state} retry={() => setRetry(value => value + 1)} />}
 
@@ -174,7 +199,7 @@ export default function InsightsDashboard() {
               {topicId && <button onClick={() => setTopicId('')} className={control}>Limpar filtro de tema</button>}
             </div>
             {topicId && <p className="mt-4 text-sm text-orange-300">Tema: {report.topics.find(topic => topic.id === topicId)?.label ?? topicId}</p>}
-            <div className="mt-5 grid gap-3 md:grid-cols-2">{report.examples.map(example => <article key={example.id} className="rounded-md border border-gray-800 bg-gray-900/50 p-4"><div className="flex flex-wrap justify-between gap-2 text-[11px] text-gray-400"><span>{getAgentLabel(example.agentType)}</span><span>{kindLabels[example.kind]}</span></div><p className="mt-3 text-sm leading-6 text-gray-200">{example.demand}</p><p className="mt-3 text-xs text-gray-500">{date(example.createdAt)} · {example.needsReview ? 'Requer revisão humana' : `Confiança: ${Math.round(example.confidence * 100)}%`}</p></article>)}</div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">{report.examples.map(example => <article key={example.id} className="rounded-md border border-gray-800 bg-gray-900/50 p-4"><div className="flex flex-wrap justify-between gap-2 text-[11px] text-gray-400"><span>{getAgentLabel(example.agentType)}</span><span>{kindLabels[example.kind]}</span></div><p className="mt-3 text-sm leading-6 text-gray-200">{example.demand}</p><p className="mt-3 text-xs text-gray-500">{date(example.createdAt)}{report.mode === 'live' ? ` · pergunta #${example.questionId}` : ''} · {example.needsReview ? 'Requer revisão humana' : `Confiança: ${Math.round(example.confidence * 100)}%`}</p></article>)}</div>
             {report.examples.length === 0 && <p className="mt-5 text-sm text-gray-400">Nenhum exemplo disponível para este filtro.</p>}
           </section>
         </>}

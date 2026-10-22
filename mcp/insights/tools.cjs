@@ -80,7 +80,7 @@ function registerDemoTools(server, { now = () => new Date() } = {}) {
   register('get_topic_examples', 'Consulte até 12 exemplos sintéticos normalizados, sem texto bruto, identificadores de usuários ou conversas. Use topicId para selecionar um tema da taxonomia.',
     z.object({ ...filterShape, limit: z.number().int().min(1).max(12).default(5) }).strict(), output({ examples: z.array(exampleSchema) }), input => {
       const { report } = getReport(input);
-      return { ...metadata(report), examples: report.examples.slice(0, input.limit) };
+      return { ...metadata(report), examples: report.examples.slice(0, input.limit).map(({ questionId: _questionId, ...example }) => example) };
     });
   register('compare_insight_periods', 'Compare o período simulado selecionado com o período anterior de igual duração. Ambos usam o mesmo conjunto sintético e relógio capturado; variação percentual é null quando a base anterior é zero. Mensagens por tema são multirrótulo, não demandas únicas.',
     z.object(filterShape).strict(), output({ current: snapshotSchema, previous: snapshotSchema, changes: z.array(changeSchema) }), input => {

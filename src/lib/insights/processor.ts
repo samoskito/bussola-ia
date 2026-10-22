@@ -34,6 +34,17 @@ export interface InsightRepository {
   listJobs(): Promise<InsightJob[]>;
   /** Read-only rejection snapshot, independent of source-window job creation dates. */
   listRejectedSources?(): Promise<Array<{ sourceId: number; userId: string }>>;
+  /* Optional read-path accelerators used only by the live report/question reads
+   * (never by the processor). Results are equivalent snapshots of the methods above;
+   * callers still derive status with fresh hashes and current user levels. */
+  /** Same rows as listSources(), fetched in parallel id slices, sorted by (createdAt, id). */
+  listSourcesForRead?(): Promise<SourceMessage[]>;
+  /** Stored classifications NOT re-verified against sources: the caller must verify hashes. */
+  listActiveInsightsForRead?(): Promise<StoredInsight[]>;
+  /** Only jobs with status 'failed' (the only status consumers of the read path inspect). */
+  listFailedJobsForRead?(): Promise<InsightJob[]>;
+  /** Current levels for many users in batched requests; missing users map to null. */
+  currentUserLevels?(userIds: readonly string[]): Promise<Map<string, SourceMessage['userLevel']>>;
 }
 
 export interface InMemoryInsightRepository extends InsightRepository {

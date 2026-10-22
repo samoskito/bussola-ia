@@ -113,8 +113,9 @@ export interface QuestionSelection {
   excludedAdminMessages: number;
 }
 /** Pure selection over rows that already carry current user levels and derived status. */
-export function selectStudentQuestions(rows: readonly DemoMessage[], query: StudentQuestionQuery, range: QuestionRange,
-  isInitial: (row: DemoMessage) => boolean): QuestionSelection {
+/** Matching rows (newest first) plus the in-scope rows used for admin-exclusion counts. Shared by list and export. */
+export function matchStudentQuestions(rows: readonly DemoMessage[], query: Omit<StudentQuestionQuery, 'limit' | 'cursor'>, range: QuestionRange,
+  isInitial: (row: DemoMessage) => boolean): { matches: DemoMessage[]; inScope: DemoMessage[] } {
   const start = range.start.getTime(), end = range.end.getTime();
   const inScope = rows.filter(row => {
     const time = Date.parse(row.createdAt);
@@ -125,6 +126,13 @@ export function selectStudentQuestions(rows: readonly DemoMessage[], query: Stud
     (!query.topicId || Boolean(row.status === 'classified' && row.classification?.topicIds.includes(query.topicId))) &&
     (query.status === 'all' || statusOf(row) === query.status) && (!query.onlyInitial || isInitial(row)))
     .sort((a, b) => -byTimeAsc(a, b));
+  return { matches, inScope };
+}
+
+export function selectStudentQuestions(rows: readonly DemoMessage[], query: StudentQuestionQuery, range: QuestionRange,
+  isInitial: (row: DemoMessage) => boolean): QuestionSelection {
+  const start = range.start.getTime(), end = range.end.getTime();
+  const { matches, inScope } = matchStudentQuestions(rows, query, range, isInitial);
   const key = filterKey(query);
   let remaining = matches;
   if (query.cursor) {
@@ -190,12 +198,14 @@ async function chatsWithEarlierMessages(source: LiveSource, chatIds: string[], b
 async function currentStudents(source: LiveSource, userIds: string[]): Promise<Map<string, { role: string | null }>> {
   const students = new Map<string, { role: string | null }>();
   const unique = Array.from(new Set(userIds));
-  for (let offset = 0; offset < unique.length; offset += 50) {
+  const chunks: string[][] = [];
+  for (let offset = 0; offset < unique.length; offset += 100) chunks.push(unique.slice(offset, offset + 100));
+  await Promise.all(chunks.map(async chunk => {
     // Deliberately selects only level and role (cargo): never name, e-mail or phone.
-    const { data, error } = await source.client.from('users').select('id,nivel,cargo').in('id', unique.slice(offset, offset + 50));
+    const { data, error } = await source.client.from('users').select('id,nivel,cargo').in('id', chunk);
     if (error || !Array.isArray(data)) throw new Error('insights_repository_error');
     for (const row of data) if (row && typeof row.id === 'string' && row.nivel === 'user') students.set(row.id, { role: normalizeRole(row.cargo) });
-  }
+  }));
   return students;
 }
 
@@ -290,4 +300,52 @@ export async function getLiveStudentQuestion(input: { questionId: number; offset
     question: projectStudentQuestion({ ...current, ...status }, { initial: first?.id === row.id, role: student.role, pseudonyms, text: chunk, truncated: next !== null }),
     offset: input.offset, nextOffset: next,
   };
+}
+
+/* ---------------- Admin panel export (same rules as list_student_questions) ---------------- */
+
+/** Response bodies above ~4.5 MB fail on the hosting platform; refuse clearly before that. */
+export const QUESTION_EXPORT_MAX_BYTES = 4_000_000;
+export interface QuestionExportFilters { days: InsightPeriod; agentType: 'all' | AgentType; topicId?: string }
+
+/** Every matching question with its FULL text, newest first. Same eligibility as the
+ * MCP list: current non-admin accounts only, role re-read, no name/e-mail/phone. */
+export async function exportLiveStudentQuestions(filters: QuestionExportFilters, now: Date, pseudonymSecret: string) {
+  const pseudonyms = createPseudonymizer(pseudonymSecret);
+  const { openLiveInsightSource } = await import('./service');
+  const source = await openLiveInsightSource(now);
+  const historyStart = await source.historyStart();
+  const query = { days: filters.days, agentType: filters.agentType, ...(filters.topicId ? { topicId: filters.topicId } : {}), onlyInitial: false, status: 'all' as const };
+  const range = resolveQuestionRange(query, now, historyStart);
+  const { rows } = await source.load(range.loadStart, true);
+  const firstLoaded = firstLoadedByChat(rows);
+  const complete = !historyStart || range.loadStart.getTime() <= historyStart.getTime();
+  const candidate = (row: DemoMessage) => firstLoaded.get(row.chatId) === row.id;
+  const { matches, inScope } = matchStudentQuestions(rows, query, range, () => true);
+  const earlier = complete ? new Set<string>() : await chatsWithEarlierMessages(source, matches.filter(candidate).map(row => row.chatId), range.loadStart);
+  const students = await currentStudents(source, matches.map(row => row.userId));
+  const questions = matches.filter(row => students.has(row.userId)).map(row => projectStudentQuestion(row, {
+    initial: candidate(row) && !earlier.has(row.chatId), role: students.get(row.userId)!.role, pseudonyms, text: row.input.trim(), truncated: false }));
+  return {
+    mode: 'live' as const, generatedAt: now.toISOString(),
+    window: { start: range.start.toISOString(), end: range.end.toISOString(), timezone: 'America/Sao_Paulo' as const },
+    filters: { days: filters.days, agentType: filters.agentType, ...(filters.topicId ? { topicId: filters.topicId } : {}) },
+    totals: { questions: questions.length, distinctPeople: new Set(questions.map(item => item.personId)).size,
+      distinctConversations: new Set(questions.map(item => item.conversationId)).size,
+      excludedAdminMessages: inScope.filter(row => row.userLevel === 'admin').length },
+    dataNotice: QUESTIONS_DATA_NOTICE,
+    questions,
+  };
+}
+
+export type QuestionExport = Awaited<ReturnType<typeof exportLiveStudentQuestions>>;
+
+/** CSV with spreadsheet-formula neutralization (same csvCell as the report export). */
+export function questionsToCsv(data: QuestionExport, cell: (value: unknown) => string): string {
+  const header = ['question_id', 'criada_em_utc', 'criada_em_sao_paulo', 'agente', 'pessoa', 'conversa', 'posicao', 'cargo', 'status',
+    'temas', 'tipo', 'resumo_classificacao', 'requer_revisao', 'tamanho_texto', 'texto'];
+  const lines = [header, ...data.questions.map(item => [item.questionId, item.createdAt, item.createdAtLocal, item.agentType, item.personId,
+    item.conversationId, item.position, item.studentRole ?? '', item.status, item.topics.map(topic => topic.id).join('|'), item.messageKind ?? '',
+    item.classificationSummary ?? '', item.needsReview === null ? '' : item.needsReview ? 'sim' : 'nao', item.textLength, item.text])];
+  return '﻿' + lines.map(line => line.map(cell).join(',')).join('\r\n') + '\r\n';
 }

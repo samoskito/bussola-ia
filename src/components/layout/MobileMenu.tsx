@@ -140,6 +140,12 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, chats }) => {
               Usuários e acessos
             </Link>
           )}
+          {user?.nivel === 'admin' && (
+            <Link href="/dashboard/hotmart" onClick={onClose} aria-current={isActive('/dashboard/hotmart') ? 'page' : undefined} className={`flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium ${isActive('/dashboard/hotmart') ? 'bg-[#FF6B00]/10 text-orange-300' : 'text-gray-300 hover:bg-gray-800'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400`}>
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M3 7h18l-2 12H5L3 7Zm5 0V5a4 4 0 0 1 8 0v2" /></svg>
+              Hotmart
+            </Link>
+          )}
           {AGENTS.map((agent) => {
             const href = `/dashboard/agent/${agent.type}`;
             const isLocked = !isAgentAvailableForUser(agent.type, user?.nivel);

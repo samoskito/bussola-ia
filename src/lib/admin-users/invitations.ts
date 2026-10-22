@@ -41,7 +41,8 @@ function requireLiveWrites(env: Environment): void {
   requireAdminUsersWrites(env);
 }
 
-function appOrigin(env: Environment): string {
+/** Exportado para convites do ator de sistema Hotmart (mesma origem fixa). */
+export function appOrigin(env: Environment): string {
   let app: URL;
   try { app = new URL(env.ADMIN_USERS_APP_URL || ''); }
   catch { return fail(503, 'app_url_missing', 'URL pública do aplicativo não configurada.'); }

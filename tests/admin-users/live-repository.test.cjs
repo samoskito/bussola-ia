@@ -118,11 +118,19 @@ test('queries use actor-scoped read RPCs and strict pagination, never direct tab
   await repo.audit(userId, actor);
   assert.deepEqual(client.calls[0], { name: 'admin_users_read', args: { p_actor: actor, p_user_id: null, p_filters: { q: 'pessoa', agentType: 'postagem', status: 'active', page: 2, pageSize: 20 } } });
   assert.equal(client.calls[1].name, 'admin_users_read');
-  assert.equal(client.calls[2].name, 'admin_users_audit_read');
+  // v2 (migration Hotmart) identifica o ator de sistema na auditoria.
+  assert.equal(client.calls[2].name, 'admin_users_audit_read_v2');
   for (const input of [{ page: 0 }, { page: 1.5 }, { pageSize: 101 }, { status: 'invalid' }, { agentType: 'unknown' }, { password: true }]) {
     await assert.rejects(repo.list(input, actor), error => error.status === 400);
   }
   assert.equal(client.calls.length, 3);
+  // Sem a migration Hotmart (função v2 ausente), volta à leitura v1.
+  const legacy = fakeClient((name) => name === 'admin_users_audit_read_v2' ? { data: null, error: { code: 'PGRST202', message: 'function not found' } } : { data: [], error: null });
+  assert.deepEqual(await createLiveAdminUsersRepository(legacy).audit(userId, actor), []);
+  assert.deepEqual(legacy.calls.map(c => c.name), ['admin_users_audit_read_v2', 'admin_users_audit_read']);
+  const forbidden = fakeClient({ data: null, error: { code: 'P0001', message: 'admin_users:forbidden' } });
+  await assert.rejects(createLiveAdminUsersRepository(forbidden).audit(userId, actor), error => error.status === 403);
+  assert.equal(forbidden.calls.length, 1, 'erro de autorização não cai no fallback');
 }));
 
 test('storage error mapping reports safe conflicts and hides database diagnostics', () => withLive(async () => {

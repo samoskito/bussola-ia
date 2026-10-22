@@ -7,7 +7,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import MobileMenu from '@/components/layout/MobileMenu';
 
-export default function AdminUsersShell({ children, mode = 'demo' }: { children: React.ReactNode; mode?: 'demo' | 'live' }) {
+export default function AdminUsersShell({ children, mode = 'demo', title = 'Usuários e acessos', notice }: { children: React.ReactNode; mode?: 'demo' | 'live'; title?: string; notice?: string }) {
   const { user, loading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   if (loading) return <div role="status" className="flex min-h-screen w-full items-center justify-center bg-gray-950 text-gray-300">Verificando acesso…</div>;
@@ -16,8 +16,8 @@ export default function AdminUsersShell({ children, mode = 'demo' }: { children:
     <div className="hidden w-64 shrink-0 lg:flex xl:w-72"><Sidebar /></div>
     <MobileMenu isOpen={menuOpen} onClose={() => setMenuOpen(false)} chats={[]} />
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <Header userName={user?.nome || user?.email || 'Administrador'} title="Usuários e acessos" onMenuToggle={() => setMenuOpen(v => !v)} />
-      <div className="shrink-0 border-b border-orange-400/25 bg-orange-500/10 px-5 py-3 text-xs leading-relaxed text-orange-200" role="status"><strong className="mr-2 tracking-widest">{mode === 'demo' ? 'DEMO LOCAL' : 'ADMINISTRAÇÃO'}</strong>{mode === 'demo' ? 'Dados fictícios em memória · nenhum e-mail real enviado · nenhuma alteração em produção.' : 'Alterações de cadastro e acesso exigem revisão. Convites são emitidos somente após sua confirmação.'}</div>
+      <Header userName={user?.nome || user?.email || 'Administrador'} title={title} onMenuToggle={() => setMenuOpen(v => !v)} />
+      <div className="shrink-0 border-b border-orange-400/25 bg-orange-500/10 px-5 py-3 text-xs leading-relaxed text-orange-200" role="status"><strong className="mr-2 tracking-widest">{mode === 'demo' ? 'DEMO LOCAL' : 'ADMINISTRAÇÃO'}</strong>{mode === 'demo' ? 'Dados fictícios em memória · nenhum e-mail real enviado · nenhuma alteração em produção.' : notice ?? 'Alterações de cadastro e acesso exigem revisão. Convites são emitidos somente após sua confirmação.'}</div>
       <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
     </div>
   </div>;

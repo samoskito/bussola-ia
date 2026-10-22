@@ -128,7 +128,12 @@ export function createLiveAdminUsersRepository(providedClient?: AdminUsersRpcCli
       return rpc('admin_users_mutate', { p_actor: actor, p_operation: 'access', p_user_id: id, p_expected_revision: expectedRevision, p_input: data, p_password_hash: null });
     },
     async audit(id: string, actor: string): Promise<AdminUserAudit[]> {
-      readGate(); return rpc('admin_users_audit_read', { p_actor: uuid(actor), p_user_id: uuid(id) });
+      readGate();
+      const args = { p_actor: uuid(actor), p_user_id: uuid(id) };
+      // v2 (migration Hotmart) identifica o ator de sistema; sem ela, usa v1.
+      try { return await rpc<AdminUserAudit[]>('admin_users_audit_read_v2', args); }
+      catch (error) { if (!(error instanceof AdminUsersError) || error.code !== 'admin_users_storage_unavailable') throw error; }
+      return rpc('admin_users_audit_read', args);
     },
   };
 }

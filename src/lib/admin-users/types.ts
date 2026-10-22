@@ -26,7 +26,8 @@ export interface AdminUserAudit {
   id: string;
   userId: string;
   actor: string;
-  action: 'created' | 'profile_updated' | 'access_updated' | 'invite_generated' | 'invite_simulated_sent' | 'invite_sent' | 'invite_send_failed' | 'password_defined' | 'demo_password_confirmed';
+  action: 'created' | 'profile_updated' | 'access_updated' | 'invite_generated' | 'invite_simulated_sent' | 'invite_sent' | 'invite_send_failed' | 'password_defined' | 'demo_password_confirmed'
+    | 'hotmart_user_created' | 'hotmart_event_applied' | 'hotmart_review_accepted' | 'hotmart_review_kept' | 'hotmart_review_dismissed';
   reason: string;
   createdAt: string;
   changes: Record<string, unknown>;

@@ -472,3 +472,14 @@ Branch `feat/mcp-claude-code-perguntas` (base origin/main 334fe2f). Sem push, de
 - `get_topic_examples`: filtra needsReview antes do limite (preenche até `limit`), inclui `questionId`/`createdAt`, resumos sem máscara (decisão do dono; admins). Gate `INSIGHTS_MCP_EXAMPLES_ENABLED` mantido.
 - Exportação do painel: link de download persistente (Chrome bloqueia o 2º download automático pós-fetch); nomes/headers via `src/lib/insights/export-files.ts`. Nova `GET /api/insights/questions-export` (admin atual, live, `INSIGHTS_MCP_QUESTIONS_ENABLED`, pseudônimos do MCP, sem nome/e-mail/telefone, limite 4 MB → 413).
 - `users.cargo`: 0 de 1.686 usuários comuns preenchidos (21/10/2026).
+
+## Hotmart direta — preparada em 22/10/2026 (branch `feat/hotmart-direta`, NÃO publicada)
+
+Substitui só o fluxo comercial Hotmart → n8n → banco; webhooks n8n das IAs e contrato n8n intactos. Plano completo, regras, máquina de estados e roteiro: `docs/plans/2026-10-22-hotmart-direta.md`.
+
+- Webhook `POST /api/hotmart/webhook` (hottok em tempo constante, registro idempotente por id e transação+evento, 200 rápido, processamento via `after`). `HOTMART_WEBHOOK_MODE=off|shadow|live` (padrão off; shadow só grava o plano).
+- Motor puro `src/lib/hotmart/rules.ts`; SQL atômico com revisão otimista em `supabase/migrations/20261022000001_hotmart_direct.sql` (NÃO aplicada; aplicar manualmente, sem `db push`). Tabelas `hotmart_offers|events|purchases|access_state|reviews`; origem manual × Hotmart por `hotmart_access_state` sem mudar `user_agent_access`; acesso efetivo = max(base manual, concessões Hotmart ativas). Acesso manual nunca é reduzido sem revisão do admin.
+- Tela admin `/dashboard/hotmart` (exige painel live; papel admin revalidado): sincroniza catálogo via API (`HOTMART_CLIENT_ID/SECRET/BASIC`, `HOTMART_ENV`), mapeia ofertas, lista eventos ("faria"/feito) e revisões.
+- Ator de sistema na auditoria: `actor_id NULL` + `changes.actor='system:hotmart'`; leitura `admin_users_audit_read_v2` com fallback v1. Convite só para usuário criado pela compra, via convites do painel.
+- Não guarda hottok, credenciais, CPF, endereço ou payload (só campos mínimos + SHA-256).
+- Testes: `npm run test:hotmart` (36) e `npm run test:hotmart:postgres` (PostgreSQL 16 descartável). Endpoint de planos da API e alguns campos não confirmados na documentação: validar no sandbox. Ativação: backup → migration → deploy off → credenciais → sincronizar/mapear → 2ª URL de webhook → shadow vs n8n → desligar só vendas do n8n → live.

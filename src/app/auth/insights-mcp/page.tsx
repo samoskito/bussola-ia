@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import ConsentForm from './ConsentForm';
 import { CONSENT_COOKIE, readConsent, requireMcpSessionAdmin } from '@/lib/insights-mcp/oauth-server';
 
 export const dynamic = 'force-dynamic';
@@ -42,11 +43,7 @@ export default async function InsightsMcpConsentPage() {
       </ul>
       <p className="text-sm text-gray-400">Os dados consultados, inclusive o texto das perguntas dos alunos, serão enviados ao aplicativo conectado. Esse texto não é anonimizado e pode conter informações que o próprio aluno digitou; nome, e-mail e telefone do cadastro não são enviados, e mensagens de administradores ficam de fora. O conector não altera contas ou acessos e não inicia classificações.</p>
       <p className="text-sm text-gray-400">A permissão depende de sua conta continuar administradora. Você pode desconectar o aplicativo e solicitar a revogação na Bússola.</p>
-      <form action="/api/insights-mcp/oauth/authorize" method="post" className="flex flex-wrap gap-3">
-        <input type="hidden" name="csrf" value={nonce} />
-        <button type="submit" name="decision" value="approve" className="rounded-lg bg-orange-500 px-5 py-3 font-semibold text-black hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-300">Autorizar somente leitura</button>
-        <button type="submit" name="decision" value="deny" className="rounded-lg border border-gray-600 px-5 py-3 hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">Cancelar</button>
-      </form>
+      <ConsentForm nonce={nonce} />
     </section>
   </main>;
 }

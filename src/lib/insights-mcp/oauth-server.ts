@@ -67,15 +67,24 @@ async function readForm(request:Request) {
   if (reader) for (;;) { const next=await reader.read();if(next.done)break;size+=next.value.byteLength;if(size>16384){await reader.cancel();throw new OAuthError(413,'invalid_request');}chunks.push(next.value); }
   const params=new URLSearchParams(Buffer.concat(chunks).toString());uniqueParams(params);return params;
 }
+const usedHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Autorização já utilizada — Bússola IA</title></head><body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:#030712;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif"><main style="max-width:32rem;border:1px solid #1f2937;border-radius:16px;background:#111827;padding:32px"><p style="margin:0 0 8px;font-size:14px;font-weight:500;color:#fb923c">Bússola IA · Insights</p><h1 style="margin:0 0 16px;font-size:24px;font-weight:600">Esta autorização já foi usada ou expirou</h1><p style="margin:0 0 16px;color:#d1d5db;line-height:1.5">Se a conexão já apareceu no aplicativo (Claude, Claude Code ou ChatGPT), não é preciso fazer mais nada: você pode fechar esta página.</p><p style="margin:0;color:#d1d5db;line-height:1.5">Caso contrário, volte ao Claude, Claude Code ou ChatGPT e inicie a conexão novamente.</p></main></body></html>`;
+// Somente para o POST do consentimento: nonce ja consumido ou cookie ausente/expirado/invalido.
+function consentUsedResponse(): Response {
+  return new Response(usedHtml, { status: 409, headers: {
+    ...headers, 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY',
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    'Set-Cookie': `${CONSENT_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+  } });
+}
 export async function authorizePost(request:Request):Promise<Response> {
   try {
     const config=getOAuthConfig();if(request.headers.get('origin')!==config.issuer)throw new OAuthError(403,'access_denied');
-    const userId=await requireMcpSessionAdmin();const cookieStore=await cookies();const consent=readConsent(cookieStore.get(CONSENT_COOKIE)?.value,userId);
+    const userId=await requireMcpSessionAdmin();const cookieStore=await cookies();let consent:AuthorizationConsent;try{consent=readConsent(cookieStore.get(CONSENT_COOKIE)?.value,userId);}catch(error){if(error instanceof OAuthError&&error.status===400&&error.code==='invalid_request')return consentUsedResponse();throw error;}
     const form=await readForm(request);if(!equalSecret(form.get('csrf')||'',consent.nonce))throw new OAuthError(403,'access_denied');
     const decision=form.get('decision');if(decision!=='approve' && decision!=='deny')throw new OAuthError(400,'invalid_request');
     const code=randomCredential();const r=consent.request;
     const result=await dbMutation(decision==='approve'?'authorize':'deny',{nonce_hash:tokenHash(consent.nonce),user_id:userId,grant_id:randomUUID(),client_id:r.clientId,resource:r.resource,redirect_uri:r.redirectUri,challenge:r.codeChallenge,code_hash:tokenHash(code)});
-    if(result===null)throw new OAuthError(400,'invalid_request');
+    if(result===null)return consentUsedResponse();
     const redirect=new URL(r.redirectUri);redirect.searchParams.set('state',r.state);redirect.searchParams.set('iss',config.issuer);redirect.searchParams.set(decision==='approve'?'code':'error',decision==='approve'?code:'access_denied');
     return new Response(null,{status:303,headers:{...headers,Location:redirect.href,'Set-Cookie':`${CONSENT_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`}});
   }catch(error){return mcpAuthErrorResponse(error);}

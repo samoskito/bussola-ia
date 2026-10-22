@@ -24,6 +24,8 @@ export const HOTMART_API = {
   plans: (ucode: string) => `/products/api/v1/products/${encodeURIComponent(ucode)}/plans`,
   pageSize: 50,
   maxPages: 100,
+  /** Produtos sincronizados em paralelo (planos+ofertas por produto), dentro do limite de 500/min. */
+  concurrency: 6,
 } as const;
 
 type Environment = Record<string, string | undefined>;
@@ -122,18 +124,23 @@ export function createHotmartApiClient(options: { env?: Environment; fetch?: Fet
     listPlans: (ucode: string) => listAll(HOTMART_API.plans(ucode), true),
     /** Catálogo achatado: uma linha por (produto, oferta), plano associado quando houver. */
     async catalog(): Promise<HotmartCatalogItem[]> {
-      const result: HotmartCatalogItem[] = [];
-      for (const product of await this.listProducts()) {
-        const ucode = str(product.ucode, 100);
-        if (!ucode) continue;
+      const products = (await this.listProducts()).filter(product => str(product.ucode, 100));
+      const perProduct: HotmartCatalogItem[][] = new Array(products.length);
+      let cursor = 0;
+      const worker = async () => {
+        for (let index = cursor++; index < products.length; index = cursor++) perProduct[index] = await productItems(products[index]);
+      };
+      const productItems = async (product: Obj): Promise<HotmartCatalogItem[]> => {
+        const result: HotmartCatalogItem[] = [];
+        const ucode = str(product.ucode, 100)!;
         const isSubscriptionProduct = product.is_subscription === true || /subscription|assinatura/i.test(String(product.format ?? ''));
-        const plans = await this.listPlans(ucode);
+        const [plans, offers] = await Promise.all([this.listPlans(ucode), this.listOffers(ucode)]);
         const planByOffer = new Map<string, Obj>();
         for (const plan of plans) {
           const offerCode = str(obj(plan.offer)?.code, 100) ?? str(obj(plan.offer)?.key, 100) ?? str(plan.offer_code, 100) ?? str(plan.offer_key, 100);
           if (offerCode) planByOffer.set(offerCode, plan);
         }
-        for (const offer of await this.listOffers(ucode)) {
+        for (const offer of offers) {
           const code = str(offer.code, 100) ?? str(offer.key, 100);
           if (!code) continue;
           const plan = planByOffer.get(code);
@@ -147,8 +154,10 @@ export function createHotmartApiClient(options: { env?: Environment; fetch?: Fet
             apiActive: typeof offer.is_active === 'boolean' ? offer.is_active : typeof product.status === 'string' ? product.status === 'ACTIVE' : null,
           });
         }
-      }
-      return result;
+        return result;
+      };
+      await Promise.all(Array.from({ length: Math.min(HOTMART_API.concurrency, products.length) }, worker));
+      return perProduct.flat();
     },
   };
 }

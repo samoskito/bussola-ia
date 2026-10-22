@@ -8,7 +8,7 @@ import type { AdminUser } from './types';
 export type InvitationRpcClient = {
   rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: any; error: { code?: string; message?: string } | null }>;
 };
-export type FirstAccessMail = { to: string; url: string; expiresAt: string };
+export type FirstAccessMail = { to: string; url: string; expiresAt: string; /** Ex.: "72 horas" (convites de compra Hotmart). Padrão: "uma hora". */ expiresInLabel?: string };
 export type FirstAccessMailer = (mail: FirstAccessMail) => Promise<void>;
 type Environment = Record<string, string | undefined>;
 
@@ -153,7 +153,7 @@ export async function sendFirstAccessEmail(mail: FirstAccessMail, env: Environme
     fail(503, 'invite_mail_config', 'Configuração de e-mail indisponível.');
   }
   const subject = 'Seu primeiro acesso à Bússola IA';
-  const text = `Use este link para definir sua senha de primeiro acesso. Ele expira em uma hora e pode ser usado uma vez:\n\n${mail.url}\n\nSe você não esperava este convite, ignore esta mensagem.`;
+  const text = `Use este link para definir sua senha de primeiro acesso. Ele expira em ${mail.expiresInLabel && /^[0-9]{1,3} horas$/.test(mail.expiresInLabel) ? mail.expiresInLabel : 'uma hora'} e pode ser usado uma vez:\n\n${mail.url}\n\nSe você não esperava este convite, ignore esta mensagem.`;
   if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
     const port = Number(env.SMTP_PORT || '587');
     if (Number.isInteger(port) && port > 0 && port <= 65535) {

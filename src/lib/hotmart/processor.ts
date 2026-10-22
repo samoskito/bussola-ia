@@ -1,10 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { getHotmartGraceDays, HotmartError } from './config';
+import { getHotmartGraceDays, getHotmartInviteTtlHours, HotmartError } from './config';
 import type { HotmartRepository } from './repository';
 import { planHotmartEvent, type HotmartPlan } from './rules';
 
 type Environment = Record<string, string | undefined>;
-export type FirstAccessSender = (mail: { to: string; url: string; expiresAt: string }) => Promise<void>;
+export type FirstAccessSender = (mail: { to: string; url: string; expiresAt: string; expiresInLabel?: string }) => Promise<void>;
 
 export interface ProcessDeps {
   repo: HotmartRepository;
@@ -30,7 +30,8 @@ export async function processHotmartEvent(eventRow: string, deps: ProcessDeps): 
     for (let attempt = 0; attempt < 3 && !committed; attempt++) {
       const context = await repo.context(eventRow);
       plan = planHotmartEvent(context, { graceDays: getHotmartGraceDays(deps.env) });
-      if (plan.createUser) plan.createUser.passwordHash = await deps.hashPassword(randomBytes(48).toString('base64url'));
+      // Shadow nunca cria usuário: não há por que gerar (nem gravar) hash.
+      if (plan.createUser && context.event.mode === 'live') plan.createUser.passwordHash = await deps.hashPassword(randomBytes(48).toString('base64url'));
       const snapshot = context.emailUser ?? context.purchaseUser;
       try {
         committed = await repo.commit(eventRow, snapshot?.revision ?? null, plan);
@@ -47,22 +48,28 @@ export async function processHotmartEvent(eventRow: string, deps: ProcessDeps): 
   if (!committed) { await repo.fail(eventRow, 'revision_conflict').catch(() => undefined); return { status: 'failed', plan }; }
   if (plan?.createUser) delete plan.createUser.passwordHash;
   if (!committed.invite || !committed.userId) return { status: committed.status, plan };
-  if (!deps.invite) return { status: committed.status, plan, invite: 'skipped' };
+  // Comprador criado sem convite ficaria sem acesso e sem aviso: abre revisão.
+  const inviteReview = async (reason: string) => { await repo.openReview(eventRow, committed!.userId!, 'invite_failed', { reason }).catch(() => undefined); };
+  if (!deps.invite) { await inviteReview('email_disabled'); return { status: committed.status, plan, invite: 'skipped' }; }
 
-  // Convite: token aleatório; somente o hash vai ao banco. Link nunca é logado.
+  // Convite de compra: uso único, só hash no banco, link nunca logado. Validade
+  // maior que a do painel (padrão 72 h, HOTMART_INVITE_TTL_HOURS, máx. 168 h)
+  // porque o comprador não está esperando o e-mail como num atendimento.
   const now = (deps.now ?? (() => new Date()))();
+  const ttlHours = getHotmartInviteTtlHours(deps.env);
   const token = randomBytes(32).toString('base64url');
-  const expiresAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(now.getTime() + ttlHours * 60 * 60 * 1000).toISOString();
   let issued: { id: string; email: string };
   let url: string;
   try {
     url = `${deps.invite.origin()}/auth/first-access#token=${token}`;
     issued = await repo.issueInvite(committed.userId, createHash('sha256').update(token).digest('hex'), expiresAt, eventRow);
   } catch {
+    await inviteReview('issue_failed');
     return { status: committed.status, plan, invite: 'failed' };
   }
   try {
-    await deps.invite.send({ to: issued.email, url, expiresAt });
+    await deps.invite.send({ to: issued.email, url, expiresAt, expiresInLabel: `${ttlHours} horas` });
   } catch {
     await repo.inviteDelivery(issued.id, 'failed', eventRow).catch(() => undefined);
     return { status: committed.status, plan, invite: 'failed' };

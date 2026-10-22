@@ -1,4 +1,4 @@
-import { HOTMART_AGENT_TYPES, type HotmartAgentType } from './config';
+import { HOTMART_AGENT_TYPES, HotmartError, type HotmartAgentType } from './config';
 
 /**
  * Motor de regras puro (sem IO). Recebe o contexto lido do banco e devolve o
@@ -29,13 +29,20 @@ export interface ContextEvent {
   recurrenceNumber: number | null; approvedAt: string | null; nextChargeAt: string | null;
   buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; mode: 'shadow' | 'live';
 }
-export interface EventContext { event: ContextEvent; offer: OfferConfig | null; emailUser: UserSnapshot | null; purchaseUser: UserSnapshot | null; today: string }
+export interface RevocationEvent { eventType: string; eventCreatedAt: string; transaction: string | null; purchaseKey: string | null }
+export interface EventContext {
+  event: ContextEvent; offer: OfferConfig | null; emailUser: UserSnapshot | null; purchaseUser: UserSnapshot | null; today: string;
+  /** Reembolsos/chargebacks/protestos já registrados da mesma transação ou compra. */
+  revocations?: RevocationEvent[];
+}
 
 export interface AccessEntry { agentType: HotmartAgentType; enabled: boolean; expiresAt: string | null; state?: { manualEnabled: boolean; manualExpiresAt: string | null } }
 export type ReviewKind = 'unmapped_offer' | 'manual_access_kept' | 'profile_divergence' | 'revocation_without_ledger' | 'stale_event'
   | 'grant_after_revocation' | 'switch_plan' | 'single_canceled' | 'identity_mismatch' | 'admin_buyer' | 'invalid_buyer' | 'invite_failed';
+/** Mudança mínima na compra; aplicada sobre o estado ATUAL e só se a compra não mudou. */
+export interface PurchaseChange { purchaseKey: string; expectedLastEventAt: string; status?: PurchaseStatus; accessUntilCap?: string | null }
 export interface ReviewProposal {
-  purchase?: PurchaseRow;
+  purchaseChange?: PurchaseChange;
   /** IAs cuja base manual é substituída por `baselineCaps` ao aceitar. */
   agents?: HotmartAgentType[];
   baselineCaps?: Partial<Record<HotmartAgentType, AgentValue>>;
@@ -212,7 +219,9 @@ const reducing = new Set<EventClass>(['revoke', 'cancel', 'delay', 'charge_date'
 
 function finish(plan: HotmartPlan): HotmartPlan {
   const writes = !!(plan.createUser || plan.profileFill || plan.purchase || plan.access?.length);
-  plan.outcome = plan.reviews.length ? 'review' : writes ? 'applied' : 'ignored';
+  // Divergência cadastral é informativa: não deixa um evento aplicado "em revisão".
+  const blocking = plan.reviews.some(review => review.kind !== 'profile_divergence');
+  plan.outcome = blocking ? 'review' : writes ? 'applied' : plan.reviews.length ? 'review' : 'ignored';
   return plan;
 }
 
@@ -237,6 +246,7 @@ export function planHotmartEvent(context: EventContext, options: PlanOptions): H
   if (snapshot) plan.userId = snapshot.user.id;
   const grace = offer?.graceDays ?? options.graceDays;
   const eventDate = saoPauloDate(event.eventCreatedAt);
+  const yesterday = addDays(today, -1);
 
   if (kind === 'switch_plan') {
     plan.reviews.push({ kind: 'switch_plan', userId: snapshot?.user.id, details: { subscriberCode: event.subscriberCode, planId: event.planId, planName: event.planName, offerCode: event.offerCode } });
@@ -257,6 +267,16 @@ export function planHotmartEvent(context: EventContext, options: PlanOptions): H
     if (!configured) {
       plan.reviews.push({ kind: 'unmapped_offer', userId: snapshot?.user.id, details: { productUcode: event.productUcode, productName: event.productName, offerCode: event.offerCode, planId: event.planId } });
       plan.summary = 'Oferta não configurada; nenhuma liberação.';
+      return finish(plan);
+    }
+    // Reembolso/chargeback da mesma transação (a qualquer tempo) ou qualquer
+    // redução terminal/protesto posterior a esta liberação: não liberar.
+    const blockers = (context.revocations ?? []).filter(item =>
+      (!!event.transaction && item.transaction === event.transaction && item.eventType !== 'PURCHASE_PROTEST')
+      || instant(item.eventCreatedAt) > instant(event.eventCreatedAt));
+    if (blockers.length) {
+      plan.reviews.push({ kind: 'grant_after_revocation', userId: snapshot?.user.id, details: { purchaseKey: event.purchaseKey, transaction: event.transaction, revocations: blockers.map(item => ({ eventType: item.eventType, eventCreatedAt: item.eventCreatedAt })) } });
+      plan.summary = 'Já existe reembolso/chargeback/protesto para esta compra; liberação exige decisão do admin.';
       return finish(plan);
     }
     if (purchase?.status === 'revoked') {
@@ -280,12 +300,13 @@ export function planHotmartEvent(context: EventContext, options: PlanOptions): H
       let accessUntil: string | null;
       if (accessKind === 'subscription') {
         accessUntil = nextCharge ? addDays(nextCharge, grace)
-          : addDays(maxDate(today, purchase?.accessUntil) ?? today, configured.durationDays ?? 31);
+          : addDays(maxDate(yesterday, purchase?.accessUntil)!, configured.durationDays ?? 31);
         if (purchase?.status === 'active') accessUntil = maxDate(accessUntil, purchase.accessUntil);
       } else {
-        // Renovação estende a partir do maior entre hoje e a validade atual.
+        // Exatamente N dias (datas inclusivas): começando hoje termina em hoje+N-1;
+        // renovação soma N dias após a validade atual (o maior entre as duas).
         const currentDates = agents.map(agent => currentEffective(working, agent)).filter(v => v.enabled && v.expiresAt && v.expiresAt >= today).map(v => v.expiresAt);
-        accessUntil = addDays(maxDate(today, purchase?.status === 'active' ? purchase.accessUntil : null, ...currentDates)!, configured.durationDays!);
+        accessUntil = addDays(maxDate(yesterday, purchase?.status === 'active' ? purchase.accessUntil : null, ...currentDates)!, configured.durationDays!);
       }
       next = {
         purchaseKey: event.purchaseKey ?? `tx:${event.eventId}`, productUcode: configured.productUcode, offerCode: configured.offerCode, offerId: configured.id,
@@ -319,7 +340,7 @@ export function planHotmartEvent(context: EventContext, options: PlanOptions): H
       return finish(plan);
     }
     if (singleCancel) {
-      if (purchase.status === 'active') plan.reviews.push({ kind: 'single_canceled', details: { purchaseKey: purchase.purchaseKey }, proposal: { purchase: { ...base(purchase), status: 'revoked' } } });
+      if (purchase.status === 'active') plan.reviews.push({ kind: 'single_canceled', details: { purchaseKey: purchase.purchaseKey }, proposal: { purchaseChange: { purchaseKey: purchase.purchaseKey, expectedLastEventAt: purchase.lastEventAt, status: 'revoked' } } });
       plan.summary = 'Cancelamento de compra única: revisão.';
       return finish(plan);
     }
@@ -333,10 +354,17 @@ export function planHotmartEvent(context: EventContext, options: PlanOptions): H
     } else {
       const nextCharge = event.nextChargeAt ? saoPauloDate(event.nextChargeAt) : null;
       if (!nextCharge || purchase.status === 'revoked' || purchase.status === 'canceled') { plan.summary = 'Alteração de cobrança sem efeito.'; return finish(plan); }
-      next = { ...base(purchase), nextCharge, accessUntil: addDays(nextCharge, grace) };
+      // Em atraso (sem pagamento) a troca de data nunca estende o acesso.
+      const overdue = purchase.status === 'delayed' || event.subscriptionStatus === 'OVERDUE' || event.subscriptionStatus === 'DELAYED';
+      next = { ...base(purchase), nextCharge, accessUntil: overdue ? minExpiry(purchase.accessUntil, addDays(nextCharge, grace)) : addDays(nextCharge, grace) };
     }
     if (stale) {
-      plan.reviews.push({ kind: 'stale_event', details: { eventType: event.eventType, eventCreatedAt: event.eventCreatedAt, lastEventAt: purchase.lastEventAt }, proposal: { purchase: { ...next, lastEventAt: purchase.lastEventAt, lastEventType: purchase.lastEventType } } });
+      // Guarda só a mudança; o aceite recalcula sobre o estado atual da compra.
+      const change: PurchaseChange = { purchaseKey: purchase.purchaseKey, expectedLastEventAt: purchase.lastEventAt };
+      if (next.status !== purchase.status) change.status = next.status;
+      if (next.accessUntil !== purchase.accessUntil) change.accessUntilCap = next.accessUntil;
+      plan.reviews.push({ kind: 'stale_event', details: { eventType: event.eventType, eventCreatedAt: event.eventCreatedAt, lastEventAt: purchase.lastEventAt },
+        ...(kind !== 'charge_date' && (change.status || change.accessUntilCap !== undefined) ? { proposal: { purchaseChange: change } } : {}) });
       plan.summary = 'Evento de redução fora de ordem; revisão antes de aplicar.';
       return finish(plan);
     }
@@ -372,9 +400,23 @@ export function planReviewAcceptance(proposal: ReviewProposal | null | undefined
   if (!proposal) return null;
   const changes: { access?: AccessEntry[]; convertToPersonal?: boolean; profileSet?: { nome?: string; telefone?: string }; purchase?: PurchaseRow } = {};
   if (proposal.profileSet) changes.profileSet = proposal.profileSet;
-  const purchases = proposal.purchase ? [...snapshot.purchases.filter(p => p.purchaseKey !== proposal.purchase!.purchaseKey), proposal.purchase] : snapshot.purchases;
-  if (proposal.purchase) changes.purchase = proposal.purchase;
-  if ((proposal.agents?.length || proposal.purchase) && snapshot.user.nivel !== 'admin') {
+  let purchases = snapshot.purchases;
+  if (proposal.purchaseChange) {
+    const change = proposal.purchaseChange;
+    const current = snapshot.purchases.find(p => p.purchaseKey === change.purchaseKey);
+    // Revisão antiga nunca sobrescreve uma compra que evoluiu depois dela.
+    if (!current || instant(current.lastEventAt) !== instant(change.expectedLastEventAt)) {
+      throw new HotmartError(409, 'review_outdated', 'A compra mudou desde que esta revisão foi criada. Reprocesse o evento ou descarte a revisão.');
+    }
+    const updated: PurchaseRow = {
+      ...current,
+      status: current.status === 'revoked' ? 'revoked' : change.status ?? current.status,
+      accessUntil: change.accessUntilCap !== undefined ? minExpiry(current.accessUntil, change.accessUntilCap) : current.accessUntil,
+    };
+    purchases = [...snapshot.purchases.filter(p => p.purchaseKey !== current.purchaseKey), updated];
+    changes.purchase = updated;
+  }
+  if ((proposal.agents?.length || proposal.purchaseChange) && snapshot.user.nivel !== 'admin') {
     const overrides: Partial<Record<HotmartAgentType, AgentValue>> = {};
     for (const agent of proposal.agents ?? []) overrides[agent] = proposal.baselineCaps?.[agent] ?? NONE;
     const result = materialize(snapshot, purchases, overrides);

@@ -15,7 +15,7 @@ type EventRow = {
   result: Record<string, unknown> | null;
 };
 type Review = { id: string; kind: string; status: string; userEmail: string | null; eventType: string | null; details: Record<string, unknown>; proposal: Record<string, unknown> | null; createdAt: string };
-type Summary = { mode: 'off' | 'shadow' | 'live'; environment: string; credentials: boolean; hottok: boolean; summary: { offers: number; unconfiguredOffers: number; openReviews: number; events: Record<string, number> | null; lastEventAt: string | null } };
+type Summary = { mode: 'off' | 'shadow' | 'live'; environment: string; credentials: boolean; hottok: boolean; summary: { offers: number; unconfiguredOffers: number; openReviews: number; events: Record<string, number> | null; lastEventAt: string | null; stuckEvents?: number } };
 
 const button = 'rounded-lg border border-gray-700 px-3 py-2 text-sm transition hover:border-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400 disabled:cursor-not-allowed disabled:opacity-40';
 const primary = `${button} border-orange-500 bg-orange-500 font-semibold text-gray-950 hover:bg-orange-400`;
@@ -101,6 +101,7 @@ export default function HotmartDashboard() {
     finally { setBusy(false); }
   }
   const sync = () => run(async () => { const r = await api<{ synced: number; environment: string }>('/sync', 'POST', {}); return `${r.synced} oferta(s) sincronizadas (${r.environment}).`; });
+  const reprocessStuck = () => run(async () => { const r = await api<{ pending: number; processed: number }>('/reprocess', 'POST', {}); return `${r.processed} de ${r.pending} evento(s) parado(s) reprocessado(s).`; });
   const reprocess = (id: string) => run(async () => { const r = await api<{ status: string }>(`/events/${id}`, 'POST', {}); return `Evento reprocessado: ${statusLabel[r.status] ?? r.status}.`; });
   const resolve = (id: string, decision: 'accept' | 'keep' | 'dismiss') => run(async () => {
     const note = (notes[id] ?? '').trim();
@@ -120,6 +121,7 @@ export default function HotmartDashboard() {
       ].map(([label, value]) => <div key={label} className="rounded-lg border border-gray-800 bg-gray-900/60 p-3"><p className="text-xs uppercase tracking-wider text-gray-500">{label}</p><p className="mt-1 text-sm text-white">{value}</p></div>)}
     </section>
     {summary && !summary.hottok && summary.mode !== 'off' && <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">HOTMART_HOTTOK ausente: o webhook recusará todos os eventos.</p>}
+    {!!s?.stuckEvents && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-500/40 bg-orange-500/10 p-3 text-sm text-orange-200"><span>{s.stuckEvents} evento(s) parado(s) há mais de 10 minutos (recebidos, com falha ou com processamento interrompido). A recuperação automática roda diariamente.</span><button type="button" className={button} disabled={busy} onClick={reprocessStuck}>Reprocessar parados</button></div>}
     {notice && <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{notice}</p>}
     {error && <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
 

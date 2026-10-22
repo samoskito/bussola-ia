@@ -6,7 +6,7 @@ const { processHotmartEvent } = load('processor');
 const { HotmartError } = load('config');
 
 function fakeRepo({ ctx, commitResults = [], claim = { claimed: true } } = {}) {
-  const calls = { commit: [], fail: [], invite: [], delivery: [], contexts: 0 };
+  const calls = { commit: [], fail: [], invite: [], delivery: [], contexts: 0, reviews: [] };
   return {
     calls,
     repo: {
@@ -21,6 +21,8 @@ function fakeRepo({ ctx, commitResults = [], claim = { claimed: true } } = {}) {
       fail: async (id, code) => calls.fail.push(code),
       issueInvite: async (userId, hash, expiresAt) => { calls.invite.push({ userId, hash }); return { id: 'inv-1', email: 'comprador@example.invalid', expiresAt }; },
       inviteDelivery: async (id, status) => calls.delivery.push(status),
+      openReview: async (eventRow, userId, kind, details) => calls.reviews.push({ userId, kind, details }),
+      issueInviteFails: false,
     },
   };
 }
@@ -41,12 +43,24 @@ test('live: comprador novo é criado com hash bcrypt desconhecido e recebe convi
   assert.deepEqual(calls.delivery, ['sent']);
 });
 
+test('convite de compra vale 72 h por padrão (configurável até 168 h) e o e-mail informa a validade', async () => {
+  const now = new Date('2026-10-22T12:00:00.000Z');
+  for (const [env, hours] of [[{}, 72], [{ HOTMART_INVITE_TTL_HOURS: '24' }, 24], [{ HOTMART_INVITE_TTL_HOURS: '999' }, 72]]) {
+    const sent = [];
+    const { repo } = fakeRepo({ ctx: context(), commitResults: [{ status: 'applied', userId: USER, invite: true }] });
+    await processHotmartEvent('row-1', deps(repo, { env, now: () => now, invite: { origin: () => 'https://x.invalid', send: async mail => sent.push(mail) } }));
+    assert.equal(sent[0].expiresAt, new Date(now.getTime() + hours * 3600000).toISOString());
+    assert.equal(sent[0].expiresInLabel, `${hours} horas`);
+  }
+});
+
 test('shadow: o SQL não pede convite, então nenhum e-mail é enviado', async () => {
   const sent = [];
   const { repo, calls } = fakeRepo({ ctx: context({ event: { mode: 'shadow' } }), commitResults: [{ status: 'shadow_planned', userId: null, invite: false }] });
   const result = await processHotmartEvent('row-1', deps(repo, { invite: { origin: () => 'https://x.invalid', send: async mail => sent.push(mail) } }));
   assert.equal(result.status, 'shadow_planned');
   assert.equal(calls.commit[0].plan.createUser.email, 'comprador@example.invalid', 'o plano "o que faria" é registrado');
+  assert.equal(calls.commit[0].plan.createUser.passwordHash, undefined, 'shadow não gera hash');
   assert.deepEqual([sent.length, calls.invite.length], [0, 0]);
 });
 
@@ -76,4 +90,9 @@ test('falha no envio do convite é registrada (gera revisão no SQL) sem desfaze
   assert.deepEqual([result.status, result.invite, calls.delivery[0]], ['applied', 'failed', 'failed']);
   const noMail = fakeRepo({ ctx: context(), commitResults: [{ status: 'applied', userId: USER, invite: true }] });
   assert.equal((await processHotmartEvent('row-1', deps(noMail.repo, { invite: null }))).invite, 'skipped');
+  assert.deepEqual(noMail.calls.reviews, [{ userId: USER, kind: 'invite_failed', details: { reason: 'email_disabled' } }], 'convite pulado abre revisão');
+  const issueFails = fakeRepo({ ctx: context(), commitResults: [{ status: 'applied', userId: USER, invite: true }] });
+  issueFails.repo.issueInvite = async () => { throw new Error('rpc'); };
+  assert.equal((await processHotmartEvent('row-1', deps(issueFails.repo, { invite: { origin: () => 'https://x.invalid', send: async () => undefined } }))).invite, 'failed');
+  assert.deepEqual(issueFails.calls.reviews.map(r => r.details.reason), ['issue_failed']);
 });

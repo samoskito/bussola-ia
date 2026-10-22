@@ -100,8 +100,11 @@ CREATE TABLE public.hotmart_events (
   processed_at timestamptz,
   user_id uuid REFERENCES public.users(id) ON DELETE SET NULL
 );
--- Segunda chave de idempotência: a mesma transação/evento chega com outro id.
-CREATE UNIQUE INDEX hotmart_events_transaction_event_uidx ON public.hotmart_events(transaction, event_type) WHERE transaction IS NOT NULL;
+-- Idempotência principal: event_id. Segunda chave: mesma transação + evento
+-- + corpo idêntico (reenvio com outro id). Mesmo tipo com corpo diferente
+-- (ex.: aprovação após protesto resolvido) é processado pelas regras de não regredir.
+CREATE UNIQUE INDEX hotmart_events_transaction_event_body_uidx ON public.hotmart_events(transaction, event_type, body_sha256) WHERE transaction IS NOT NULL;
+CREATE INDEX hotmart_events_transaction_idx ON public.hotmart_events(transaction) WHERE transaction IS NOT NULL;
 CREATE INDEX hotmart_events_received_idx ON public.hotmart_events(received_at DESC, id);
 CREATE INDEX hotmart_events_status_idx ON public.hotmart_events(status, received_at);
 CREATE INDEX hotmart_events_purchase_idx ON public.hotmart_events(purchase_key, event_created_at);
@@ -218,7 +221,7 @@ BEGIN
   END IF;
   SELECT id, status INTO v_existing FROM public.hotmart_events
     WHERE event_id = p_event->>'eventId'
-       OR (p_event->>'transaction' IS NOT NULL AND transaction = p_event->>'transaction' AND event_type = p_event->>'eventType')
+       OR (p_event->>'transaction' IS NOT NULL AND transaction = p_event->>'transaction' AND event_type = p_event->>'eventType' AND body_sha256 = p_event->>'bodySha256')
     ORDER BY received_at LIMIT 1;
   IF v_existing.id IS NULL THEN RAISE EXCEPTION USING MESSAGE = 'hotmart:ingest_conflict', ERRCODE = '40001'; END IF;
   RETURN jsonb_build_object('id', v_existing.id, 'duplicate', true, 'status', v_existing.status);
@@ -331,12 +334,21 @@ BEGIN
     'offer', public.hotmart_offer_json(v_offer),
     'emailUser', CASE WHEN v_email_user IS NULL THEN NULL ELSE public.hotmart_user_snapshot(v_email_user) END,
     'purchaseUser', v_purchase_user,
+    -- Reembolso/chargeback/protesto da mesma transação ou compra recebidos
+    -- antes (inclusive fora de ordem): a liberação não pode ignorá-los.
+    'revocations', COALESCE((SELECT jsonb_agg(jsonb_build_object('eventType', r.event_type, 'eventCreatedAt', r.event_created_at,
+        'transaction', r.transaction, 'purchaseKey', r.purchase_key) ORDER BY r.event_created_at)
+      FROM public.hotmart_events r
+      WHERE r.id <> v_event.id AND r.event_type IN ('PURCHASE_REFUNDED', 'PURCHASE_CHARGEBACK', 'PURCHASE_PROTEST')
+        AND ((v_event.transaction IS NOT NULL AND r.transaction = v_event.transaction)
+          OR (v_event.purchase_key IS NOT NULL AND r.purchase_key = v_event.purchase_key))), '[]'::jsonb),
     'today', (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date);
 END;
 $$;
 
 -- Aplica mudanças de acesso/cadastro/ledger de um usuário já bloqueado.
--- Interno: chamado apenas por hotmart_commit_event/hotmart_admin_resolve_review.
+-- Interno: chamado apenas por hotmart_commit_event/hotmart_admin_resolve_review
+-- (SECURITY DEFINER do dono). Sem EXECUTE para service_role/anon/authenticated.
 CREATE FUNCTION public.hotmart_apply_user_changes(p_user_id uuid, p_plan jsonb, p_allow_profile_set boolean) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
@@ -428,12 +440,19 @@ BEGIN
 END;
 $$;
 
+-- Interno (mesmo regime de grants de hotmart_apply_user_changes). Divergência
+-- cadastral abre no máximo uma revisão aberta por usuário + campo + valor.
 CREATE FUNCTION public.hotmart_insert_reviews(p_event_row uuid, p_user_id uuid, p_reviews jsonb) RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE v_count integer := 0; v_review jsonb;
 BEGIN
   IF jsonb_typeof(p_reviews) IS DISTINCT FROM 'array' THEN RETURN 0; END IF;
   FOR v_review IN SELECT value FROM jsonb_array_elements(p_reviews) LOOP
+    IF v_review->>'kind' = 'profile_divergence' AND EXISTS (SELECT 1 FROM public.hotmart_reviews x
+        WHERE x.status = 'open' AND x.kind = 'profile_divergence' AND x.user_id = COALESCE((v_review->>'userId')::uuid, p_user_id)
+          AND x.details->>'field' = v_review->'details'->>'field' AND x.details->>'hotmart' = v_review->'details'->>'hotmart') THEN
+      CONTINUE;
+    END IF;
     INSERT INTO public.hotmart_reviews(event_row_id, user_id, kind, details, proposal)
     VALUES (p_event_row, COALESCE((v_review->>'userId')::uuid, p_user_id), v_review->>'kind',
       COALESCE(v_review->'details', '{}'::jsonb), CASE WHEN jsonb_typeof(v_review->'proposal') = 'object' THEN v_review->'proposal' ELSE NULL END);
@@ -469,7 +488,7 @@ BEGIN
   END IF;
 
   IF v_event.mode = 'shadow' THEN
-    UPDATE public.hotmart_events SET status = 'shadow_planned', plan = p_plan, processed_at = clock_timestamp(),
+    UPDATE public.hotmart_events SET status = 'shadow_planned', plan = p_plan #- '{createUser,passwordHash}', processed_at = clock_timestamp(),
       result = jsonb_build_object('mode', 'shadow', 'writes', false)
     WHERE id = p_event_row;
     RETURN jsonb_build_object('status', 'shadow_planned', 'userId', NULL, 'invite', false);
@@ -537,7 +556,7 @@ BEGIN
   PERFORM public.hotmart_assert_service();
   v_now := clock_timestamp();
   IF p_token_hash IS NULL OR p_token_hash !~ '^[0-9a-f]{64}$' OR p_expires_at IS NULL
-     OR p_expires_at <= v_now OR p_expires_at > v_now + interval '1 hour' THEN
+     OR p_expires_at <= v_now OR p_expires_at > v_now + interval '168 hours' THEN
     RAISE EXCEPTION 'invalid invitation request' USING ERRCODE = '22023';
   END IF;
   PERFORM public.admin_users_lock(p_user_id);
@@ -585,6 +604,38 @@ BEGIN
 END;
 $$;
 
+-- Recuperação: eventos parados (função morreu após o 200). Lease = claim com
+-- 'processing' por 5 min; limite de 5 tentativas para falhas.
+CREATE FUNCTION public.hotmart_pending_events(p_older_than_minutes integer, p_max_attempts integer, p_limit integer) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE v_ids jsonb;
+BEGIN
+  PERFORM public.hotmart_assert_service();
+  IF p_older_than_minutes IS NULL OR p_older_than_minutes < 1 OR p_max_attempts IS NULL OR p_max_attempts NOT BETWEEN 1 AND 20
+     OR p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN
+    RAISE EXCEPTION USING MESSAGE = 'hotmart:invalid_input', ERRCODE = '22023';
+  END IF;
+  SELECT COALESCE(jsonb_agg(id ORDER BY received_at), '[]'::jsonb) INTO v_ids FROM (
+    SELECT id, received_at FROM public.hotmart_events
+    WHERE ((status IN ('received', 'failed') AND received_at < clock_timestamp() - make_interval(mins => p_older_than_minutes))
+        OR (status = 'processing' AND claimed_at < clock_timestamp() - interval '5 minutes'))
+      AND attempts < p_max_attempts
+    ORDER BY received_at LIMIT p_limit) e;
+  RETURN v_ids;
+END;
+$$;
+
+-- Revisão avulsa aberta pelo processador (ex.: comprador criado sem convite).
+CREATE FUNCTION public.hotmart_open_review(p_event_row uuid, p_user_id uuid, p_kind text, p_details jsonb) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  PERFORM public.hotmart_assert_service();
+  IF p_kind NOT IN ('invite_failed') THEN RAISE EXCEPTION USING MESSAGE = 'hotmart:invalid_input', ERRCODE = '22023'; END IF;
+  INSERT INTO public.hotmart_reviews(event_row_id, user_id, kind, details)
+  VALUES (p_event_row, p_user_id, p_kind, COALESCE(p_details, '{}'::jsonb));
+END;
+$$;
+
 -- ===================== RPCs administrativas (admin atual) =====================
 
 CREATE FUNCTION public.hotmart_admin_read(p_actor uuid, p_resource text, p_filters jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
@@ -616,7 +667,10 @@ BEGIN
       'unconfiguredOffers', (SELECT count(*) FROM public.hotmart_offers WHERE access_kind IS NULL),
       'openReviews', (SELECT count(*) FROM public.hotmart_reviews WHERE status = 'open'),
       'events', (SELECT jsonb_object_agg(status, n) FROM (SELECT status, count(*) n FROM public.hotmart_events GROUP BY status) s),
-      'lastEventAt', (SELECT max(received_at) FROM public.hotmart_events)) INTO v_result;
+      'lastEventAt', (SELECT max(received_at) FROM public.hotmart_events),
+      'stuckEvents', (SELECT count(*) FROM public.hotmart_events WHERE
+        (status IN ('received', 'failed') AND received_at < clock_timestamp() - interval '10 minutes' AND attempts < 5)
+        OR (status = 'processing' AND claimed_at < clock_timestamp() - interval '5 minutes'))) INTO v_result;
   ELSIF p_resource = 'review' THEN
     SELECT jsonb_build_object('id', r.id, 'eventRowId', r.event_row_id, 'userId', r.user_id, 'kind', r.kind, 'status', r.status,
       'details', r.details, 'proposal', r.proposal, 'user', CASE WHEN r.user_id IS NULL THEN NULL ELSE public.hotmart_user_snapshot(r.user_id) END)
@@ -746,17 +800,22 @@ REVOKE ALL ON FUNCTION
   public.hotmart_commit_event(uuid, text, jsonb), public.hotmart_issue_invite(uuid, text, timestamptz, uuid),
   public.hotmart_invite_delivery(uuid, text, uuid), public.hotmart_admin_read(uuid, text, jsonb),
   public.hotmart_admin_sync_offers(uuid, jsonb), public.hotmart_admin_configure_offer(uuid, uuid, jsonb),
-  public.hotmart_admin_resolve_review(uuid, uuid, text, text, text, jsonb), public.admin_users_audit_read_v2(uuid, uuid)
+  public.hotmart_admin_resolve_review(uuid, uuid, text, text, text, jsonb), public.admin_users_audit_read_v2(uuid, uuid),
+  public.hotmart_pending_events(integer, integer, integer), public.hotmart_open_review(uuid, uuid, text, jsonb)
 FROM PUBLIC, anon, authenticated;
--- Somente pontos de entrada expostos ao service role; helpers internos ficam
--- acessíveis apenas ao dono (SECURITY DEFINER encadeado).
+-- Somente pontos de entrada expostos ao service role. Helpers internos
+-- (hotmart_apply_user_changes, hotmart_insert_reviews, hotmart_user_snapshot,
+-- hotmart_user_revision, hotmart_offer_json, hotmart_assert_service) NÃO recebem
+-- EXECUTE: só funções SECURITY DEFINER do dono os chamam. hotmart_valid_agents
+-- é usado em CHECK e fica executável pelo service role.
 GRANT EXECUTE ON FUNCTION
   public.hotmart_ingest_event(jsonb, text), public.hotmart_claim_event(uuid, boolean), public.hotmart_fail_event(uuid, text),
   public.hotmart_event_context(uuid), public.hotmart_commit_event(uuid, text, jsonb),
   public.hotmart_issue_invite(uuid, text, timestamptz, uuid), public.hotmart_invite_delivery(uuid, text, uuid),
   public.hotmart_admin_read(uuid, text, jsonb), public.hotmart_admin_sync_offers(uuid, jsonb),
   public.hotmart_admin_configure_offer(uuid, uuid, jsonb), public.hotmart_admin_resolve_review(uuid, uuid, text, text, text, jsonb),
-  public.admin_users_audit_read_v2(uuid, uuid)
+  public.admin_users_audit_read_v2(uuid, uuid),
+  public.hotmart_pending_events(integer, integer, integer), public.hotmart_open_review(uuid, uuid, text, jsonb)
 TO service_role;
 GRANT EXECUTE ON FUNCTION public.hotmart_valid_agents(text[]) TO service_role;
 

@@ -86,6 +86,8 @@ const grants = id => qj(`SELECT COALESCE(jsonb_object_agg(agent_type, jsonb_buil
     assert.match(sql("SET ROLE anon; SELECT public.hotmart_ingest_event('{}'::jsonb,'live');", false), /permission denied/);
     assert.match(sql('SET ROLE authenticated; SELECT * FROM public.hotmart_events;', false), /permission denied/);
     assert.match(sql("SET ROLE service_role; SELECT public.hotmart_apply_user_changes(gen_random_uuid(),'{}'::jsonb,true);", false), /permission denied/, 'helper interno não exposto');
+    assert.match(sql("SET ROLE service_role; SELECT public.hotmart_insert_reviews(gen_random_uuid(),NULL,'[]'::jsonb);", false), /permission denied/);
+    assert.match(sql("SET ROLE service_role; SELECT public.hotmart_user_snapshot(gen_random_uuid());", false), /permission denied/);
     assert.equal(sql("SELECT count(*) FROM pg_class WHERE relname LIKE 'hotmart_%' AND relkind='r' AND relrowsecurity;"), '5');
     fail("SELECT public.hotmart_ingest_event('{}'::jsonb,'live');", /hotmart:forbidden|null value|violates/);
     assert.match(sql("SET request.jwt.claim.role='anon'; SET ROLE service_role; SELECT public.hotmart_ingest_event('{}'::jsonb,'live');", false), /hotmart:forbidden/);
@@ -105,7 +107,9 @@ const grants = id => qj(`SELECT COALESCE(jsonb_object_agg(agent_type, jsonb_buil
     const a = ingest(first, 'shadow');
     assert.equal(a.duplicate, false);
     assert.deepEqual(ingest(first, 'shadow'), { ...a, duplicate: true });
-    assert.equal(ingest({ ...first, id: 'outro-id' }, 'shadow').duplicate, true);
+    // Mesma transação+evento com corpo diferente NÃO é descartado (id é a idempotência principal).
+    const sameTx = ingest({ ...first, id: 'outro-id' }, 'shadow');
+    assert.equal(sameTx.duplicate, false);
     assert.doesNotMatch(q('SELECT row_to_json(e)::text FROM hotmart_events e;'), /12345678909|Rua Sigilosa/, 'sem CPF/endereço no banco');
 
     // SHADOW: registra o plano sem escrever em users/grants/ledger.
@@ -113,6 +117,8 @@ const grants = id => qj(`SELECT COALESCE(jsonb_object_agg(agent_type, jsonb_buil
     const shadow = await processRow(a.id);
     assert.equal(shadow.plan.createUser.email, 'novo@example.invalid');
     assert.equal(qj(shadow.statement).status, 'shadow_planned');
+    assert.doesNotMatch(q(`SELECT plan::text FROM hotmart_events WHERE id=${lit(a.id)};`), /passwordHash|\$2[aby]\$/, 'shadow não guarda hash');
+    assert.doesNotMatch(JSON.stringify(qj(`SELECT public.hotmart_admin_read('${admin}','events');`)), /passwordHash/);
     assert.deepEqual(counts(), before, 'shadow não escreve');
     const stored = qj(`SELECT plan FROM hotmart_events WHERE id=${lit(a.id)};`);
     assert.equal(stored.summary, shadow.plan.summary);
@@ -133,6 +139,8 @@ const grants = id => qj(`SELECT COALESCE(jsonb_object_agg(agent_type, jsonb_buil
     // Convite do ator de sistema reaproveita a tabela de convites do painel.
     const invite = qj(`SELECT public.hotmart_issue_invite(${lit(created.userId)}, ${lit('a'.repeat(64))}, now() + interval '50 minutes', ${lit(live.id)});`);
     q(`SELECT public.hotmart_invite_delivery(${lit(invite.id)}, 'sent', ${lit(live.id)});`);
+    // Convite de compra pode valer até 168 h (padrão 72 h no app); além disso é recusado.
+    fail(`SELECT public.hotmart_issue_invite(${lit(created.userId)}, ${lit('d'.repeat(64))}, now() + interval '200 hours', ${lit(live.id)});`, /invalid invitation/);
     assert.deepEqual(qj(`SELECT jsonb_build_object('by',issued_by,'sys',issued_by_system,'st',delivery_status) FROM admin_user_invitations WHERE id=${lit(invite.id)};`), { by: null, sys: 'hotmart', st: 'sent' });
     assert.equal(qj(`SELECT public.admin_users_validate_invite(${lit('a'.repeat(64))});`).valid, true, 'consumo segue o fluxo existente');
     const v2 = qj(`SELECT public.admin_users_audit_read_v2('${admin}', ${lit(created.userId)});`);
@@ -145,20 +153,36 @@ const grants = id => qj(`SELECT COALESCE(jsonb_object_agg(agent_type, jsonb_buil
     // Revisão otimista: estado divergente é recusado.
     fail(exRun.statement.replace(/, '[0-9a-f]{32}', /, ", 'revisao-velha', "), /revision_conflict/);
     q(`UPDATE hotmart_events SET status='processing' WHERE id=${lit(ex.id)};`);
-    assert.equal(qj(exRun.statement).status, 'review');
+    assert.equal(qj(exRun.statement).status, 'applied', 'divergência cadastral não deixa o evento em revisão');
     const exUser = qj(`SELECT to_jsonb(u) FROM users u WHERE id='${existing}';`);
     assert.deepEqual([exUser.nome, exUser.telefone], ['Nome Manual', '11900000000']);
     assert.equal(q(`SELECT kind FROM hotmart_reviews WHERE event_row_id=${lit(ex.id)};`), 'profile_divergence');
-    assert.equal(grants(existing).comunicacao.expiresAt, '2027-10-22');
+    assert.equal(grants(existing).comunicacao.expiresAt, '2027-10-21', 'exatamente 365 dias');
+    // Nova cobrança com o mesmo nome divergente não duplica a revisão.
+    const ex2 = ingest(rawEvent({ email: 'existente@example.invalid', tx: 'HP-EX2', name: 'Outro Nome', created: '2026-10-22T13:00:00Z' }), 'live');
+    assert.equal(qj((await processRow(ex2.id)).statement).status, 'applied');
+    assert.equal(q(`SELECT count(*) FROM hotmart_reviews WHERE user_id='${existing}' AND kind='profile_divergence' AND status='open';`), '1');
 
     // Reembolso: corta o que a Hotmart concedeu.
     const refund = ingest(rawEvent({ type: 'PURCHASE_REFUNDED', email: 'existente@example.invalid', tx: 'HP-EX', created: '2026-10-23T12:00:00Z' }), 'live');
     assert.equal(qj((await processRow(refund.id)).statement).status, 'applied');
-    assert.deepEqual(grants(existing).comunicacao, { enabled: false, expiresAt: null });
+    // A compra HP-EX2 continua ativa: o acesso efetivo é a maior concessão ativa.
     assert.equal(q(`SELECT status FROM hotmart_purchases WHERE purchase_key='tx:HP-EX';`), 'revoked');
-    // Aprovação antiga chegando depois não regride.
+    assert.equal(grants(existing).comunicacao.expiresAt, '2028-10-20');
+    // Aprovação antiga (corpo diferente) chegando depois é processada, mas não regride.
     const late = ingest(rawEvent({ email: 'existente@example.invalid', tx: 'HP-EX', created: '2026-10-21T12:00:00Z', offer: 'off1' }), 'live');
-    assert.equal(late.duplicate, true, 'mesma transação+evento já registrada');
+    assert.equal(late.duplicate, false);
+    const beforeLate = grants(existing);
+    assert.ok(['ignored', 'review'].includes(qj((await processRow(late.id)).statement).status));
+    assert.deepEqual(grants(existing), beforeLate);
+    assert.equal(q(`SELECT status FROM hotmart_purchases WHERE purchase_key='tx:HP-EX';`), 'revoked');
+    // Reembolso que chega ANTES da aprovação (reenvio atrasado): comprador novo não é criado.
+    const pre = ingest(rawEvent({ type: 'PURCHASE_REFUNDED', email: 'pre@example.invalid', tx: 'HP-PRE', created: '2026-10-25T12:00:00Z' }), 'live');
+    assert.equal(qj((await processRow(pre.id)).statement).status, 'ignored');
+    const preApproval = ingest(rawEvent({ email: 'pre@example.invalid', tx: 'HP-PRE', created: '2026-10-22T12:00:00Z' }), 'live');
+    assert.equal(qj((await processRow(preApproval.id)).statement).status, 'review');
+    assert.equal(q("SELECT count(*) FROM users WHERE email='pre@example.invalid';"), '0');
+    assert.equal(q(`SELECT kind FROM hotmart_reviews WHERE event_row_id=${lit(preApproval.id)};`), 'grant_after_revocation');
 
     // Plano global legado: compra converte preservando as outras IAs; reembolso mantém manual e vai para revisão.
     const leg = ingest(rawEvent({ email: 'legado@example.invalid', tx: 'HP-LEG', name: 'Legado n8n', phone: '11 90000-0001' }), 'live');
@@ -189,8 +213,23 @@ const grants = id => qj(`SELECT COALESCE(jsonb_object_agg(agent_type, jsonb_buil
     assert.equal(q(`SELECT source FROM hotmart_offers WHERE offer_code='off-desconhecida';`), 'webhook');
     // Commit sem reserva é recusado.
     fail(`SELECT public.hotmart_commit_event(${lit(um.id)}, NULL, ${json({ outcome: 'ignored', reviews: [] })});`, /not_claimed/);
+    // Recuperação: evento parado aparece em pending e na contagem da tela.
+    const stuck = ingest(rawEvent({ email: 'parado@example.invalid', tx: 'HP-STUCK' }), 'live');
+    q(`UPDATE hotmart_events SET received_at = now() - interval '1 hour' WHERE id=${lit(stuck.id)};`);
+    assert.ok(qj('SELECT public.hotmart_pending_events(10, 5, 20);').includes(stuck.id));
+    q(`UPDATE hotmart_events SET attempts = 5 WHERE id=${lit(stuck.id)};`);
+    assert.ok(!qj('SELECT public.hotmart_pending_events(10, 5, 20);').includes(stuck.id), 'limite de tentativas');
+    q(`UPDATE hotmart_events SET attempts = 1, status='processing', claimed_at = now() - interval '6 minutes' WHERE id=${lit(stuck.id)};`);
+    assert.ok(qj('SELECT public.hotmart_pending_events(10, 5, 20);').includes(stuck.id), 'lease vencido é retomado');
+    assert.equal(qj(`SELECT public.hotmart_claim_event(${lit(stuck.id)});`).claimed, true);
+    assert.ok(!qj('SELECT public.hotmart_pending_events(10, 5, 20);').includes(stuck.id), 'lease ativo não é retomado');
+    q(`UPDATE hotmart_events SET status='received', claimed_at=NULL WHERE id=${lit(stuck.id)};`);
+    fail("SELECT public.hotmart_pending_events(0, 5, 20);", /invalid_input/);
+    q(`SELECT public.hotmart_open_review(${lit(live.id)}, ${lit(created.userId)}, 'invite_failed', '{"reason":"email_disabled"}'::jsonb);`);
+    fail(`SELECT public.hotmart_open_review(${lit(live.id)}, ${lit(created.userId)}, 'unmapped_offer', '{}'::jsonb);`, /invalid_input/);
     const summary = qj(`SELECT public.hotmart_admin_read('${admin}','summary');`);
     assert.ok(summary.openReviews >= 2);
+    assert.ok(summary.stuckEvents >= 1);
     console.log('PostgreSQL isolado: todas as verificações Hotmart passaram');
   } finally {
     if (started) cli(['rm', '-f', name]);

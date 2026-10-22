@@ -23,9 +23,12 @@ test('aprovação nova: cria usuário, libera IAs da oferta pelo prazo e pede co
   assert.equal(p.outcome, 'applied');
   assert.deepEqual(p.createUser, { email: 'comprador@example.invalid', nome: 'Comprador Teste', telefone: '+55 11 90000-0000' });
   assert.equal(p.invite, true);
-  assert.equal(p.purchase.accessUntil, '2027-10-22');
+  // Exatamente 365 dias inclusivos: 22/10/2026 a 21/10/2027.
+  assert.equal(p.purchase.accessUntil, '2027-10-21');
   assert.deepEqual(p.purchase.grantedTransactions, ['HP1']);
-  assert.deepEqual(p.access.map(a => [a.agentType, a.enabled, a.expiresAt]), [['comunicacao', true, '2027-10-22'], ['apresentacao', true, '2027-10-22']]);
+  assert.deepEqual(p.access.map(a => [a.agentType, a.enabled, a.expiresAt]), [['comunicacao', true, '2027-10-21'], ['apresentacao', true, '2027-10-21']]);
+  assert.equal(plan(context({ offer: offer({ durationDays: 1 }) })).purchase.accessUntil, '2026-10-22', '1 dia = só hoje');
+  assert.equal(plan(context({ offer: offer({ durationDays: 30 }) })).purchase.accessUntil, '2026-11-20');
   assert.deepEqual(access(p, 'comunicacao').state, { manualEnabled: false, manualExpiresAt: null });
   assert.equal(p.convertToPersonal, undefined);
 });
@@ -40,7 +43,7 @@ test('renovação: estende a partir do maior entre hoje e a validade atual', () 
   assert.equal(access(p, 'comunicacao').expiresAt, '2028-01-10');
   // Validade vencida não é base: conta a partir de hoje.
   const expired = ownedUser([ownedGrant('comunicacao', '2026-01-01')], [purchase({ accessUntil: '2026-01-01', status: 'active' })]);
-  assert.equal(plan(context({ emailUser: expired })).purchase.accessUntil, '2027-10-22');
+  assert.equal(plan(context({ emailUser: expired })).purchase.accessUntil, '2027-10-21');
 });
 
 test('duplicado da mesma transação (APPROVED → COMPLETE) não estende de novo', () => {
@@ -192,7 +195,7 @@ test('cadastro: preenche só campos vazios e sinaliza divergências', () => {
   const divergent = plan(context({ emailUser: snapshot({ user: { nome: 'Outro Nome', telefone: '(11) 90000-0000' } }) }));
   assert.equal(divergent.profileFill, undefined, 'nunca sobrescreve');
   assert.deepEqual(divergent.reviews.map(r => r.details.field), ['nome'], 'telefone igual após normalização');
-  assert.equal(divergent.outcome, 'review');
+  assert.equal(divergent.outcome, 'applied', 'divergência cadastral não deixa o evento em revisão');
   assert.ok(divergent.purchase, 'acesso segue liberado mesmo com divergência cadastral');
 });
 
@@ -239,4 +242,65 @@ test('eventos sem efeito comercial e troca de plano', () => {
   assert.equal(plan(context({ event: { eventType: 'PURCHASE_EXPIRED' } })).outcome, 'ignored');
   const sw = plan(context({ emailUser: snapshot(), event: { eventType: 'SWITCH_PLAN', subscriberCode: 'S1', purchaseKey: 'sub:S1' } }));
   assert.equal(sw.reviews[0].kind, 'switch_plan');
+});
+
+test('reembolso/chargeback/protesto recebido ANTES da aprovação bloqueia a liberação (novo e existente)', () => {
+  const refund = [{ eventType: 'PURCHASE_REFUNDED', eventCreatedAt: '2026-10-25T12:00:00+00:00', transaction: 'HP1', purchaseKey: 'tx:HP1' }];
+  const fresh = plan({ ...context(), revocations: refund });
+  assert.equal(fresh.outcome, 'review');
+  assert.equal(fresh.reviews[0].kind, 'grant_after_revocation');
+  assert.equal(fresh.createUser, undefined, 'comprador novo não é criado');
+  assert.equal(fresh.purchase, undefined);
+  const existing = plan({ ...context({ emailUser: snapshot() }), revocations: refund });
+  assert.deepEqual([existing.outcome, existing.access, existing.purchase], ['review', undefined, undefined]);
+  // Reembolso da mesma transação bloqueia mesmo com data anterior; chargeback idem.
+  assert.equal(plan({ ...context(), revocations: [{ ...refund[0], eventType: 'PURCHASE_CHARGEBACK', eventCreatedAt: '2026-10-01T00:00:00+00:00' }] }).outcome, 'review');
+  // Protesto posterior bloqueia; protesto anterior (disputa resolvida) não.
+  const protest = { eventType: 'PURCHASE_PROTEST', transaction: 'HP1', purchaseKey: 'tx:HP1' };
+  assert.equal(plan({ ...context(), revocations: [{ ...protest, eventCreatedAt: '2026-10-23T00:00:00+00:00' }] }).outcome, 'review');
+  assert.equal(plan({ ...context(), revocations: [{ ...protest, eventCreatedAt: '2026-10-20T00:00:00+00:00' }] }).outcome, 'applied');
+  // Assinatura: reembolso posterior na mesma chave de compra (outra transação) também bloqueia.
+  const sub = context({ offer: offer({ accessKind: 'subscription' }), event: { purchaseKey: 'sub:S1', subscriberCode: 'S1', transaction: 'HP10' } });
+  assert.equal(plan({ ...sub, revocations: [{ eventType: 'PURCHASE_REFUNDED', eventCreatedAt: '2026-10-24T00:00:00+00:00', transaction: 'HP09', purchaseKey: 'sub:S1' }] }).outcome, 'review');
+});
+
+test('revisões stale_event/single_canceled guardam só a mudança e recusam aceite sobre compra que mudou', () => {
+  const p0 = purchase({ purchaseKey: 'tx:HP1', grantedTransactions: ['HP1'], accessUntil: '2027-10-21', lastEventAt: '2026-10-25T12:00:00+00:00' });
+  const user = ownedUser([ownedGrant('comunicacao', '2027-10-21'), ownedGrant('apresentacao', '2027-10-21')], [p0]);
+  const stale = plan(context({ emailUser: user, event: { eventType: 'PURCHASE_REFUNDED', eventCreatedAt: '2026-10-20T12:00:00.000Z' } }));
+  const proposal = stale.reviews[0].proposal;
+  assert.deepEqual(proposal, { purchaseChange: { purchaseKey: 'tx:HP1', expectedLastEventAt: '2026-10-25T12:00:00+00:00', status: 'revoked' } });
+  // Aceite com a compra inalterada: aplica sobre o estado atual (preserva transações).
+  const accepted = rules.planReviewAcceptance(proposal, user);
+  assert.equal(accepted.purchase.status, 'revoked');
+  assert.deepEqual(accepted.purchase.grantedTransactions, ['HP1']);
+  assert.deepEqual(accepted.access.map(a => [a.agentType, a.enabled]), [['comunicacao', false], ['apresentacao', false]]);
+  // Compra evoluiu depois da revisão: 409 claro, nada é sobrescrito.
+  const evolved = ownedUser([ownedGrant('comunicacao', '2028-10-20')], [{ ...p0, grantedTransactions: ['HP1', 'HP2'], accessUntil: '2028-10-20', lastEventAt: '2026-11-01T12:00:00+00:00' }]);
+  assert.throws(() => rules.planReviewAcceptance(proposal, evolved), { status: 409, code: 'review_outdated' });
+  assert.throws(() => rules.planReviewAcceptance(proposal, snapshot()), { code: 'review_outdated' });
+  // single_canceled também guarda só a mudança.
+  const single = plan(context({ emailUser: ownedUser([], [p0]), event: { eventType: 'PURCHASE_CANCELED', eventCreatedAt: '2026-10-26T12:00:00.000Z' } }));
+  assert.deepEqual(single.reviews[0].proposal, { purchaseChange: { purchaseKey: 'tx:HP1', expectedLastEventAt: '2026-10-25T12:00:00+00:00', status: 'revoked' } });
+  // Cancelamento antigo de assinatura: só o teto de validade, aplicado como mínimo do atual.
+  const s0 = purchase({ purchaseKey: 'sub:S1', kind: 'subscription', accessUntil: '2026-12-25', lastEventAt: '2026-11-22T12:00:00+00:00' });
+  const sUser = ownedUser([ownedGrant('comunicacao', '2026-12-25'), ownedGrant('apresentacao', '2026-12-25')], [s0]);
+  const oldCancel = plan(context({ emailUser: sUser, event: { eventType: 'SUBSCRIPTION_CANCELLATION', purchaseKey: 'sub:S1', subscriberCode: 'S1', transaction: null, nextChargeAt: '2026-12-22T12:00:00.000Z', eventCreatedAt: '2026-11-10T12:00:00.000Z' } }));
+  assert.deepEqual(oldCancel.reviews[0].proposal.purchaseChange, { purchaseKey: 'sub:S1', expectedLastEventAt: '2026-11-22T12:00:00+00:00', status: 'canceled', accessUntilCap: '2026-12-22' });
+  assert.equal(rules.planReviewAcceptance(oldCancel.reviews[0].proposal, sUser).purchase.accessUntil, '2026-12-22');
+});
+
+test('troca de data de cobrança não estende assinatura em atraso', () => {
+  const delayed = purchase({ purchaseKey: 'sub:S1', kind: 'subscription', status: 'delayed', accessUntil: '2026-11-26', nextCharge: '2026-11-22', lastEventAt: '2026-11-23T12:00:00+00:00' });
+  const user = ownedUser([ownedGrant('comunicacao', '2026-11-26'), ownedGrant('apresentacao', '2026-11-26')], [delayed]);
+  const ev = { eventType: 'UPDATE_SUBSCRIPTION_CHARGE_DATE', purchaseKey: 'sub:S1', subscriberCode: 'S1', transaction: null, nextChargeAt: '2026-12-10T12:00:00.000Z', eventCreatedAt: '2026-11-24T12:00:00.000Z' };
+  const p = plan(context({ emailUser: user, event: ev }));
+  assert.equal(p.purchase.accessUntil, '2026-11-26');
+  assert.equal(p.purchase.nextCharge, '2026-12-10');
+  assert.equal(p.access, undefined);
+  // Status OVERDUE no próprio evento também não estende.
+  const active = ownedUser([ownedGrant('comunicacao', '2026-11-25'), ownedGrant('apresentacao', '2026-11-25')], [{ ...delayed, status: 'active', accessUntil: '2026-11-25' }]);
+  assert.equal(plan(context({ emailUser: active, event: { ...ev, subscriptionStatus: 'OVERDUE' } })).purchase.accessUntil, '2026-11-25');
+  // Ativa e em dia: nova data + tolerância.
+  assert.equal(plan(context({ emailUser: active, event: ev })).purchase.accessUntil, '2026-12-13');
 });

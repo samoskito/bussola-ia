@@ -20,6 +20,12 @@ export function getHotmartGraceDays(env: Environment = process.env): number {
   return Number.isInteger(value) && value >= 0 && value <= 60 ? value : 3;
 }
 
+/** Validade do convite de compra (horas). Padrão 72; limite SQL 168. */
+export function getHotmartInviteTtlHours(env: Environment = process.env): number {
+  const value = Number(env.HOTMART_INVITE_TTL_HOURS?.trim() || '72');
+  return Number.isInteger(value) && value >= 1 && value <= 168 ? value : 72;
+}
+
 export function getHotmartApiEnvironment(env: Environment = process.env): 'sandbox' | 'production' {
   return env.HOTMART_ENV?.trim() === 'production' ? 'production' : 'sandbox';
 }
